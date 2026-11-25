@@ -36,13 +36,16 @@
   <data name="ImageSize" xml:space="preserve"><value>{0:N0} × {1:N0} px</value></data>
   <data name="ZoomPercent" xml:space="preserve"><value>{0:0.#}%</value></data>
   <data name="ThumbnailUnreadable" xml:space="preserve"><value>Cannot be read</value></data>
-  <data name="ShowResults" xml:space="preserve"><value>Show _results</value></data>
+  <data name="ShowResults" xml:space="preserve"><value>Show _Results</value></data>
   <data name="HasResultBadge" xml:space="preserve"><value>Result</value></data>
-  <data name="HasResultTip" xml:space="preserve"><value>A result of this image exists</value></data>
+  <data name="HasResultTip" xml:space="preserve"><value>A Result of this image exists</value></data>
   <data name="SettingsMenu" xml:space="preserve"><value>_Settings…</value></data>
   <data name="SettingsTitle" xml:space="preserve"><value>Settings</value></data>
   <data name="LanguageLabel" xml:space="preserve"><value>Language</value></data>
   <data name="LanguageSystem" xml:space="preserve"><value>System language</value></data>
+  <!-- Each language is named in itself, so the same in every language. -->
+  <data name="LanguageEnglish" xml:space="preserve"><value>English</value></data>
+  <data name="LanguageBulgarian" xml:space="preserve"><value>Български</value></data>
   <data name="SaveModeLabel" xml:space="preserve"><value>Saving</value></data>
   <data name="SuffixMode" xml:space="preserve"><value>Suffix mode</value></data>
   <data name="SuffixModeHint" xml:space="preserve"><value>Keep the Original and save the Result beside it under its name plus the Result suffix.</value></data>
@@ -55,4 +58,20 @@
   <data name="Save" xml:space="preserve"><value>Save</value></data>
   <data name="Cancel" xml:space="preserve"><value>Cancel</value></data>
   <data name="SettingsNotSaved" xml:space="preserve"><value>The settings could not be saved to {0}: {1} They apply until you close the app.</value></data>
+  <data name="UnexpectedError" xml:space="preserve"><value>Something went wrong: {0}</value></data>
+  <data name="ToolbarOpenFiles" xml:space="preserve"><value>Open files</value></data>
+  <data name="ToolbarOpenFilesTip" xml:space="preserve"><value>Open screenshot files (Ctrl+O)</value></data>
+  <data name="ToolbarOpenFolder" xml:space="preserve"><value>Open folder</value></data>
+  <data name="ToolbarOpenFolderTip" xml:space="preserve"><value>Open the screenshots in a folder (Ctrl+Shift+O)</value></data>
+  <data name="ToolbarFit" xml:space="preserve"><value>Fit</value></data>
+  <data name="ToolbarFitTip" xml:space="preserve"><value>Fit the image to the window (Ctrl+0)</value></data>
+  <data name="ToolbarActualSize" xml:space="preserve"><value>100%</value></data>
+  <data name="ToolbarActualSizeTip" xml:space="preserve"><value>Show the image at its actual size (Ctrl+1)</value></data>
+  <data name="ToolbarShowResults" xml:space="preserve"><value>Show Results</value></data>
+  <data name="ToolbarShowResultsTip" xml:space="preserve"><value>List the Results beside their Originals</value></data>
+  <data name="ToolbarBackground" xml:space="preserve"><value>Background:</value></data>
+  <data name="ToolbarBackgroundTip" xml:space="preserve"><value>What the viewer shows behind the image</value></data>
+  <data name="ToolbarCheckerboard" xml:space="preserve"><value>Checkerboard</value></data>
+  <data name="ToolbarWhite" xml:space="preserve"><value>White</value></data>
+  <data name="ToolbarDarkGrey" xml:space="preserve"><value>Dark grey</value></data>
 </root>

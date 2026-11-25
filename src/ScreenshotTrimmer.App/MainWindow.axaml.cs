@@ -15,7 +15,6 @@ namespace ScreenshotTrimmer.App;
 
 public partial class MainWindow : Window, IPathPicker
 {
-    private string? _lastFolder;
     private MainWindowViewModel? _viewModel;
     private readonly Dictionary<Control, StripEntry> _shownEntries = [];
 
@@ -64,6 +63,7 @@ public partial class MainWindow : Window, IPathPicker
         _viewModel = new MainWindowViewModel(workspace, this, settings);
         _viewModel.PropertyChanged += OnViewModelPropertyChanged;
         DataContext = _viewModel;
+        Closed += (_, _) => _viewModel.Dispose();
     }
 
     /// <summary>Opens the paths given on the command line, relative to the current folder, like any other open.</summary>
@@ -77,18 +77,25 @@ public partial class MainWindow : Window, IPathPicker
     {
         if (_viewModel is null)
             return;
-        var edited = await new SettingsWindow(_viewModel.Settings).ShowDialog<UserSettings?>(this);
-        if (edited is not null)
-            _viewModel.ApplySettings(edited);
+        try
+        {
+            var edited = await new SettingsWindow(_viewModel.Settings).ShowDialog<UserSettings?>(this);
+            if (edited is not null)
+                _viewModel.ApplySettings(edited);
+        }
+        catch (Exception e)
+        {
+            _viewModel.ReportFailure(e);
+        }
     }
 
-    public async Task<IReadOnlyList<string>> PickFilesAsync()
+    public async Task<IReadOnlyList<string>> PickFilesAsync(string? startFolder)
     {
         var files = await StorageProvider.OpenFilePickerAsync(new FilePickerOpenOptions
         {
             Title = Localizer.Instance["OpenFilesTitle"],
             AllowMultiple = true,
-            SuggestedStartLocation = await LastFolderAsync(),
+            SuggestedStartLocation = await FolderAsync(startFolder),
             FileTypeFilter =
             [
                 new FilePickerFileType(Localizer.Instance["ImagesFilter"])
@@ -99,28 +106,22 @@ public partial class MainWindow : Window, IPathPicker
                 new FilePickerFileType(Localizer.Instance["AllFilesFilter"]) { Patterns = ["*"] },
             ],
         });
-        var paths = LocalPaths(files);
-        if (paths.Count > 0)
-            _lastFolder = Path.GetDirectoryName(paths[0]);
-        return paths;
+        return LocalPaths(files);
     }
 
-    public async Task<IReadOnlyList<string>> PickFolderAsync()
+    public async Task<IReadOnlyList<string>> PickFolderAsync(string? startFolder)
     {
         var folders = await StorageProvider.OpenFolderPickerAsync(new FolderPickerOpenOptions
         {
             Title = Localizer.Instance["OpenFolderTitle"],
             AllowMultiple = false,
-            SuggestedStartLocation = await LastFolderAsync(),
+            SuggestedStartLocation = await FolderAsync(startFolder),
         });
-        var paths = LocalPaths(folders);
-        if (paths.Count > 0)
-            _lastFolder = paths[0];
-        return paths;
+        return LocalPaths(folders);
     }
 
-    private async Task<IStorageFolder?> LastFolderAsync() =>
-        _lastFolder is null ? null : await StorageProvider.TryGetFolderFromPathAsync(_lastFolder);
+    private async Task<IStorageFolder?> FolderAsync(string? path) =>
+        path is null ? null : await StorageProvider.TryGetFolderFromPathAsync(path);
 
     private static List<string> LocalPaths(IEnumerable<IStorageItem> items) =>
         items.Select(item => item.TryGetLocalPath()).OfType<string>().ToList();
@@ -173,7 +174,7 @@ public partial class MainWindow : Window, IPathPicker
     }
 
     // The strip recycles its containers as it scrolls; remembering which entry each one shows tells an entry when it
-    // leaves the view, so thumbnails queued for entries scrolled past are not decoded.
+    // leaves the view, so thumbnails queued for entries scrolled past are not decoded and shown ones can be let go.
     private void OnStripContainerPrepared(object? sender, ContainerPreparedEventArgs e)
     {
         if (Strip.ItemFromContainer(e.Container) is StripEntry entry)
@@ -183,7 +184,7 @@ public partial class MainWindow : Window, IPathPicker
     private void OnStripContainerClearing(object? sender, ContainerClearingEventArgs e)
     {
         if (_shownEntries.Remove(e.Container, out var entry))
-            entry.Hidden();
+            entry.Unload();
     }
 
     private void OnViewModelPropertyChanged(object? sender, PropertyChangedEventArgs e)

@@ -7,13 +7,14 @@ using ScreenshotTrimmer.App.Controls;
 using ScreenshotTrimmer.App.Imaging;
 using ScreenshotTrimmer.App.Localization;
 using ScreenshotTrimmer.App.Mvvm;
+using ScreenshotTrimmer.Processing.Files;
 using ScreenshotTrimmer.Processing.Settings;
 using ScreenshotTrimmer.Processing.Workspaces;
 
 namespace ScreenshotTrimmer.App;
 
 /// <summary>The main window's state: the strip, the selected image, the viewer and the notices.</summary>
-public sealed class MainWindowViewModel : Observable
+public sealed class MainWindowViewModel : Observable, IDisposable
 {
     private readonly Workspace _workspace;
     private readonly SettingsSession _settings;
@@ -28,13 +29,14 @@ public sealed class MainWindowViewModel : Observable
     private double _zoom;
     private ViewerBackground _background;
     private string? _openFolder;
+    private string? _lastFolder;
 
     public MainWindowViewModel(Workspace workspace, IPathPicker picker, SettingsSession settings)
     {
         _workspace = workspace;
         _settings = settings;
-        OpenFilesCommand = new RelayCommand(async () => OpenPicked(await picker.PickFilesAsync()));
-        OpenFolderCommand = new RelayCommand(async () => OpenPicked(await picker.PickFolderAsync()));
+        OpenFilesCommand = new RelayCommand(() => OpenPicked(() => picker.PickFilesAsync(_lastFolder)));
+        OpenFolderCommand = new RelayCommand(() => OpenPicked(() => picker.PickFolderAsync(_lastFolder)));
         _workspace.Changed += OnWorkspaceChanged;
         Localizer.Instance.PropertyChanged += OnLanguageChanged;
         NextCommand = new RelayCommand(_workspace.Next);
@@ -42,6 +44,12 @@ public sealed class MainWindowViewModel : Observable
         RemoveSelectedCommand = new RelayCommand(RemoveSelected);
         RemoveEntryCommand = new RelayCommand<StripEntry>(Remove);
         DismissNoticesCommand = new RelayCommand(DismissNotices);
+        ToggleShowResultsCommand = new RelayCommand(() => ShowResults = !ShowResults);
+        ChooseBackgroundCommand = new RelayCommand<object>(choice =>
+        {
+            if (choice is ViewerBackground background)
+                Background = background;
+        });
     }
 
     public ObservableCollection<StripEntry> Entries { get; } = [];
@@ -52,17 +60,8 @@ public sealed class MainWindowViewModel : Observable
         get => _selectedEntry;
         set
         {
-            if (value is not null && value.Image.Path != _workspace.Selected?.Path)
-            {
-                try
-                {
-                    _workspace.Select(value.Image);
-                }
-                catch (ArgumentException)
-                {
-                    // The file left the list on disk; the strip catches up with the update already posted.
-                }
-            }
+            if (value is not null && !SamePath(value.Image.Path, _workspace.Selected?.Path))
+                IfStillListed(value.Image, _workspace.Select);
             else
                 Set(ref _selectedEntry, value);
         }
@@ -107,35 +106,14 @@ public sealed class MainWindowViewModel : Observable
     }
 
     /// <summary>What the viewer draws behind the image. Session-only; starts as the checkerboard.</summary>
+    /// <remarks>
+    /// The menu's and toolbar's choices show it with <see cref="IsValueConverter"/>; the menu's set it with
+    /// <see cref="ChooseBackgroundCommand"/>, since a menu item does not check itself when clicked.
+    /// </remarks>
     public ViewerBackground Background
     {
         get => _background;
-        set
-        {
-            if (!Set(ref _background, value))
-                return;
-            Raise(nameof(IsCheckerboardBackground));
-            Raise(nameof(IsWhiteBackground));
-            Raise(nameof(IsDarkGreyBackground));
-        }
-    }
-
-    public bool IsCheckerboardBackground
-    {
-        get => Background == ViewerBackground.Checkerboard;
-        set => SetBackgroundIf(value, ViewerBackground.Checkerboard);
-    }
-
-    public bool IsWhiteBackground
-    {
-        get => Background == ViewerBackground.White;
-        set => SetBackgroundIf(value, ViewerBackground.White);
-    }
-
-    public bool IsDarkGreyBackground
-    {
-        get => Background == ViewerBackground.DarkGrey;
-        set => SetBackgroundIf(value, ViewerBackground.DarkGrey);
+        set => Set(ref _background, value);
     }
 
     /// <summary>The selected image's file name for the status bar.</summary>
@@ -180,14 +158,24 @@ public sealed class MainWindowViewModel : Observable
 
     public ICommand DismissNoticesCommand { get; }
 
+    /// <summary>Turns <see cref="ShowResults"/> on or off.</summary>
+    public ICommand ToggleShowResultsCommand { get; }
+
+    /// <summary>Sets <see cref="Background"/> to the <see cref="ViewerBackground"/> given as the parameter.</summary>
+    public ICommand ChooseBackgroundCommand { get; }
+
     /// <summary>
     /// Opens <paramref name="paths"/> in the workspace, replacing the list, and reports any path that does not exist
-    /// and an empty result as notices.
+    /// and an empty result as notices. The pickers then start in the folder of the first path that exists, however
+    /// the paths were opened.
     /// </summary>
     public void Open(IReadOnlyList<string> paths)
     {
         var missing = _workspace.Open(paths);
-        _openFolder = OpenFolder(paths.Select(Path.GetFullPath).Except(missing));
+        var opened = paths.Select(Path.GetFullPath).Except(missing, FileNames.Comparer).ToList();
+        _openFolder = OpenFolder(opened);
+        if (opened.Count > 0)
+            _lastFolder = FolderOf(opened[0]) ?? _lastFolder;
         Raise(nameof(Title));
 
         _notices.Clear();
@@ -216,6 +204,23 @@ public sealed class MainWindowViewModel : Observable
         }
     }
 
+    /// <summary>Reports something that went wrong unexpectedly as a notice, instead of letting it end the app.</summary>
+    public void ReportFailure(Exception failure)
+    {
+        _notices.Add(new Message("UnexpectedError", failure.Message));
+        RaiseNotices();
+    }
+
+    /// <summary>Lets go of the language, the workspace and the shown image; the window is closing.</summary>
+    public void Dispose()
+    {
+        Localizer.Instance.PropertyChanged -= OnLanguageChanged;
+        _workspace.Changed -= OnWorkspaceChanged;
+        // A load still running sees it is outdated and disposes its bitmap.
+        _loadNumber++;
+        Image = null;
+    }
+
     /// <summary>
     /// The folder the opened <paramref name="paths"/> share: a folder itself, or the folder holding a file. <c>null</c>
     /// when nothing was opened or the paths lie in different folders.
@@ -223,12 +228,21 @@ public sealed class MainWindowViewModel : Observable
     private static string? OpenFolder(IEnumerable<string> paths)
     {
         var folders = paths
-            .Select(path => Directory.Exists(path) ? path : Path.GetDirectoryName(path))
-            .Select(folder => folder is null ? null : Path.TrimEndingDirectorySeparator(folder))
-            .Distinct()
+            .Select(FolderOf)
+            .OfType<string>()
+            .Distinct(FileNames.Comparer)
             .ToList();
         return folders.Count == 1 ? folders[0] : null;
     }
+
+    /// <summary>The folder <paramref name="path"/> names, or the folder holding the file it names, without a trailing separator.</summary>
+    private static string? FolderOf(string path) =>
+        (Directory.Exists(path) ? path : Path.GetDirectoryName(path)) is { } folder
+            ? Path.TrimEndingDirectorySeparator(folder)
+            : null;
+
+    private static bool SamePath(string? a, string? b) =>
+        a is null || b is null ? a == b : FileNames.Same(a, b);
 
     /// <summary>The folder's own name; a root folder such as <c>C:\</c> or <c>/</c>, which has none, shows in full.</summary>
     private static string FolderName(string folder) =>
@@ -246,22 +260,36 @@ public sealed class MainWindowViewModel : Observable
             Remove(entry.Image);
     }
 
-    private void Remove(WorkspaceImage image)
+    private void Remove(WorkspaceImage image) => IfStillListed(image, _workspace.Remove);
+
+    /// <summary>
+    /// Runs <paramref name="action"/> on <paramref name="image"/> unless the file has left the list on disk meanwhile;
+    /// then the strip catches up with the update already posted.
+    /// </summary>
+    private static void IfStillListed(WorkspaceImage image, Action<WorkspaceImage> action)
     {
         try
         {
-            _workspace.Remove(image);
+            action(image);
         }
         catch (ArgumentException)
         {
-            // The file left the list on disk; the strip catches up with the update already posted.
         }
     }
 
-    private void OpenPicked(IReadOnlyList<string> paths)
+    /// <summary>Opens what <paramref name="pick"/> asks the user for; a picker that fails is reported as a notice.</summary>
+    private async void OpenPicked(Func<Task<IReadOnlyList<string>>> pick)
     {
-        if (paths.Count > 0)
-            Open(paths);
+        try
+        {
+            var paths = await pick();
+            if (paths.Count > 0)
+                Open(paths);
+        }
+        catch (Exception e)
+        {
+            ReportFailure(e);
+        }
     }
 
     private void OnWorkspaceChanged(object? sender, WorkspaceChange change)
@@ -284,8 +312,8 @@ public sealed class MainWindowViewModel : Observable
             Raise(nameof(ShowsHint));
         }
 
-        var selected = Entries.FirstOrDefault(entry => entry.Image.Path == change.Selected?.Path);
-        if (change.Selected?.Path != _shownPath)
+        var selected = Entries.FirstOrDefault(entry => SamePath(entry.Image.Path, change.Selected?.Path));
+        if (!SamePath(change.Selected?.Path, _shownPath))
             LoadImage(change.Selected?.Path);
         Set(ref _selectedEntry, selected, nameof(SelectedEntry));
 
@@ -293,12 +321,15 @@ public sealed class MainWindowViewModel : Observable
             ReportUnavailable(change.UnavailableFolders);
     }
 
-    /// <summary>Tells the user which folders went away; the title stops naming the open folder once it is gone.</summary>
+    /// <summary>
+    /// Tells the user which folders went away; the title stops naming the open folder once it is gone. The workspace
+    /// reports folders without a trailing separator, as <see cref="FolderOf"/> gives them.
+    /// </summary>
     private void ReportUnavailable(IReadOnlyList<string> folders)
     {
         _notices.Add(new Message("FolderUnavailable", string.Join(", ", folders)));
         RaiseNotices();
-        if (_openFolder is not null && folders.Any(folder => Path.TrimEndingDirectorySeparator(folder) == _openFolder))
+        if (_openFolder is not null && folders.Any(folder => FileNames.Same(folder, _openFolder)))
         {
             _openFolder = null;
             Raise(nameof(Title));
@@ -322,8 +353,9 @@ public sealed class MainWindowViewModel : Observable
         {
             bitmap = await Task.Run(() => BitmapLoading.Load(path));
         }
-        catch (Exception e) when (e is IOException or UnauthorizedAccessException or InvalidDataException)
+        catch (Exception)
         {
+            // Unreadable, not an image, or anything unforeseen while decoding: the viewer says so instead.
             failure = new Message("ImageUnreadable", Path.GetFileName(path));
         }
 
@@ -352,12 +384,6 @@ public sealed class MainWindowViewModel : Observable
     {
         Raise(nameof(NoticeText));
         Raise(nameof(HasNotices));
-    }
-
-    private void SetBackgroundIf(bool chosen, ViewerBackground background)
-    {
-        if (chosen)
-            Background = background;
     }
 
     private void RaiseStatus()
