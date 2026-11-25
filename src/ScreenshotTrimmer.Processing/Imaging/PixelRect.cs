@@ -18,4 +18,12 @@ public readonly record struct PixelRect(int X, int Y, int Width, int Height)
         var bottom = Math.Min(Bottom, other.Bottom);
         return new PixelRect(left, top, Math.Max(0, right - left), Math.Max(0, bottom - top));
     }
+
+    /// <summary>The smallest rectangle that contains both this rectangle and <paramref name="other"/>.</summary>
+    public PixelRect Union(PixelRect other)
+    {
+        var left = Math.Min(X, other.X);
+        var top = Math.Min(Y, other.Y);
+        return new PixelRect(left, top, Math.Max(Right, other.Right) - left, Math.Max(Bottom, other.Bottom) - top);
+    }
 }
