@@ -21,7 +21,13 @@
         <MenuItem Header="{loc:Tr OpenFiles}" InputGesture="Ctrl+O" Command="{Binding OpenFilesCommand}" />
         <MenuItem Header="{loc:Tr OpenFolder}" InputGesture="Ctrl+Shift+O" Command="{Binding OpenFolderCommand}" />
         <Separator />
+        <MenuItem x:Name="SettingsItem" Header="{loc:Tr SettingsMenu}" InputGesture="Ctrl+OemComma" />
+        <Separator />
         <MenuItem x:Name="ExitItem" Header="{loc:Tr Exit}" />
+      </MenuItem>
+      <MenuItem Header="{loc:Tr ViewMenu}">
+        <MenuItem Header="{loc:Tr ShowResults}" ToggleType="CheckBox"
+                  IsChecked="{Binding ShowResults, Mode=TwoWay}" />
       </MenuItem>
       <MenuItem Header="{loc:Tr ImageMenu}">
         <MenuItem Header="{loc:Tr NextImage}" InputGesture="PageDown" Command="{Binding NextCommand}" />
@@ -43,8 +49,9 @@
       <ListBox x:Name="Strip" ItemsSource="{Binding Entries}" SelectedItem="{Binding SelectedEntry}">
         <ListBox.ItemTemplate>
           <DataTemplate x:DataType="app:StripEntry">
-            <!-- A fixed-size box, so the strip does not jump as placeholders turn into thumbnails. -->
-            <StackPanel Spacing="4" HorizontalAlignment="Center">
+            <!-- A fixed-size box, so the strip does not jump as placeholders turn into thumbnails.
+                 A listed Result is dimmed; an Original whose Result exists carries the "has result" badge. -->
+            <StackPanel Spacing="4" HorizontalAlignment="Center" Opacity="{Binding Opacity}">
               <Border Width="{x:Static imaging:ThumbnailCache.BoxWidth}" Height="{x:Static imaging:ThumbnailCache.BoxHeight}"
                       CornerRadius="2" Background="{DynamicResource SystemControlBackgroundBaseLowBrush}">
                 <Panel>
@@ -59,8 +66,16 @@
                   </StackPanel>
                 </Panel>
               </Border>
-              <TextBlock Text="{Binding Name}" TextTrimming="CharacterEllipsis" TextAlignment="Center"
-                         Width="{x:Static imaging:ThumbnailCache.BoxWidth}" ToolTip.Tip="{Binding Name}" />
+              <DockPanel Width="{x:Static imaging:ThumbnailCache.BoxWidth}">
+                <Border DockPanel.Dock="Right" IsVisible="{Binding HasResult}" Margin="6,0,0,0" Padding="5,1"
+                        CornerRadius="3" VerticalAlignment="Center"
+                        Background="{DynamicResource SystemControlBackgroundAccentBrush}"
+                        ToolTip.Tip="{loc:Tr HasResultTip}">
+                  <TextBlock Text="{loc:Tr HasResultBadge}" FontSize="11" Foreground="White" />
+                </Border>
+                <TextBlock Text="{Binding Name}" TextTrimming="CharacterEllipsis" TextAlignment="Center"
+                           VerticalAlignment="Center" ToolTip.Tip="{Binding Name}" />
+              </DockPanel>
             </StackPanel>
           </DataTemplate>
         </ListBox.ItemTemplate>

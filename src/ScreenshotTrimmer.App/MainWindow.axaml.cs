@@ -4,6 +4,8 @@ using Avalonia.Input;
 using Avalonia.Interactivity;
 using Avalonia.Platform.Storage;
 using ScreenshotTrimmer.App.Localization;
+using ScreenshotTrimmer.App.Mvvm;
+using ScreenshotTrimmer.Processing.Settings;
 using ScreenshotTrimmer.Processing.Workspaces;
 
 namespace ScreenshotTrimmer.App;
@@ -18,6 +20,11 @@ public partial class MainWindow : Window, IPathPicker
     {
         InitializeComponent();
         ExitItem.Click += (_, _) => Close();
+        SettingsItem.Click += (_, _) => EditSettings();
+        KeyBindings.Add(new KeyBinding
+        {
+            Gesture = new KeyGesture(Key.OemComma, KeyModifiers.Control), Command = new RelayCommand(EditSettings),
+        });
         AddHandler(DragDrop.DragOverEvent, OnDragOver);
         AddHandler(DragDrop.DropEvent, OnDrop);
         // Tunnel, so the strip's own Page Up / Page Down handling does not jump a whole page.
@@ -26,10 +33,13 @@ public partial class MainWindow : Window, IPathPicker
         Strip.ContainerClearing += OnStripContainerClearing;
     }
 
-    /// <summary>Shows <paramref name="workspace"/> in this window, which picks the paths it opens.</summary>
-    public void Attach(Workspace workspace)
+    /// <summary>
+    /// Shows <paramref name="workspace"/> in this window, which picks the paths it opens and edits
+    /// <paramref name="settings"/>.
+    /// </summary>
+    public void Attach(Workspace workspace, SettingsSession settings)
     {
-        _viewModel = new MainWindowViewModel(workspace, this);
+        _viewModel = new MainWindowViewModel(workspace, this, settings);
         _viewModel.PropertyChanged += OnViewModelPropertyChanged;
         DataContext = _viewModel;
     }
@@ -39,6 +49,15 @@ public partial class MainWindow : Window, IPathPicker
     {
         if (args.Count > 0)
             _viewModel?.Open(args.Select(Path.GetFullPath).ToList());
+    }
+
+    private async void EditSettings()
+    {
+        if (_viewModel is null)
+            return;
+        var edited = await new SettingsWindow(_viewModel.Settings).ShowDialog<UserSettings?>(this);
+        if (edited is not null)
+            _viewModel.ApplySettings(edited);
     }
 
     public async Task<IReadOnlyList<string>> PickFilesAsync()

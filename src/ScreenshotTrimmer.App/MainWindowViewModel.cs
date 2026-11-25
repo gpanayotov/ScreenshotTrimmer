@@ -6,6 +6,7 @@ using Avalonia.Threading;
 using ScreenshotTrimmer.App.Imaging;
 using ScreenshotTrimmer.App.Localization;
 using ScreenshotTrimmer.App.Mvvm;
+using ScreenshotTrimmer.Processing.Settings;
 using ScreenshotTrimmer.Processing.Workspaces;
 
 namespace ScreenshotTrimmer.App;
@@ -14,6 +15,7 @@ namespace ScreenshotTrimmer.App;
 public sealed class MainWindowViewModel : Observable
 {
     private readonly Workspace _workspace;
+    private readonly SettingsSession _settings;
     private readonly List<Message> _notices = [];
     private readonly ThumbnailCache _thumbnails = new();
     private IReadOnlyList<WorkspaceImage>? _listedImages;
@@ -23,9 +25,10 @@ public sealed class MainWindowViewModel : Observable
     private int _loadNumber;
     private string? _shownPath;
 
-    public MainWindowViewModel(Workspace workspace, IPathPicker picker)
+    public MainWindowViewModel(Workspace workspace, IPathPicker picker, SettingsSession settings)
     {
         _workspace = workspace;
+        _settings = settings;
         OpenFilesCommand = new RelayCommand(async () => OpenPicked(await picker.PickFilesAsync()));
         OpenFolderCommand = new RelayCommand(async () => OpenPicked(await picker.PickFolderAsync()));
         _workspace.Changed += OnWorkspaceChanged;
@@ -47,6 +50,19 @@ public sealed class MainWindowViewModel : Observable
                 _workspace.Select(value.Image);
             else
                 Set(ref _selectedEntry, value);
+        }
+    }
+
+    /// <summary>Whether Results are listed in the strip; session-only, off by default.</summary>
+    public bool ShowResults
+    {
+        get => _workspace.ShowResults;
+        set
+        {
+            if (value == _workspace.ShowResults)
+                return;
+            _workspace.ShowResults = value;
+            Raise();
         }
     }
 
@@ -96,6 +112,24 @@ public sealed class MainWindowViewModel : Observable
         if (_workspace.Images.Count == 0)
             _notices.Add(new Message("NoImagesFound"));
         RaiseNotices();
+    }
+
+    /// <summary>The settings in use.</summary>
+    public UserSettings Settings => _settings.Current;
+
+    /// <summary>
+    /// Makes <paramref name="settings"/> current: switches the language, lists the strip again and saves them, reporting
+    /// a settings file that cannot be written as a notice.
+    /// </summary>
+    public void ApplySettings(UserSettings settings)
+    {
+        var failure = _settings.Change(settings);
+        _workspace.ApplySettings(settings);
+        if (failure is not null)
+        {
+            _notices.Add(new Message("SettingsNotSaved", _settings.FilePath, failure));
+            RaiseNotices();
+        }
     }
 
     private void OpenPicked(IReadOnlyList<string> paths)

@@ -77,4 +77,9 @@ public sealed class StripEntry(WorkspaceImage image, ThumbnailCache thumbnails) 
             loading.Dispose();
         }
     }
+    /// <summary>Whether this image's Result exists beside it, shown as the "has result" badge.</summary>
+    public bool HasResult => Image.HasResult;
+
+    /// <summary>Listed Results, shown only when the user asks for them, are dimmed so the Originals stand out.</summary>
+    public double Opacity => Image.IsResult ? 0.6 : 1.0;
 }
