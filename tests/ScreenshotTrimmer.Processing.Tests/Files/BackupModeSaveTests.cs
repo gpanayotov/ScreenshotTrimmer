@@ -1,3 +1,4 @@
+using System.Runtime.Versioning;
 using ScreenshotTrimmer.Processing.Files;
 using ScreenshotTrimmer.Processing.Imaging;
 using SkiaSharp;
@@ -81,6 +82,44 @@ public class BackupModeSaveTests
     }
 
     [Fact]
+    public void An_unrelated_png_beside_a_jpeg_original_is_never_overwritten_and_nothing_changes()
+    {
+        using var folder = new TempFolder();
+        var originalPath = folder.File("shot.jpg");
+        var unrelatedPath = folder.File("shot.png");
+        EncodedImages.Write(originalPath, EncodedImages.HalfAndHalf(8, 8, SKColors.Red, SKColors.Blue));
+        EncodedImages.Write(unrelatedPath, EncodedImages.HalfAndHalf(8, 8, SKColors.Green, SKColors.White));
+        var originalBytes = File.ReadAllBytes(originalPath);
+        var unrelatedBytes = File.ReadAllBytes(unrelatedPath);
+
+        var failure = Assert.Throws<SaveFailedException>(
+            () => ResultFiles.Save(Synthetic.Gradient(4, 4), originalPath, Backup));
+
+        Assert.Equal(unrelatedPath, failure.TargetPath);
+        Assert.Equal(SaveFailureReason.TargetExists, failure.Reason);
+        Assert.Equal(["shot.jpg", "shot.png"], folder.Entries());
+        Assert.Equal(originalBytes, File.ReadAllBytes(originalPath));
+        Assert.Equal(unrelatedBytes, File.ReadAllBytes(unrelatedPath));
+    }
+
+    [Fact]
+    public void Saving_a_jpeg_original_again_replaces_the_earlier_result()
+    {
+        using var folder = new TempFolder();
+        var originalPath = folder.File("photo.jpg");
+        EncodedImages.Write(originalPath, EncodedImages.HalfAndHalf(8, 8, SKColors.Red, SKColors.Blue));
+        ResultFiles.Save(Synthetic.Gradient(4, 4), originalPath, Backup);
+        var second = Synthetic.Gradient(6, 6);
+
+        // The backup now exists, so photo.png is the earlier Result and is replaced.
+        var report = ResultFiles.Save(second, originalPath, Backup);
+
+        Assert.Equal(["photo-original.jpg", "photo.png"], folder.Entries());
+        Assert.True(ImageFile.Load(folder.File("photo.png")).PixelsEqual(second));
+        Assert.Equal([folder.File("photo.png")], report.Written);
+    }
+
+    [Fact]
     public void A_failed_write_reports_a_reason_and_leaves_the_original_where_it_was()
     {
         using var folder = new TempFolder();
@@ -100,6 +139,7 @@ public class BackupModeSaveTests
     }
 
     [UnixNonRootFact]
+    [UnsupportedOSPlatform("windows")]
     public void A_read_only_folder_is_reported_as_access_denied_and_nothing_changes()
     {
         using var folder = new TempFolder();
@@ -122,5 +162,24 @@ public class BackupModeSaveTests
         {
             File.SetUnixFileMode(folder.Path, writable);
         }
+    }
+
+    [Theory]
+    [InlineData("")]
+    [InlineData("a/b")]
+    [InlineData("x*")]
+    public void An_invalid_backup_suffix_fails_clearly_and_moves_nothing(string suffix)
+    {
+        using var folder = new TempFolder();
+        var originalPath = folder.File("photo.jpg");
+        EncodedImages.Write(originalPath, EncodedImages.HalfAndHalf(8, 8, SKColors.Red, SKColors.Blue));
+        var originalBytes = File.ReadAllBytes(originalPath);
+
+        var failure = Assert.Throws<ArgumentException>(
+            () => ResultFiles.Save(Synthetic.Gradient(4, 4), originalPath, Backup with { BackupSuffix = suffix }));
+
+        Assert.Contains("suffix", failure.Message, StringComparison.OrdinalIgnoreCase);
+        Assert.Equal(["photo.jpg"], folder.Entries());
+        Assert.Equal(originalBytes, File.ReadAllBytes(originalPath));
     }
 }

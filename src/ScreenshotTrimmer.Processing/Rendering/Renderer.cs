@@ -9,7 +9,7 @@ public static class Renderer
     /// Applies <paramref name="steps"/> to <paramref name="original"/> and returns the Result.
     /// The Original is never modified, so rendering again always starts from its pixels.
     /// </summary>
-    public static RenderOutput Render(RgbaImage original, Steps steps)
+    public static RenderedResult Render(RgbaImage original, Steps steps)
     {
         ArgumentNullException.ThrowIfNull(original);
         ArgumentNullException.ThrowIfNull(steps);
@@ -17,12 +17,12 @@ public static class Renderer
         var bounds = new PixelRect(0, 0, original.Width, original.Height);
         var (window, popups) = steps.Crop is null ? (bounds, []) : Clip(steps.Crop, bounds);
         var overhang = Overhang.Of(window, Union(window, popups));
-        var report = new RenderReport { InputHasShadowPadding = AlreadyProcessed.HasShadowPadding(original) };
+        var report = new RenderReport { OriginalHasShadowPadding = AlreadyProcessed.HasShadowPadding(original) };
 
         // Frame lines narrow the window inside the Original, so the popups are kept whole whatever is removed.
         if (steps.FrameLines)
         {
-            (window, var removed) = FrameLines.Trim(original, window, overhang);
+            (window, var removed) = FrameLines.Remove(original, window, Overhang.Reaching(window, popups));
             report = report with { FrameLinesRemoved = removed };
         }
 
@@ -30,7 +30,9 @@ public static class Renderer
 
         if (steps.RoundedCorners is not null)
         {
-            var (measured, applied) = CornerRounding.Apply(result, steps.RoundedCorners, overhang);
+            var area = Union(window, popups);
+            var windowInResult = window with { X = window.X - area.X, Y = window.Y - area.Y };
+            var (measured, applied) = CornerRounding.Apply(result, windowInResult, steps.RoundedCorners, overhang);
             report = report with { MeasuredRadii = measured, AppliedRadii = applied };
         }
 
@@ -40,7 +42,7 @@ public static class Renderer
             report = report with { ShadowPadding = padding };
         }
 
-        return new RenderOutput(result, report);
+        return new RenderedResult(result, report);
     }
 
     /// <summary>The crop's window and popups clipped to the image, leaving out popups wholly outside it.</summary>
@@ -59,17 +61,17 @@ public static class Renderer
     /// Copies the window and each popup into a fully transparent image of their bounding rectangle,
     /// so nothing beside them shows.
     /// </summary>
-    private static RgbaImage Compose(RgbaImage source, PixelRect window, PixelRect[] popups)
+    private static RgbaImage Compose(RgbaImage original, PixelRect window, PixelRect[] popups)
     {
         var area = Union(window, popups);
         var result = new RgbaImage(area.Width, area.Height);
         foreach (var part in popups.Prepend(window))
             for (var y = part.Y; y < part.Bottom; y++)
                 for (var x = part.X; x < part.Right; x++)
-                    result[x - area.X, y - area.Y] = source[x, y];
+                    result[x - area.X, y - area.Y] = original[x, y];
         return result;
     }
 }
 
 /// <summary>The Result's pixels and what the render measured.</summary>
-public sealed record RenderOutput(RgbaImage Result, RenderReport Report);
+public sealed record RenderedResult(RgbaImage Result, RenderReport Report);

@@ -46,13 +46,6 @@ public sealed class RgbaImage
     public bool PixelsEqual(RgbaImage other) =>
         Width == other.Width && Height == other.Height && _pixels.AsSpan().SequenceEqual(other._pixels);
 
-    public RgbaImage Clone()
-    {
-        var copy = new RgbaImage(Width, Height);
-        _pixels.CopyTo(copy._pixels, 0);
-        return copy;
-    }
-
     private int Offset(int x, int y)
     {
         if ((uint)x >= (uint)Width || (uint)y >= (uint)Height)

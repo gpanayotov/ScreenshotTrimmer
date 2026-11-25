@@ -17,8 +17,11 @@ public static class ResultFiles
     /// and leaves the Original untouched. Backup mode moves the Original to
     /// <c>name&lt;backup suffix&gt;.&lt;original extension&gt;</c>, then writes the Result as <c>name.png</c>;
     /// if that backup already exists, neither it nor the Original is moved and the report notes it.
+    /// With no backup yet, an existing <c>name.png</c> that is not the Original itself fails the save
+    /// (<see cref="SaveFailureReason.TargetExists"/>) and nothing changes.
     /// </remarks>
     /// <exception cref="SaveFailedException">The target could not be written. Nothing is left behind.</exception>
+    /// <exception cref="ArgumentException">The suffix the mode uses is not a valid <see cref="FileSuffix"/>. Nothing changes.</exception>
     public static SaveReport Save(RgbaImage result, string originalPath, SaveOptions options)
     {
         ArgumentNullException.ThrowIfNull(result);
@@ -30,11 +33,13 @@ public static class ResultFiles
 
         if (options.Mode == SaveMode.Backup)
         {
+            FileSuffix.Require(options.BackupSuffix, nameof(options));
             var backupPath = Path.Combine(folder, name + options.BackupSuffix + Path.GetExtension(fullOriginal));
             var targetPath = Path.Combine(folder, name + ".png");
             return Failing(targetPath, () => SaveWithBackup(result, fullOriginal, backupPath, targetPath));
         }
 
+        FileSuffix.Require(options.ResultSuffix, nameof(options));
         var resultPath = Path.Combine(folder, name + options.ResultSuffix + ".png");
         return Failing(resultPath, () =>
         {
@@ -78,10 +83,20 @@ public static class ResultFiles
             return new SaveReport { Written = [targetPath], ExistingBackup = backupPath };
         }
 
+        // With no backup yet, a file at the target that is not the Original itself is someone else's
+        // (e.g. shot.png beside shot.jpg), and the library never deletes a file.
+        if (File.Exists(targetPath) && !SamePath(targetPath, originalPath))
+            throw new SaveFailedException(targetPath, SaveFailureReason.TargetExists);
+
         File.Move(originalPath, backupPath);
         try
         {
-            pending.Commit(overwrite: true);
+            pending.Commit(overwrite: false);
+        }
+        catch (IOException e) when (File.Exists(targetPath))
+        {
+            File.Move(backupPath, originalPath);
+            throw new SaveFailedException(targetPath, SaveFailureReason.TargetExists, e);
         }
         catch
         {
@@ -90,6 +105,11 @@ public static class ResultFiles
         }
         return new SaveReport { Written = [targetPath], Moved = [new FileMove(originalPath, backupPath)] };
     }
+
+    private static bool SamePath(string a, string b) =>
+        string.Equals(a, b, OperatingSystem.IsWindows() || OperatingSystem.IsMacOS()
+            ? StringComparison.OrdinalIgnoreCase
+            : StringComparison.Ordinal);
 
     /// <summary>Runs a save, turning any file-system failure into a <see cref="SaveFailedException"/> with a reason.</summary>
     private static SaveReport Failing(string targetPath, Func<SaveReport> save)

@@ -186,4 +186,18 @@ public class SettingsStoreTests
 
         Assert.Equal(Path.Combine(appData, "ScreenshotTrimmer", "settings.json"), store.FilePath);
     }
+
+    [Theory]
+    [InlineData("a/b", "-original")]
+    [InlineData("-trimmed", "")]
+    public void Saving_an_invalid_suffix_fails_clearly_and_writes_nothing(string resultSuffix, string backupSuffix)
+    {
+        using var folder = new TempFolder();
+        var store = new SettingsStore(folder.Path);
+
+        Assert.Throws<ArgumentException>(
+            () => store.Save(new UserSettings { ResultSuffix = resultSuffix, BackupSuffix = backupSuffix }));
+
+        Assert.False(File.Exists(store.FilePath));
+    }
 }

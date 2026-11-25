@@ -83,4 +83,25 @@ public class SuffixModeSaveTests
         Assert.Equal(["shot-trimmed.png", "shot.png"], folder.Entries());
         Assert.True(Directory.Exists(folder.File("shot-trimmed.png")));
     }
+
+    [Theory]
+    [InlineData("")]
+    [InlineData("a/b")]
+    [InlineData("a\\b")]
+    [InlineData("x?")]
+    [InlineData("tab\t")]
+    public void An_invalid_result_suffix_fails_clearly_and_writes_nothing(string suffix)
+    {
+        using var folder = new TempFolder();
+        var originalPath = folder.File("shot.png");
+        EncodedImages.Write(originalPath, EncodedImages.HalfAndHalf(8, 8, SKColors.Red, SKColors.Blue));
+        var originalBytes = File.ReadAllBytes(originalPath);
+
+        var failure = Assert.Throws<ArgumentException>(
+            () => ResultFiles.Save(Synthetic.Gradient(4, 4), originalPath, new SaveOptions { ResultSuffix = suffix }));
+
+        Assert.Contains("suffix", failure.Message, StringComparison.OrdinalIgnoreCase);
+        Assert.Equal(["shot.png"], folder.Entries());
+        Assert.Equal(originalBytes, File.ReadAllBytes(originalPath));
+    }
 }

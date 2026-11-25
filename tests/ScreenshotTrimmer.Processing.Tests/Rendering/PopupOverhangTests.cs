@@ -130,6 +130,28 @@ public class PopupOverhangTests
         Assert.Equal(default, result[0, 74]);
     }
 
+    [Fact]
+    public void No_frame_lines_are_removed_on_a_side_a_popup_reaches_flush()
+    {
+        // The window of SloppyWindowWithMenuBelow, with a narrow menu at 45..50 x 40..63 whose bottom edge
+        // is flush with the crop's bottom edge: removing the bottom strip would leave the menu sticking out.
+        var original = Synthetic.WindowWithStrips(60, 40, left: 20, top: 20, right: 20, bottom: 60);
+        for (var y = 40; y < 63; y++)
+            for (var x = 45; x < 50; x++)
+                original[x, y] = Menu;
+        var crop = Crop.WithPopups(new PixelRect(17, 17, 66, 46), new PixelRect(45, 40, 5, 23));
+
+        var output = Renderer.Render(original, new Steps { Crop = crop, FrameLines = true });
+
+        Assert.Equal(new FrameLinesRemoved(3, 3, 3, 0), output.Report.FrameLinesRemoved);
+        var result = output.Result;
+        Assert.Equal(60, result.Width);
+        Assert.Equal(43, result.Height);
+        Assert.Equal(Synthetic.Background, result[0, 42]);
+        Assert.Equal(Synthetic.Background, result[59, 42]);
+        Assert.Equal(Menu, result[27, 42]);
+    }
+
     /// <summary>
     /// A 160x120 window with 12px rounded corners at 40..200 x 40..160 on a page, and a menu at the given
     /// rectangle sticking out past one of its sides.
@@ -157,7 +179,7 @@ public class PopupOverhangTests
     [InlineData(Side.Top, 80, 10, 40, 40)]
     [InlineData(Side.Right, 190, 70, 40, 40)]
     [InlineData(Side.Bottom, 80, 150, 40, 40)]
-    public void The_corners_on_a_side_with_an_overhang_stay_square(Side side, int mx, int my, int mw, int mh)
+    public void The_corners_on_a_side_with_an_overhang_stay_square_but_report_their_measured_radius(Side side, int mx, int my, int mw, int mh)
     {
         var menu = new PixelRect(mx, my, mw, mh);
         var (original, crop) = RoundedWindowWithMenu(menu);
@@ -167,15 +189,19 @@ public class PopupOverhangTests
         // The window's corners in the Original, and whether each lies on the overhang side.
         var (ox, oy) = (Math.Min(40, mx), Math.Min(40, my));
         var applied = output.Report.AppliedRadii!;
-        var corners = new (double Radius, int X, int Y, bool OnOverhang)[]
+        var measured = output.Report.MeasuredRadii!;
+        var corners = new (double Radius, double Measured, int X, int Y, bool OnOverhang)[]
         {
-            (applied.TopLeft, 40, 40, side is Side.Left or Side.Top),
-            (applied.TopRight, 199, 40, side is Side.Right or Side.Top),
-            (applied.BottomRight, 199, 159, side is Side.Right or Side.Bottom),
-            (applied.BottomLeft, 40, 159, side is Side.Left or Side.Bottom),
+            (applied.TopLeft, measured.TopLeft, 40, 40, side is Side.Left or Side.Top),
+            (applied.TopRight, measured.TopRight, 199, 40, side is Side.Right or Side.Top),
+            (applied.BottomRight, measured.BottomRight, 199, 159, side is Side.Right or Side.Bottom),
+            (applied.BottomLeft, measured.BottomLeft, 40, 159, side is Side.Left or Side.Bottom),
         };
-        foreach (var (radius, x, y, onOverhang) in corners)
+        foreach (var (radius, measuredRadius, x, y, onOverhang) in corners)
         {
+            // Every corner of the window is measured, whether or not it is rounded. (A menu over the window's
+            // edge near a corner can nudge the measurement a little.)
+            Assert.InRange(measuredRadius, 11, 14);
             var pixel = output.Result[x - ox, y - oy];
             if (onOverhang)
             {

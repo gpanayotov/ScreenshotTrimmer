@@ -1,4 +1,5 @@
 using ScreenshotTrimmer.Processing.Files;
+using ScreenshotTrimmer.Processing.Rendering;
 
 namespace ScreenshotTrimmer.Processing.Settings;
 
@@ -16,16 +17,16 @@ public sealed record UserSettings
     public SaveMode SaveMode { get; init; } = SaveMode.Suffix;
 
     /// <summary>Appended to the Original's name for the Result in Suffix mode.</summary>
-    public string ResultSuffix { get; init; } = "-trimmed";
+    public string ResultSuffix { get; init; } = SaveOptions.DefaultResultSuffix;
 
     /// <summary>Appended to the Original's name for the kept Original in Backup mode.</summary>
-    public string BackupSuffix { get; init; } = "-original";
+    public string BackupSuffix { get; init; } = SaveOptions.DefaultBackupSuffix;
 
     /// <summary>Scales the Shadow's blur and padding; 1.0 is the default look.</summary>
-    public double ShadowSize { get; init; } = 1.0;
+    public double ShadowSize { get; init; } = Shadow.DefaultSize;
 
     /// <summary>The Shadow's opacity, from 0 to 1.</summary>
-    public double ShadowOpacity { get; init; } = 0.35;
+    public double ShadowOpacity { get; init; } = Shadow.DefaultOpacity;
 
     /// <summary>Whether Clean edges removes frame lines.</summary>
     public bool FrameLines { get; init; } = true;

@@ -22,7 +22,7 @@ internal static class FrameLines
     /// Narrows <paramref name="area"/> of <paramref name="image"/> by the frame lines found along its edges.
     /// Sides with a Popup overhang are skipped, so the popup's edge is not mistaken for a frame.
     /// </summary>
-    public static (PixelRect Area, FrameLinesRemoved Removed) Trim(RgbaImage image, PixelRect area, Overhang overhang)
+    public static (PixelRect Area, FrameLinesRemoved Removed) Remove(RgbaImage image, PixelRect area, Overhang overhang)
     {
         var removed = new int[4];
         bool[] skip = [overhang.Left, overhang.Top, overhang.Right, overhang.Bottom];
@@ -82,20 +82,14 @@ internal static class FrameLines
         var different = 0;
         for (var i = 0; i < count; i++)
         {
-            if (Difference(outer[i], median) <= Tolerance)
+            if (outer[i].DifferenceTo(median) <= Tolerance)
                 uniform++;
-            if (Difference(outer[i], inner[i]) > Tolerance)
+            if (outer[i].DifferenceTo(inner[i]) > Tolerance)
                 different++;
         }
 
         return uniform >= UniformShare * count && different >= DifferentShare * count;
     }
-
-    /// <summary>Colour difference: the largest difference in any channel.</summary>
-    private static int Difference(Rgba a, Rgba b) =>
-        Math.Max(
-            Math.Max(Math.Abs(a.R - b.R), Math.Abs(a.G - b.G)),
-            Math.Max(Math.Abs(a.B - b.B), Math.Abs(a.A - b.A)));
 
     /// <summary>The per-channel median colour of a line.</summary>
     private static Rgba Median(Rgba[] line)

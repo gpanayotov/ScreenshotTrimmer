@@ -5,7 +5,7 @@ namespace ScreenshotTrimmer.Processing.Rendering;
 /// <summary>
 /// The crop Step: the window rectangle to keep, plus any popup rectangles whose <b>Popup overhang</b>
 /// sticks out past it, in the Original's pixel coordinates.
-/// The same input whether it was drawn by hand (Classic crop) or found by Auto crop.
+/// The same crop whether it was drawn by hand (Classic crop) or found by Auto crop.
 /// Rectangles are clipped to the image. The Result covers the bounding rectangle of all of them,
 /// and the pixels in it that lie outside every rectangle are fully transparent.
 /// </summary>

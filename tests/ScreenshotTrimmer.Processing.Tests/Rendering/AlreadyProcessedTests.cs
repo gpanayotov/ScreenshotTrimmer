@@ -12,7 +12,7 @@ public class AlreadyProcessedTests
 
         var report = Renderer.Render(shadowed, Steps.None).Report;
 
-        Assert.True(report.InputHasShadowPadding);
+        Assert.True(report.OriginalHasShadowPadding);
     }
 
     [Fact]
@@ -20,7 +20,7 @@ public class AlreadyProcessedTests
     {
         var report = Renderer.Render(Synthetic.Gradient(120, 80), Steps.None).Report;
 
-        Assert.False(report.InputHasShadowPadding);
+        Assert.False(report.OriginalHasShadowPadding);
     }
 
     /// <summary>
@@ -47,7 +47,7 @@ public class AlreadyProcessedTests
     {
         var report = Renderer.Render(Bordered(0, opaqueOnBorder), Steps.None).Report;
 
-        Assert.Equal(expected, report.InputHasShadowPadding);
+        Assert.Equal(expected, report.OriginalHasShadowPadding);
     }
 
     [Theory]
@@ -57,6 +57,6 @@ public class AlreadyProcessedTests
     {
         var report = Renderer.Render(Bordered(borderAlpha, 0), Steps.None).Report;
 
-        Assert.Equal(expected, report.InputHasShadowPadding);
+        Assert.Equal(expected, report.OriginalHasShadowPadding);
     }
 }
