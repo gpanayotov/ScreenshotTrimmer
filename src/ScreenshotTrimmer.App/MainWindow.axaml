@@ -20,6 +20,8 @@
         <MenuItem Header="{loc:Tr OpenFiles}" InputGesture="Ctrl+O" Command="{Binding OpenFilesCommand}" />
         <MenuItem Header="{loc:Tr OpenFolder}" InputGesture="Ctrl+Shift+O" Command="{Binding OpenFolderCommand}" />
         <Separator />
+        <MenuItem x:Name="SettingsItem" Header="{loc:Tr SettingsMenu}" InputGesture="Ctrl+OemComma" />
+        <Separator />
         <MenuItem x:Name="ExitItem" Header="{loc:Tr Exit}" />
       </MenuItem>
       <MenuItem Header="{loc:Tr ImageMenu}">
