@@ -9,14 +9,34 @@ namespace ScreenshotTrimmer.Processing.Workspaces;
 /// </summary>
 public sealed class Workspace : IDisposable
 {
+    /// <summary>How long the disk must stay quiet after a change before the list is updated.</summary>
+    public static readonly TimeSpan DefaultWatchDelay = TimeSpan.FromMilliseconds(300);
+
+    private readonly Lock _lock = new();
+    private readonly TimeSpan _watchDelay;
+    private readonly Timer _relistTimer;
+    private readonly Dictionary<string, FileSystemWatcher> _watchers = new(FileNames.Comparer);
+    private bool _disposed;
     private UserSettings _settings;
     private IReadOnlyList<string> _openedPaths = [];
     private bool _showResults;
 
     public Workspace(UserSettings settings)
+        : this(settings, DefaultWatchDelay)
+    {
+    }
+
+    /// <summary>
+    /// A workspace that updates the list once the disk has been quiet for <paramref name="watchDelay"/> after a change
+    /// in a watched folder.
+    /// </summary>
+    public Workspace(UserSettings settings, TimeSpan watchDelay)
     {
         ArgumentNullException.ThrowIfNull(settings);
+        ArgumentOutOfRangeException.ThrowIfLessThan(watchDelay, TimeSpan.Zero);
         _settings = settings;
+        _watchDelay = watchDelay;
+        _relistTimer = new Timer(_ => OnDiskQuiet());
     }
 
     /// <summary>The listed images in strip order.</summary>
@@ -25,7 +45,10 @@ public sealed class Workspace : IDisposable
     /// <summary>The selected image, or <c>null</c> when nothing is listed.</summary>
     public WorkspaceImage? Selected { get; private set; }
 
-    /// <summary>Raised once per update to the list or the selection, on the thread that made it.</summary>
+    /// <summary>
+    /// Raised once per update to the list or the selection. Updates the caller makes are raised on its thread; updates
+    /// that follow the disk are raised on a thread-pool thread.
+    /// </summary>
     public event EventHandler<WorkspaceChange>? Changed;
 
     /// <summary>
@@ -41,13 +64,16 @@ public sealed class Workspace : IDisposable
         var missing = fullPaths.Where(path => !File.Exists(path) && !Directory.Exists(path)).ToList();
         var existing = fullPaths.Except(missing).ToList();
 
-        _openedPaths = existing;
-        var listing = List();
-        Selected = listing.Selected is { } opened
-            ? Images.First(image => image.Path == opened.Path)
-            : Images.FirstOrDefault();
-
-        RaiseChanged();
+        lock (_lock)
+        {
+            ObjectDisposedException.ThrowIf(_disposed, this);
+            _openedPaths = existing;
+            var listing = List();
+            Selected = listing.Selected is { } opened
+                ? Images.First(image => image.Path == opened.Path)
+                : Images.FirstOrDefault();
+            RaiseChanged();
+        }
         return missing;
     }
 
@@ -60,15 +86,18 @@ public sealed class Workspace : IDisposable
         get => _showResults;
         set
         {
-            if (value == _showResults)
-                return;
-            _showResults = value;
-            var selected = Selected;
-            List();
-            Selected = Images.FirstOrDefault(image => image.Path == selected?.Path)
-                ?? (selected is { IsResult: true } ? OriginalOf(selected) : null)
-                ?? Images.FirstOrDefault();
-            RaiseChanged();
+            lock (_lock)
+            {
+                if (value == _showResults)
+                    return;
+                _showResults = value;
+                var selected = Selected;
+                List();
+                Selected = Images.FirstOrDefault(image => image.Path == selected?.Path)
+                    ?? (selected is { IsResult: true } ? OriginalOf(selected) : null)
+                    ?? Images.FirstOrDefault();
+                RaiseChanged();
+            }
         }
     }
 
@@ -80,36 +109,61 @@ public sealed class Workspace : IDisposable
     public void ApplySettings(UserSettings settings)
     {
         ArgumentNullException.ThrowIfNull(settings);
-        _settings = settings;
-        if (_openedPaths.Count == 0)
-            return;
+        lock (_lock)
+        {
+            _settings = settings;
+            if (_openedPaths.Count == 0)
+                return;
 
-        var selectedIndex = SelectedIndex;
-        var selectedPath = Selected?.Path;
-        List();
-        Selected = Images.FirstOrDefault(image => image.Path == selectedPath)
-            ?? (Images.Count == 0 ? null : Images[Math.Clamp(selectedIndex, 0, Images.Count - 1)]);
-        RaiseChanged();
+            var selectedIndex = SelectedIndex;
+            var selectedPath = Selected?.Path;
+            List();
+            Selected = Images.FirstOrDefault(image => image.Path == selectedPath)
+                ?? (Images.Count == 0 ? null : Images[Math.Clamp(selectedIndex, 0, Images.Count - 1)]);
+            RaiseChanged();
+        }
     }
 
     /// <summary>Selects <paramref name="image"/>, which must be one of <see cref="Images"/>.</summary>
     public void Select(WorkspaceImage image)
     {
         ArgumentNullException.ThrowIfNull(image);
-        var index = IndexOf(image);
-        if (index < 0)
-            throw new ArgumentException("The image is not listed in this workspace.", nameof(image));
-        SelectAt(index);
+        lock (_lock)
+        {
+            var index = IndexOf(image);
+            if (index < 0)
+                throw new ArgumentException("The image is not listed in this workspace.", nameof(image));
+            SelectAt(index);
+        }
     }
 
     /// <summary>Selects the next image; does nothing on the last one.</summary>
-    public void Next() => SelectAt(SelectedIndex + 1);
+    public void Next()
+    {
+        lock (_lock)
+            SelectAt(SelectedIndex + 1);
+    }
 
     /// <summary>Selects the previous image; does nothing on the first one.</summary>
-    public void Previous() => SelectAt(SelectedIndex - 1);
+    public void Previous()
+    {
+        lock (_lock)
+            SelectAt(SelectedIndex - 1);
+    }
 
+    /// <summary>Stops watching the disk.</summary>
     public void Dispose()
     {
+        lock (_lock)
+        {
+            if (_disposed)
+                return;
+            _disposed = true;
+            _relistTimer.Dispose();
+            foreach (var watcher in _watchers.Values)
+                watcher.Dispose();
+            _watchers.Clear();
+        }
     }
 
     /// <summary>The listed Original of the Result <paramref name="result"/>, if any.</summary>
@@ -162,7 +216,63 @@ public sealed class Workspace : IDisposable
                 ContentVersion = ContentVersion.Of(image.Path),
             })
             .ToList();
+        Watch(FoldersToWatch());
         return listing;
+    }
+
+    /// <summary>The folders whose changes can change the list: each opened folder and every folder holding an image.</summary>
+    private IEnumerable<string> FoldersToWatch() =>
+        _openedPaths.Select(path => Directory.Exists(path) ? path : Path.GetDirectoryName(path)!)
+            .Concat(Images.Select(image => Path.GetDirectoryName(image.Path)!))
+            .Where(Directory.Exists);
+
+    /// <summary>Watches exactly <paramref name="folders"/>, without their subfolders.</summary>
+    private void Watch(IEnumerable<string> folders)
+    {
+        var wanted = folders.ToHashSet(FileNames.Comparer);
+        foreach (var folder in _watchers.Keys.Where(folder => !wanted.Contains(folder)).ToList())
+        {
+            _watchers[folder].Dispose();
+            _watchers.Remove(folder);
+        }
+        foreach (var folder in wanted.Where(folder => !_watchers.ContainsKey(folder)))
+        {
+            var watcher = new FileSystemWatcher(folder)
+            {
+                IncludeSubdirectories = false,
+                NotifyFilter = NotifyFilters.FileName | NotifyFilters.DirectoryName
+                    | NotifyFilters.LastWrite | NotifyFilters.Size,
+            };
+            watcher.Created += OnDiskChanged;
+            watcher.Deleted += OnDiskChanged;
+            watcher.Changed += OnDiskChanged;
+            watcher.Renamed += OnDiskChanged;
+            watcher.EnableRaisingEvents = true;
+            _watchers.Add(folder, watcher);
+        }
+    }
+
+    /// <summary>Puts the re-list off until the disk has been quiet for the watch delay, so a burst gives one update.</summary>
+    private void OnDiskChanged(object sender, FileSystemEventArgs e)
+    {
+        lock (_lock)
+        {
+            if (!_disposed)
+                _relistTimer.Change(_watchDelay, Timeout.InfiniteTimeSpan);
+        }
+    }
+
+    private void OnDiskQuiet()
+    {
+        lock (_lock)
+        {
+            if (_disposed)
+                return;
+            var selectedPath = Selected?.Path;
+            List();
+            Selected = Images.FirstOrDefault(image => image.Path == selectedPath) ?? Images.FirstOrDefault();
+            RaiseChanged();
+        }
     }
 
     private void RaiseChanged() =>

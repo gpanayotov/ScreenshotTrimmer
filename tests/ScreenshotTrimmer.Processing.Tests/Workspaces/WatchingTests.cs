@@ -1,0 +1,124 @@
+using ScreenshotTrimmer.Processing.Settings;
+using ScreenshotTrimmer.Processing.Workspaces;
+
+namespace ScreenshotTrimmer.Processing.Tests.Workspaces;
+
+/// <summary>
+/// The workspace following the disk. Each test changes a real folder and waits, with a timeout, for the workspace's
+/// change notification showing the new state; the wait is generous because file events arrive late on busy CI machines.
+/// </summary>
+public class WatchingTests
+{
+    private static readonly TimeSpan WatchDelay = TimeSpan.FromMilliseconds(150);
+    private static readonly TimeSpan Timeout = TimeSpan.FromSeconds(15);
+
+    private static void Touch(TempFolder folder, params string[] names)
+    {
+        foreach (var name in names)
+            File.WriteAllBytes(folder.File(name), [0]);
+    }
+
+    private static string[] Names(IEnumerable<WorkspaceImage> images) =>
+        images.Select(i => Path.GetFileName(i.Path)).ToArray();
+
+    private static string? SelectedName(WorkspaceChange change) =>
+        change.Selected is { } selected ? Path.GetFileName(selected.Path) : null;
+
+    private static Workspace OpenFolder(TempFolder folder, params string[] names)
+    {
+        Touch(folder, names);
+        var workspace = new Workspace(new UserSettings(), WatchDelay);
+        workspace.Open([folder.Path]);
+        return workspace;
+    }
+
+    /// <summary>
+    /// The first change from <paramref name="workspace"/> that satisfies <paramref name="until"/>. Subscribe before
+    /// changing the disk; on a slow file system an intermediate state may be announced first, which is skipped.
+    /// </summary>
+    private static Task<WorkspaceChange> ChangeWhere(Workspace workspace, Func<WorkspaceChange, bool> until)
+    {
+        var next = new TaskCompletionSource<WorkspaceChange>(TaskCreationOptions.RunContinuationsAsynchronously);
+        EventHandler<WorkspaceChange>? handler = null;
+        handler = (_, change) =>
+        {
+            if (!until(change))
+                return;
+            workspace.Changed -= handler;
+            next.TrySetResult(change);
+        };
+        workspace.Changed += handler;
+        return next.Task.WaitAsync(Timeout);
+    }
+
+    [Fact]
+    public async Task An_added_file_appears_in_its_sorted_place()
+    {
+        using var folder = new TempFolder();
+        using var workspace = OpenFolder(folder, "shot-1.png", "shot-10.png");
+        var change = ChangeWhere(workspace, c => c.Images.Count == 3);
+
+        Touch(folder, "shot-2.png");
+
+        Assert.Equal(["shot-1.png", "shot-2.png", "shot-10.png"], Names((await change).Images));
+        Assert.Equal(["shot-1.png", "shot-2.png", "shot-10.png"], Names(workspace.Images));
+    }
+
+    [Fact]
+    public async Task A_deleted_file_disappears()
+    {
+        using var folder = new TempFolder();
+        using var workspace = OpenFolder(folder, "a.png", "b.png", "c.png");
+        var change = ChangeWhere(workspace, c => c.Images.Count == 2);
+
+        File.Delete(folder.File("b.png"));
+
+        Assert.Equal(["a.png", "c.png"], Names((await change).Images));
+    }
+
+    [Fact]
+    public async Task An_overwritten_file_gets_a_new_content_version()
+    {
+        using var folder = new TempFolder();
+        using var workspace = OpenFolder(folder, "a.png", "b.png");
+        var before = workspace.Images.Select(i => i.ContentVersion).ToArray();
+        var change = ChangeWhere(workspace, c => c.Images[1].ContentVersion != before[1]);
+
+        File.WriteAllBytes(folder.File("b.png"), [1, 2, 3]);
+        // Two writes within the file system's timestamp resolution would otherwise look the same.
+        File.SetLastWriteTimeUtc(folder.File("b.png"), DateTime.UtcNow.AddMinutes(1));
+
+        var changed = await change;
+        Assert.Equal(["a.png", "b.png"], Names(changed.Images));
+        Assert.Equal(before[0], changed.Images[0].ContentVersion);
+    }
+
+    [Fact]
+    public async Task The_has_result_badge_follows_the_result_appearing_and_disappearing()
+    {
+        using var folder = new TempFolder();
+        using var workspace = OpenFolder(folder, "a.png", "b.png");
+
+        var appeared = ChangeWhere(workspace, c => c.Images[0].HasResult);
+        Touch(folder, "a-trimmed.png");
+        Assert.Equal(["a.png", "b.png"], Names((await appeared).Images));
+
+        var disappeared = ChangeWhere(workspace, c => !c.Images[0].HasResult);
+        File.Delete(folder.File("a-trimmed.png"));
+        Assert.Equal(["a.png", "b.png"], Names((await disappeared).Images));
+    }
+
+    [Fact]
+    public async Task The_selection_is_kept_when_other_files_change()
+    {
+        using var folder = new TempFolder();
+        using var workspace = OpenFolder(folder, "b.png", "c.png", "d.png");
+        workspace.Next();
+        var change = ChangeWhere(workspace, c => Names(c.Images) is ["a.png", "b.png", "c.png"]);
+
+        Touch(folder, "a.png");
+        File.Delete(folder.File("d.png"));
+
+        Assert.Equal("c.png", SelectedName(await change));
+    }
+}
