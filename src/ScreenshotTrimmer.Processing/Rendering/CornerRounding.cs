@@ -18,18 +18,19 @@ internal static class CornerRounding
     private const int Subsamples = 8;
 
     /// <summary>
-    /// Measures and clears the corners. The corners on a side with a Popup overhang are not the window's
-    /// corners, so they are not measured (reported as square) and stay square.
+    /// Measures the corners of <paramref name="window"/>, the window's rectangle within <paramref name="image"/>,
+    /// and makes the pixels outside the rounded corners transparent. The Result's corners on a side with a
+    /// Popup overhang are not the window's corners, so they stay square; their measured radius is still reported.
     /// </summary>
-    public static (CornerRadii Measured, CornerRadii Applied) Apply(RgbaImage image, RoundedCorners settings, Overhang overhang)
+    public static (CornerRadii Measured, CornerRadii Applied) Apply(
+        RgbaImage image, PixelRect window, RoundedCorners settings, Overhang overhang)
     {
-        var measured = Measure(image);
-        measured = new CornerRadii(
+        var measured = Measure(image, window);
+        var applied = Group(new CornerRadii(
             overhang.Left || overhang.Top ? 0 : measured.TopLeft,
             overhang.Right || overhang.Top ? 0 : measured.TopRight,
             overhang.Right || overhang.Bottom ? 0 : measured.BottomRight,
-            overhang.Left || overhang.Bottom ? 0 : measured.BottomLeft);
-        var applied = Group(measured);
+            overhang.Left || overhang.Bottom ? 0 : measured.BottomLeft));
         if (settings.ManualRadius is { } manual)
             applied = new CornerRadii(
                 applied.TopLeft > 0 ? manual : 0,
@@ -89,34 +90,34 @@ internal static class CornerRounding
                 if (inside == Subsamples * Subsamples)
                     continue;
 
-                var (x, y) = ToImage(image, corner, dx, dy);
+                var (x, y) = ToImage(new PixelRect(0, 0, image.Width, image.Height), corner, dx, dy);
                 var pixel = image[x, y];
                 var alpha = (byte)Math.Round(pixel.A * inside / (double)(Subsamples * Subsamples));
                 image[x, y] = pixel with { A = alpha };
             }
     }
 
-    private static CornerRadii Measure(RgbaImage image)
+    private static CornerRadii Measure(RgbaImage image, PixelRect window)
     {
-        var limit = Math.Min(MaxLimit, Math.Min(image.Width / 4, image.Height / 4));
+        var limit = Math.Min(MaxLimit, Math.Min(window.Width / 4, window.Height / 4));
         if (limit < 1)
             return CornerRadii.Square;
 
         return new CornerRadii(
-            MeasureCorner(image, limit, Corner.TopLeft),
-            MeasureCorner(image, limit, Corner.TopRight),
-            MeasureCorner(image, limit, Corner.BottomRight),
-            MeasureCorner(image, limit, Corner.BottomLeft));
+            MeasureCorner(image, window, limit, Corner.TopLeft),
+            MeasureCorner(image, window, limit, Corner.TopRight),
+            MeasureCorner(image, window, limit, Corner.BottomRight),
+            MeasureCorner(image, window, limit, Corner.BottomLeft));
     }
 
     /// <summary>
     /// Walks the outer row and the outer column from the corner, counting the pixels that differ from a
     /// reference pixel <paramref name="limit"/> px further in, and turns the average count into a radius.
     /// </summary>
-    private static double MeasureCorner(RgbaImage image, int limit, Corner corner)
+    private static double MeasureCorner(RgbaImage image, PixelRect window, int limit, Corner corner)
     {
-        var rowCount = CountDiffering(image, corner, limit, alongRow: true);
-        var columnCount = CountDiffering(image, corner, limit, alongRow: false);
+        var rowCount = CountDiffering(image, window, corner, limit, alongRow: true);
+        var columnCount = CountDiffering(image, window, corner, limit, alongRow: false);
         if (rowCount >= limit || columnCount >= limit)
             return 0;
 
@@ -129,32 +130,35 @@ internal static class CornerRounding
         return count + Math.Sqrt(count) + 0.5;
     }
 
-    private static int CountDiffering(RgbaImage image, Corner corner, int limit, bool alongRow)
+    private static int CountDiffering(RgbaImage image, PixelRect window, Corner corner, int limit, bool alongRow)
     {
-        var reference = alongRow ? Pixel(image, corner, limit, 0) : Pixel(image, corner, 0, limit);
+        var reference = alongRow ? Pixel(image, window, corner, limit, 0) : Pixel(image, window, corner, 0, limit);
         var count = 0;
         for (var i = 0; i < limit; i++)
         {
-            var pixel = alongRow ? Pixel(image, corner, i, 0) : Pixel(image, corner, 0, i);
+            var pixel = alongRow ? Pixel(image, window, corner, i, 0) : Pixel(image, window, corner, 0, i);
             if (Difference(pixel, reference) > DifferenceThreshold)
                 count++;
         }
         return count;
     }
 
-    /// <summary>The pixel <paramref name="dx"/> across and <paramref name="dy"/> down from the corner, both inward.</summary>
-    private static Rgba Pixel(RgbaImage image, Corner corner, int dx, int dy)
+    /// <summary>
+    /// The pixel <paramref name="dx"/> across and <paramref name="dy"/> down from the corner of
+    /// <paramref name="window"/>, both inward.
+    /// </summary>
+    private static Rgba Pixel(RgbaImage image, PixelRect window, Corner corner, int dx, int dy)
     {
-        var (x, y) = ToImage(image, corner, dx, dy);
+        var (x, y) = ToImage(window, corner, dx, dy);
         return image[x, y];
     }
 
-    private static (int X, int Y) ToImage(RgbaImage image, Corner corner, int dx, int dy) => corner switch
+    private static (int X, int Y) ToImage(PixelRect rect, Corner corner, int dx, int dy) => corner switch
     {
-        Corner.TopLeft => (dx, dy),
-        Corner.TopRight => (image.Width - 1 - dx, dy),
-        Corner.BottomRight => (image.Width - 1 - dx, image.Height - 1 - dy),
-        _ => (dx, image.Height - 1 - dy),
+        Corner.TopLeft => (rect.X + dx, rect.Y + dy),
+        Corner.TopRight => (rect.Right - 1 - dx, rect.Y + dy),
+        Corner.BottomRight => (rect.Right - 1 - dx, rect.Bottom - 1 - dy),
+        _ => (rect.X + dx, rect.Bottom - 1 - dy),
     };
 
     /// <summary>The largest difference in any channel.</summary>

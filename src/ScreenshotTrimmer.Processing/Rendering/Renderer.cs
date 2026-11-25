@@ -30,7 +30,9 @@ public static class Renderer
 
         if (steps.RoundedCorners is not null)
         {
-            var (measured, applied) = CornerRounding.Apply(result, steps.RoundedCorners, overhang);
+            var area = Union(window, popups);
+            var windowInResult = window with { X = window.X - area.X, Y = window.Y - area.Y };
+            var (measured, applied) = CornerRounding.Apply(result, windowInResult, steps.RoundedCorners, overhang);
             report = report with { MeasuredRadii = measured, AppliedRadii = applied };
         }
 

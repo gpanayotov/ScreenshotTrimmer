@@ -157,7 +157,7 @@ public class PopupOverhangTests
     [InlineData(Side.Top, 80, 10, 40, 40)]
     [InlineData(Side.Right, 190, 70, 40, 40)]
     [InlineData(Side.Bottom, 80, 150, 40, 40)]
-    public void The_corners_on_a_side_with_an_overhang_stay_square(Side side, int mx, int my, int mw, int mh)
+    public void The_corners_on_a_side_with_an_overhang_stay_square_but_report_their_measured_radius(Side side, int mx, int my, int mw, int mh)
     {
         var menu = new PixelRect(mx, my, mw, mh);
         var (original, crop) = RoundedWindowWithMenu(menu);
@@ -167,15 +167,19 @@ public class PopupOverhangTests
         // The window's corners in the Original, and whether each lies on the overhang side.
         var (ox, oy) = (Math.Min(40, mx), Math.Min(40, my));
         var applied = output.Report.AppliedRadii!;
-        var corners = new (double Radius, int X, int Y, bool OnOverhang)[]
+        var measured = output.Report.MeasuredRadii!;
+        var corners = new (double Radius, double Measured, int X, int Y, bool OnOverhang)[]
         {
-            (applied.TopLeft, 40, 40, side is Side.Left or Side.Top),
-            (applied.TopRight, 199, 40, side is Side.Right or Side.Top),
-            (applied.BottomRight, 199, 159, side is Side.Right or Side.Bottom),
-            (applied.BottomLeft, 40, 159, side is Side.Left or Side.Bottom),
+            (applied.TopLeft, measured.TopLeft, 40, 40, side is Side.Left or Side.Top),
+            (applied.TopRight, measured.TopRight, 199, 40, side is Side.Right or Side.Top),
+            (applied.BottomRight, measured.BottomRight, 199, 159, side is Side.Right or Side.Bottom),
+            (applied.BottomLeft, measured.BottomLeft, 40, 159, side is Side.Left or Side.Bottom),
         };
-        foreach (var (radius, x, y, onOverhang) in corners)
+        foreach (var (radius, measuredRadius, x, y, onOverhang) in corners)
         {
+            // Every corner of the window is measured, whether or not it is rounded. (A menu over the window's
+            // edge near a corner can nudge the measurement a little.)
+            Assert.InRange(measuredRadius, 11, 14);
             var pixel = output.Result[x - ox, y - oy];
             if (onOverhang)
             {
