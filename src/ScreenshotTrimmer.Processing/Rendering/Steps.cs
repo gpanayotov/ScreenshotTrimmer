@@ -14,6 +14,9 @@ public sealed record Steps
     /// <summary>The crop, or null to keep the whole image.</summary>
     public Crop? Crop { get; init; }
 
+    /// <summary>Frame lines (Clean edges): remove leftover lines of background along the crop's edges.</summary>
+    public bool FrameLines { get; init; }
+
     /// <summary>Rounded-corner clearing, or null to leave the corners as they are.</summary>
     public RoundedCorners? RoundedCorners { get; init; }
 }

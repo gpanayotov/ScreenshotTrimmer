@@ -17,6 +17,12 @@ public static class Renderer
         var result = steps.Crop is null ? original.Clone() : ApplyCrop(original, steps.Crop);
         var report = new RenderReport();
 
+        if (steps.FrameLines)
+        {
+            (result, var removed) = FrameLines.Remove(result);
+            report = report with { FrameLinesRemoved = removed };
+        }
+
         if (steps.RoundedCorners is not null)
         {
             var (measured, applied) = CornerRounding.Apply(result, steps.RoundedCorners);
