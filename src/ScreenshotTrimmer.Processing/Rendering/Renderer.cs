@@ -15,7 +15,7 @@ public static class Renderer
         ArgumentNullException.ThrowIfNull(steps);
 
         var result = steps.Crop is null ? original.Clone() : ApplyCrop(original, steps.Crop);
-        var report = new RenderReport();
+        var report = new RenderReport { InputHasShadowPadding = AlreadyProcessed.HasShadowPadding(original) };
 
         if (steps.FrameLines)
         {
