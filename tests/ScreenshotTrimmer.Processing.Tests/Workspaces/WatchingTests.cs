@@ -148,4 +148,53 @@ public class WatchingTests
 
         Assert.Equal("b.png", SelectedName(await change));
     }
+
+    [Fact]
+    public async Task A_renamed_file_moves_to_its_new_name_and_place_and_stays_selected()
+    {
+        using var folder = new TempFolder();
+        using var workspace = OpenFolder(folder, "a.png", "b.png", "c.png");
+        var change = ChangeWhere(workspace, c => Names(c.Images).Contains("z.png"));
+
+        File.Move(folder.File("a.png"), folder.File("z.png"));
+
+        var changed = await change;
+        Assert.Equal(["b.png", "c.png", "z.png"], Names(changed.Images));
+        Assert.Equal("z.png", SelectedName(changed));
+    }
+
+    [Fact]
+    public async Task With_several_files_open_only_those_files_are_kept_under_their_new_names()
+    {
+        using var folder = new TempFolder();
+        Touch(folder, "a.png", "b.png", "c.png", "d.png");
+        using var workspace = new Workspace(new UserSettings(), WatchDelay);
+        workspace.Open([folder.File("a.png"), folder.File("c.png"), folder.File("d.png")]);
+        var change = ChangeWhere(workspace, c => Names(c.Images).Contains("e.png"));
+
+        Touch(folder, "new.png");
+        File.Delete(folder.File("d.png"));
+        File.Move(folder.File("c.png"), folder.File("e.png"));
+
+        Assert.Equal(["a.png", "e.png"], Names((await change).Images));
+    }
+
+    [Fact]
+    public async Task With_one_file_open_its_folder_stays_listed_when_that_file_is_deleted()
+    {
+        using var folder = new TempFolder();
+        Touch(folder, "a.png", "b.png", "c.png");
+        using var workspace = new Workspace(new UserSettings(), WatchDelay);
+        workspace.Open([folder.File("b.png")]);
+        var change = ChangeWhere(workspace, c => !Names(c.Images).Contains("b.png"));
+
+        File.Delete(folder.File("b.png"));
+        var changed = await change;
+        Assert.Equal(["a.png", "c.png"], Names(changed.Images));
+        Assert.Equal("c.png", SelectedName(changed));
+
+        var added = ChangeWhere(workspace, c => Names(c.Images).Contains("d.png"));
+        Touch(folder, "d.png");
+        Assert.Equal(["a.png", "c.png", "d.png"], Names((await added).Images));
+    }
 }

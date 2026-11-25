@@ -1,3 +1,4 @@
+using System.Collections.Concurrent;
 using ScreenshotTrimmer.Processing.Files;
 using ScreenshotTrimmer.Processing.Settings;
 
@@ -16,9 +17,11 @@ public sealed class Workspace : IDisposable
     private readonly TimeSpan _watchDelay;
     private readonly Timer _relistTimer;
     private readonly Dictionary<string, FileSystemWatcher> _watchers = new(FileNames.Comparer);
+    private readonly ConcurrentQueue<(string From, string To)> _renames = new();
     private bool _disposed;
     private UserSettings _settings;
     private IReadOnlyList<string> _openedPaths = [];
+    private bool _openedOneFile;
     private bool _showResults;
 
     public Workspace(UserSettings settings)
@@ -68,6 +71,7 @@ public sealed class Workspace : IDisposable
         {
             ObjectDisposedException.ThrowIf(_disposed, this);
             _openedPaths = existing;
+            _openedOneFile = existing is [var only] && File.Exists(only);
             var listing = List();
             Selected = listing.Selected is { } opened
                 ? Images.First(image => image.Path == opened.Path)
@@ -178,14 +182,14 @@ public sealed class Workspace : IDisposable
     }
 
     /// <summary>
-    /// The listed entry for <paramref name="before"/>[<paramref name="index"/>] if it is still listed; otherwise the
+    /// The listed entry at the path <paramref name="before"/>[<paramref name="index"/>] if it is still listed; otherwise the
     /// nearest still-listed entry after it, or before it when none follows. <c>null</c> when nothing is listed.
     /// </summary>
-    private WorkspaceImage? SurvivorNear(IReadOnlyList<WorkspaceImage> before, int index)
+    private WorkspaceImage? SurvivorNear(IReadOnlyList<string> before, int index)
     {
         var candidates = before.Skip(index).Concat(before.Take(index).Reverse());
         return candidates
-            .Select(old => Images.FirstOrDefault(image => image.Path == old.Path))
+            .Select(path => Images.FirstOrDefault(image => image.Path == path))
             .FirstOrDefault(image => image is not null)
             ?? Images.FirstOrDefault();
     }
@@ -259,7 +263,7 @@ public sealed class Workspace : IDisposable
             watcher.Created += OnDiskChanged;
             watcher.Deleted += OnDiskChanged;
             watcher.Changed += OnDiskChanged;
-            watcher.Renamed += OnDiskChanged;
+            watcher.Renamed += OnRenamed;
             watcher.EnableRaisingEvents = true;
             _watchers.Add(folder, watcher);
         }
@@ -281,13 +285,45 @@ public sealed class Workspace : IDisposable
         }
     }
 
+    /// <summary>Notes a rename, so the opened paths and the selection can follow the file to its new name.</summary>
+    private void OnRenamed(object sender, RenamedEventArgs e)
+    {
+        _renames.Enqueue((e.OldFullPath, e.FullPath));
+        OnDiskChanged(sender, e);
+    }
+
+    /// <summary>Maps a path to where the renames reported since the last re-list moved it.</summary>
+    private Func<string, string> TakeRenames()
+    {
+        var moves = new List<(string From, string To)>();
+        while (_renames.TryDequeue(out var rename))
+            moves.Add(rename);
+        return path =>
+        {
+            foreach (var (from, to) in moves)
+            {
+                if (path == from)
+                    path = to;
+            }
+            return path;
+        };
+    }
+
     private void OnDiskQuiet()
     {
         lock (_lock)
         {
             if (_disposed)
                 return;
-            var before = Images;
+            var renamed = TakeRenames();
+            _openedPaths = _openedPaths.Select(renamed).ToList();
+            if (_openedOneFile && _openedPaths is [var file] && !File.Exists(file))
+            {
+                // The file opened on its own is gone; the rest of its folder stays listed.
+                _openedPaths = [Path.GetDirectoryName(file)!];
+                _openedOneFile = false;
+            }
+            var before = Images.Select(image => renamed(image.Path)).ToList();
             var selectedIndex = SelectedIndex;
             List();
             Selected = selectedIndex < 0 ? Images.FirstOrDefault() : SurvivorNear(before, selectedIndex);
