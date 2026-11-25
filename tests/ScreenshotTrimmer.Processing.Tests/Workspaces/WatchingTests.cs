@@ -121,4 +121,31 @@ public class WatchingTests
 
         Assert.Equal("c.png", SelectedName(await change));
     }
+
+    [Fact]
+    public async Task Deleting_the_selected_file_selects_the_next_one()
+    {
+        using var folder = new TempFolder();
+        using var workspace = OpenFolder(folder, "a.png", "b.png", "c.png");
+        workspace.Next();
+        var change = ChangeWhere(workspace, c => c.Images.Count == 2);
+
+        File.Delete(folder.File("b.png"));
+
+        Assert.Equal("c.png", SelectedName(await change));
+    }
+
+    [Fact]
+    public async Task Deleting_the_selected_last_file_selects_the_previous_one()
+    {
+        using var folder = new TempFolder();
+        using var workspace = OpenFolder(folder, "a.png", "b.png", "c.png");
+        workspace.Next();
+        workspace.Next();
+        var change = ChangeWhere(workspace, c => c.Images.Count == 2);
+
+        File.Delete(folder.File("c.png"));
+
+        Assert.Equal("b.png", SelectedName(await change));
+    }
 }

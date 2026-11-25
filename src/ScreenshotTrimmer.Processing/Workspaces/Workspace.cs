@@ -177,6 +177,19 @@ public sealed class Workspace : IDisposable
         return Images.FirstOrDefault(image => FileNames.Same(StemOf(image.Path), originalStem));
     }
 
+    /// <summary>
+    /// The listed entry for <paramref name="before"/>[<paramref name="index"/>] if it is still listed; otherwise the
+    /// nearest still-listed entry after it, or before it when none follows. <c>null</c> when nothing is listed.
+    /// </summary>
+    private WorkspaceImage? SurvivorNear(IReadOnlyList<WorkspaceImage> before, int index)
+    {
+        var candidates = before.Skip(index).Concat(before.Take(index).Reverse());
+        return candidates
+            .Select(old => Images.FirstOrDefault(image => image.Path == old.Path))
+            .FirstOrDefault(image => image is not null)
+            ?? Images.FirstOrDefault();
+    }
+
     private static string StemOf(string path) =>
         Path.Combine(Path.GetDirectoryName(path)!, Path.GetFileNameWithoutExtension(path));
 
@@ -253,12 +266,18 @@ public sealed class Workspace : IDisposable
     }
 
     /// <summary>Puts the re-list off until the disk has been quiet for the watch delay, so a burst gives one update.</summary>
+    /// <remarks>
+    /// Takes no lock: disposing a watcher waits for its event handlers, and watchers are disposed under the lock.
+    /// </remarks>
     private void OnDiskChanged(object sender, FileSystemEventArgs e)
     {
-        lock (_lock)
+        try
         {
-            if (!_disposed)
-                _relistTimer.Change(_watchDelay, Timeout.InfiniteTimeSpan);
+            _relistTimer.Change(_watchDelay, Timeout.InfiniteTimeSpan);
+        }
+        catch (ObjectDisposedException)
+        {
+            // The workspace was disposed while this event was on its way.
         }
     }
 
@@ -268,9 +287,10 @@ public sealed class Workspace : IDisposable
         {
             if (_disposed)
                 return;
-            var selectedPath = Selected?.Path;
+            var before = Images;
+            var selectedIndex = SelectedIndex;
             List();
-            Selected = Images.FirstOrDefault(image => image.Path == selectedPath) ?? Images.FirstOrDefault();
+            Selected = selectedIndex < 0 ? Images.FirstOrDefault() : SurvivorNear(before, selectedIndex);
             RaiseChanged();
         }
     }
