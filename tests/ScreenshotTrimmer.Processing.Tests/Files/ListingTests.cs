@@ -127,6 +127,19 @@ public class ListingTests
         Assert.Equal([true, false], listing.Images.Select(i => i.HasResult));
     }
 
+    [LinuxFact]
+    public void On_a_case_sensitive_file_system_a_result_matches_its_original_in_letter_case()
+    {
+        using var folder = new TempFolder();
+        Touch(folder, "Shot.png", "shot-trimmed.png", "Shot-TRIMMED.png");
+
+        var listing = ImageListing.List([folder.Path], new ListingOptions { IncludeResults = true });
+
+        Assert.Equal(["Shot.png", "Shot-TRIMMED.png", "shot-trimmed.png"], Names(listing));
+        Assert.Equal([false, false, false], listing.Images.Select(i => i.IsResult));
+        Assert.Equal([false, false, false], listing.Images.Select(i => i.HasResult));
+    }
+
     [Fact]
     public void Opening_a_result_on_its_own_lists_and_selects_it_while_other_results_stay_hidden()
     {

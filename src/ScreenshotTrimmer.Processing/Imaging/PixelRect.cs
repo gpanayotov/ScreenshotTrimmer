@@ -26,4 +26,7 @@ public readonly record struct PixelRect(int X, int Y, int Width, int Height)
         var top = Math.Min(Y, other.Y);
         return new PixelRect(left, top, Math.Max(Right, other.Right) - left, Math.Max(Bottom, other.Bottom) - top);
     }
+
+    /// <summary>This rectangle in the coordinates of <paramref name="outer"/>, whose top-left corner becomes (0, 0).</summary>
+    public PixelRect RelativeTo(PixelRect outer) => this with { X = X - outer.X, Y = Y - outer.Y };
 }

@@ -103,6 +103,27 @@ public class BackupModeSaveTests
     }
 
     [Fact]
+    public void An_unrelated_png_beside_a_jpeg_original_is_never_overwritten_even_with_an_existing_backup()
+    {
+        using var folder = new TempFolder();
+        var originalPath = folder.File("shot.jpg");
+        var backupPath = folder.File("shot-original.jpg");
+        var unrelatedPath = folder.File("shot.png");
+        EncodedImages.Write(originalPath, EncodedImages.HalfAndHalf(8, 8, SKColors.Red, SKColors.Blue));
+        EncodedImages.Write(backupPath, EncodedImages.HalfAndHalf(8, 8, SKColors.Green, SKColors.White));
+        EncodedImages.Write(unrelatedPath, EncodedImages.HalfAndHalf(8, 8, SKColors.Yellow, SKColors.Black));
+        var unrelatedBytes = File.ReadAllBytes(unrelatedPath);
+
+        var failure = Assert.Throws<SaveFailedException>(
+            () => ResultFiles.Save(Synthetic.Gradient(4, 4), originalPath, Backup));
+
+        Assert.Equal(unrelatedPath, failure.TargetPath);
+        Assert.Equal(SaveFailureReason.TargetExists, failure.Reason);
+        Assert.Equal(["shot-original.jpg", "shot.jpg", "shot.png"], folder.Entries());
+        Assert.Equal(unrelatedBytes, File.ReadAllBytes(unrelatedPath));
+    }
+
+    [Fact]
     public void Saving_a_jpeg_original_again_replaces_the_earlier_result()
     {
         using var folder = new TempFolder();

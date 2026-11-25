@@ -153,12 +153,13 @@ public class PopupOverhangTests
     }
 
     /// <summary>
-    /// A 160x120 window with 12px rounded corners at 40..200 x 40..160 on a page, and a menu at the given
-    /// rectangle sticking out past one of its sides.
+    /// A 160x120 window at 40..200 x 40..160 on a page, with 12px rounded corners unless radii are given,
+    /// and a menu at the given rectangle sticking out past one of its sides.
     /// </summary>
-    private static (RgbaImage Original, Crop Crop) RoundedWindowWithMenu(PixelRect menu)
+    private static (RgbaImage Original, Crop Crop) RoundedWindowWithMenu(
+        PixelRect menu, float topLeft = 12, float topRight = 12, float bottomRight = 12, float bottomLeft = 12)
     {
-        var window = Synthetic.RoundedWindow(160, 120, 12, 12, 12, 12);
+        var window = Synthetic.RoundedWindow(160, 120, topLeft, topRight, bottomRight, bottomLeft);
         var original = new RgbaImage(240, 200);
         for (var y = 0; y < 200; y++)
             for (var x = 0; x < 240; x++)
@@ -215,6 +216,23 @@ public class PopupOverhangTests
             }
         }
         Assert.Equal(Menu, output.Result[mx - ox + mw / 2, my - oy + mh / 2]);
+    }
+
+    [Fact]
+    public void A_corner_beside_an_overhang_still_pairs_the_rounded_corner_it_agrees_with()
+    {
+        // Rounded top corners, square bottom ones, and a menu past the left side: the top-left corner stays
+        // square for the menu, but it still agrees with the top-right one, so that one is rounded.
+        var (original, crop) = RoundedWindowWithMenu(new PixelRect(10, 70, 40, 40), 12, 12, 0, 0);
+
+        var output = Renderer.Render(original, new Steps { Crop = crop, RoundedCorners = new RoundedCorners() });
+
+        var applied = output.Report.AppliedRadii!;
+        Assert.Equal(0, applied.TopLeft);
+        Assert.InRange(applied.TopRight, 11, 13);
+        Assert.Equal(0, applied.BottomRight);
+        Assert.Equal(0, applied.BottomLeft);
+        Assert.Equal(0, output.Result[199 - 10, 0].A);
     }
 
     [Fact]

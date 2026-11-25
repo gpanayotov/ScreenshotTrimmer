@@ -114,6 +114,21 @@ public class RoundedCornersTests
     }
 
     [Fact]
+    public void Agreement_chains_so_every_corner_in_a_group_gets_the_same_radius()
+    {
+        // Measured about 9.5, 11.3 and 13.7: each agrees with the next, though the outer two differ by more than 3px.
+        var original = Synthetic.RoundedWindow(160, 120, 9, 11, 14, 0);
+
+        var report = Renderer.Render(original, RoundedOn).Report;
+
+        var applied = report.AppliedRadii!;
+        Assert.Equal(report.MeasuredRadii!.BottomRight, applied.TopLeft);
+        Assert.Equal(applied.TopLeft, applied.TopRight);
+        Assert.Equal(applied.TopLeft, applied.BottomRight);
+        Assert.Equal(0, applied.BottomLeft);
+    }
+
+    [Fact]
     public void A_manual_radius_replaces_the_measurement_for_every_corner_that_would_be_rounded()
     {
         var original = Synthetic.RoundedWindow(160, 120, 10, 10, 0, 0);
