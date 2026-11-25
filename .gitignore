@@ -2,3 +2,7 @@
 .claude
 skills-lock.json
 samples/
+bin/
+obj/
+TestResults/
+*.user
