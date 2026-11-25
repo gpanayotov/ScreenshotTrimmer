@@ -1,11 +1,11 @@
 namespace ScreenshotTrimmer.Processing.Files;
 
-/// <summary>Which save rule <see cref="ResultFiles.Save"/> applies to a Result of an Original.</summary>
+/// <summary>Where a Result goes when it is saved next to its Original.</summary>
 public enum SaveMode
 {
-    /// <summary>The Original is left untouched; the Result is saved beside it under its name plus the Result suffix.</summary>
+    /// <summary>The Original is left untouched; the Result is saved under the Original's name plus a suffix.</summary>
     Suffix,
 
-    /// <summary>The Original is kept under its name plus the backup suffix; the Result takes the Original's name.</summary>
+    /// <summary>The Result takes the Original's name; the Original is kept under its name plus a suffix.</summary>
     Backup,
 }
