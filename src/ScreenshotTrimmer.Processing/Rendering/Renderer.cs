@@ -26,13 +26,12 @@ public static class Renderer
             report = report with { FrameLinesRemoved = removed };
         }
 
-        var result = Compose(original, window, popups);
+        var area = Union(window, popups);
+        var result = Compose(original, area, popups.Prepend(window));
 
         if (steps.RoundedCorners is not null)
         {
-            var area = Union(window, popups);
-            var windowInResult = window with { X = window.X - area.X, Y = window.Y - area.Y };
-            var (measured, applied) = CornerRounding.Apply(result, windowInResult, steps.RoundedCorners, overhang);
+            var (measured, applied) = CornerRounding.Apply(result, window.RelativeTo(area), steps.RoundedCorners, overhang);
             report = report with { MeasuredRadii = measured, AppliedRadii = applied };
         }
 
@@ -58,14 +57,13 @@ public static class Renderer
         popups.Aggregate(window, (union, popup) => union.Union(popup));
 
     /// <summary>
-    /// Copies the window and each popup into a fully transparent image of their bounding rectangle,
-    /// so nothing beside them shows.
+    /// Copies each of <paramref name="parts"/>, the window and its popups, into a fully transparent image of
+    /// <paramref name="area"/>, their bounding rectangle, so nothing beside them shows.
     /// </summary>
-    private static RgbaImage Compose(RgbaImage original, PixelRect window, PixelRect[] popups)
+    private static RgbaImage Compose(RgbaImage original, PixelRect area, IEnumerable<PixelRect> parts)
     {
-        var area = Union(window, popups);
         var result = new RgbaImage(area.Width, area.Height);
-        foreach (var part in popups.Prepend(window))
+        foreach (var part in parts)
             for (var y = part.Y; y < part.Bottom; y++)
                 for (var x = part.X; x < part.Right; x++)
                     result[x - area.X, y - area.Y] = original[x, y];
