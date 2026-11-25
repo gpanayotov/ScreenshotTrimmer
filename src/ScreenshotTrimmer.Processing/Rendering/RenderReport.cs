@@ -8,6 +8,17 @@ public sealed record RenderReport
 {
     /// <summary>How many frame lines were removed on each side; all zero when Frame lines is off.</summary>
     public FrameLinesRemoved FrameLinesRemoved { get; init; } = FrameLinesRemoved.None;
+
+    /// <summary>
+    /// The radius measured at each corner (0 = square), or null when rounded corners were not applied.
+    /// </summary>
+    public CornerRadii? MeasuredRadii { get; init; }
+
+    /// <summary>
+    /// The radius each corner was actually rounded at (0 = left square), after grouping corners that
+    /// agree and applying any manual radius; null when rounded corners were not applied.
+    /// </summary>
+    public CornerRadii? AppliedRadii { get; init; }
 }
 
 /// <summary>The number of frame lines removed on each side of the crop.</summary>
