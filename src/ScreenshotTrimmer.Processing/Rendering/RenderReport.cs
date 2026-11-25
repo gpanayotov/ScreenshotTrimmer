@@ -30,7 +30,7 @@ public sealed record RenderReport
     /// Whether the Original already had shadow padding, i.e. was already processed
     /// (see <see cref="AlreadyProcessed.HasShadowPadding"/>), so the interface can warn and leave Shadow off.
     /// </summary>
-    public bool InputHasShadowPadding { get; init; }
+    public bool OriginalHasShadowPadding { get; init; }
 }
 
 /// <summary>The number of frame lines removed on each side of the crop.</summary>

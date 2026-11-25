@@ -78,14 +78,14 @@ public class ShadowTests
     }
 
     [Fact]
-    public void The_shadow_follows_the_rounded_corners_cleared_before_it()
+    public void The_shadow_follows_the_corners_rounded_before_it()
     {
         var original = Synthetic.RoundedWindow(160, 120, 16, 16, 16, 16);
         var steps = new Steps { RoundedCorners = new RoundedCorners(), Shadow = new Shadow() };
 
         var result = Renderer.Render(original, steps).Result;
 
-        // The Subject's top-left pixel was cleared by the rounding, so only the soft shadow shows there,
+        // The Subject's top-left pixel was made transparent by the rounding, so only the soft shadow shows there,
         // and it is fainter than beside a straight edge, because the outline curves away from it.
         var corner = result[14, 14];
         Assert.Equal((0, 0, 0), (corner.R, corner.G, corner.B));

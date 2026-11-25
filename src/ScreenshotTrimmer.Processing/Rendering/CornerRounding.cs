@@ -137,7 +137,7 @@ internal static class CornerRounding
         for (var i = 0; i < limit; i++)
         {
             var pixel = alongRow ? Pixel(image, window, corner, i, 0) : Pixel(image, window, corner, 0, i);
-            if (Difference(pixel, reference) > DifferenceThreshold)
+            if (pixel.DifferenceTo(reference) > DifferenceThreshold)
                 count++;
         }
         return count;
@@ -160,10 +160,6 @@ internal static class CornerRounding
         Corner.BottomRight => (rect.Right - 1 - dx, rect.Bottom - 1 - dy),
         _ => (rect.X + dx, rect.Bottom - 1 - dy),
     };
-
-    /// <summary>The largest difference in any channel.</summary>
-    private static int Difference(Rgba a, Rgba b) =>
-        Math.Max(Math.Max(Math.Abs(a.R - b.R), Math.Abs(a.G - b.G)), Math.Max(Math.Abs(a.B - b.B), Math.Abs(a.A - b.A)));
 
     private enum Corner { TopLeft, TopRight, BottomRight, BottomLeft }
 }

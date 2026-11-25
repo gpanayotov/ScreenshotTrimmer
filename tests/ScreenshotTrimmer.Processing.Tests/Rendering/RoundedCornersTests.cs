@@ -141,7 +141,7 @@ public class RoundedCornersTests
     }
 
     [Fact]
-    public void Rounded_corners_are_measured_and_cleared_on_the_cropped_window()
+    public void Rounded_corners_are_measured_and_rounded_on_the_cropped_window()
     {
         var screenshot = new RgbaImage(300, 200);
         var window = Synthetic.RoundedWindow(160, 120, 12, 12, 12, 12);

@@ -17,7 +17,7 @@ public sealed record Steps
     /// <summary>Frame lines (Clean edges): remove leftover lines of background along the crop's edges.</summary>
     public bool FrameLines { get; init; }
 
-    /// <summary>Rounded-corner clearing, or null to leave the corners as they are.</summary>
+    /// <summary>Rounded corners (Clean edges): make the pixels outside the rounded corners transparent, or null to leave the corners as they are.</summary>
     public RoundedCorners? RoundedCorners { get; init; }
 
     /// <summary>The Shadow, or null for none. Applied last, after Clean edges.</summary>
