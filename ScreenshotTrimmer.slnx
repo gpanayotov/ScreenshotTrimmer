@@ -1,5 +1,6 @@
 <Solution>
   <Folder Name="/src/">
+    <Project Path="src/ScreenshotTrimmer.App/ScreenshotTrimmer.App.csproj" />
     <Project Path="src/ScreenshotTrimmer.Processing/ScreenshotTrimmer.Processing.csproj" />
   </Folder>
   <Folder Name="/tests/">

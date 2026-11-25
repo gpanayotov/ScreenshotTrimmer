@@ -1,0 +1,62 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:app="using:ScreenshotTrimmer.App"
+        xmlns:controls="using:ScreenshotTrimmer.App.Controls"
+        xmlns:loc="using:ScreenshotTrimmer.App.Localization"
+        x:Class="ScreenshotTrimmer.App.MainWindow"
+        x:DataType="app:MainWindowViewModel"
+        Title="{loc:Tr AppTitle}"
+        Width="1100" Height="750" MinWidth="500" MinHeight="350"
+        DragDrop.AllowDrop="True">
+
+  <Window.KeyBindings>
+    <KeyBinding Gesture="Ctrl+O" Command="{Binding OpenFilesCommand}" />
+    <KeyBinding Gesture="Ctrl+Shift+O" Command="{Binding OpenFolderCommand}" />
+  </Window.KeyBindings>
+
+  <DockPanel>
+    <Menu DockPanel.Dock="Top">
+      <MenuItem Header="{loc:Tr FileMenu}">
+        <MenuItem Header="{loc:Tr OpenFiles}" InputGesture="Ctrl+O" Command="{Binding OpenFilesCommand}" />
+        <MenuItem Header="{loc:Tr OpenFolder}" InputGesture="Ctrl+Shift+O" Command="{Binding OpenFolderCommand}" />
+        <Separator />
+        <MenuItem x:Name="ExitItem" Header="{loc:Tr Exit}" />
+      </MenuItem>
+      <MenuItem Header="{loc:Tr ImageMenu}">
+        <MenuItem Header="{loc:Tr NextImage}" InputGesture="PageDown" Command="{Binding NextCommand}" />
+        <MenuItem Header="{loc:Tr PreviousImage}" InputGesture="PageUp" Command="{Binding PreviousCommand}" />
+      </MenuItem>
+    </Menu>
+
+    <!-- Non-blocking notices, such as "No images found". -->
+    <Border DockPanel.Dock="Top" IsVisible="{Binding HasNotices}" Padding="12,6"
+            Background="{DynamicResource SystemControlBackgroundBaseLowBrush}">
+      <DockPanel>
+        <Button DockPanel.Dock="Right" VerticalAlignment="Center" Content="{loc:Tr Dismiss}"
+                Command="{Binding DismissNoticesCommand}" />
+        <SelectableTextBlock Text="{Binding NoticeText}" TextWrapping="Wrap" VerticalAlignment="Center" />
+      </DockPanel>
+    </Border>
+
+    <Grid ColumnDefinitions="240,4,*">
+      <ListBox x:Name="Strip" ItemsSource="{Binding Entries}" SelectedItem="{Binding SelectedEntry}">
+        <ListBox.ItemTemplate>
+          <DataTemplate x:DataType="app:StripEntry">
+            <TextBlock Text="{Binding Name}" TextTrimming="CharacterEllipsis" />
+          </DataTemplate>
+        </ListBox.ItemTemplate>
+      </ListBox>
+
+      <GridSplitter Grid.Column="1" ResizeDirection="Columns" />
+
+      <Panel Grid.Column="2">
+        <controls:ImageViewer Source="{Binding Image}" Margin="8" />
+        <TextBlock Text="{Binding ViewerMessage}" IsVisible="{Binding ViewerMessage, Converter={x:Static StringConverters.IsNotNullOrEmpty}}"
+                   HorizontalAlignment="Center" VerticalAlignment="Center" TextWrapping="Wrap" Margin="24" />
+        <TextBlock Text="{loc:Tr EmptyHint}" IsVisible="{Binding ShowsHint}" MaxWidth="480"
+                   HorizontalAlignment="Center" VerticalAlignment="Center" TextAlignment="Center" TextWrapping="Wrap"
+                   Foreground="{DynamicResource SystemControlForegroundBaseMediumBrush}" />
+      </Panel>
+    </Grid>
+  </DockPanel>
+</Window>
