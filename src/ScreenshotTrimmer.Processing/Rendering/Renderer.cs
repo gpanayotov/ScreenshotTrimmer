@@ -15,7 +15,15 @@ public static class Renderer
         ArgumentNullException.ThrowIfNull(steps);
 
         var result = steps.Crop is null ? original.Clone() : ApplyCrop(original, steps.Crop);
-        return new RenderOutput(result, new RenderReport());
+        var report = new RenderReport();
+
+        if (steps.RoundedCorners is not null)
+        {
+            var (measured, applied) = CornerRounding.Apply(result, steps.RoundedCorners);
+            report = report with { MeasuredRadii = measured, AppliedRadii = applied };
+        }
+
+        return new RenderOutput(result, report);
     }
 
     private static RgbaImage ApplyCrop(RgbaImage source, Crop crop)

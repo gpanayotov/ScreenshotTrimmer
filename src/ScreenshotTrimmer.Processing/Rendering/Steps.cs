@@ -13,4 +13,7 @@ public sealed record Steps
 
     /// <summary>The crop, or null to keep the whole image.</summary>
     public Crop? Crop { get; init; }
+
+    /// <summary>Rounded-corner clearing, or null to leave the corners as they are.</summary>
+    public RoundedCorners? RoundedCorners { get; init; }
 }
