@@ -191,5 +191,37 @@ public class PopupOverhangTests
         Assert.Equal(Menu, output.Result[mx - ox + mw / 2, my - oy + mh / 2]);
     }
 
+    [Fact]
+    public void The_Shadow_follows_the_combined_outline_of_window_and_popup()
+    {
+        // Window 40..200 x 40..160, menu 80..120 x 150..190 dropping 30px below it.
+        var (original, crop) = RoundedWindowWithMenu(new PixelRect(80, 150, 40, 40));
+
+        var output = Renderer.Render(original, new Steps { Crop = crop, Shadow = new Shadow() });
+
+        // The Result is the 160x150 bounding rectangle plus 14px of padding; Original (x, y) lands at
+        // (x - 40 + 14, y - 40 + 14).
+        var result = output.Result;
+        Assert.Equal(188, result.Width);
+        Assert.Equal(178, result.Height);
+        static (int, int) Map(int x, int y) => (x - 26, y - 26);
+
+        // Just below the menu and just below the window beside it, the shadow shows as it does
+        // below any straight edge (alpha 53, see ShadowTests).
+        var (bx, by) = Map(100, 190);
+        var belowMenu = result[bx, by];
+        Assert.Equal((0, 0, 0), (belowMenu.R, belowMenu.G, belowMenu.B));
+        Assert.InRange(belowMenu.A, 50, 56);
+        var (wx, wy) = Map(170, 160);
+        Assert.InRange(result[wx, wy].A, 50, 56);
+
+        // Further down beside the menu, past the window's shadow, the transparent area stays clear;
+        // the shadow reaches that far only below the menu.
+        var (cx, cy) = Map(170, 185);
+        Assert.Equal(0, result[cx, cy].A);
+        var (mx, my) = Map(100, 195);
+        Assert.InRange(result[mx, my].A, 1, 50);
+    }
+
     private static bool Inside(PixelRect r, int x, int y) => x >= r.X && x < r.Right && y >= r.Y && y < r.Bottom;
 }
