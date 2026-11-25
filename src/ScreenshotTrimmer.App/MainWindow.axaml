@@ -2,6 +2,7 @@
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:app="using:ScreenshotTrimmer.App"
         xmlns:controls="using:ScreenshotTrimmer.App.Controls"
+        xmlns:imaging="using:ScreenshotTrimmer.App.Imaging"
         xmlns:loc="using:ScreenshotTrimmer.App.Localization"
         x:Class="ScreenshotTrimmer.App.MainWindow"
         x:DataType="app:MainWindowViewModel"
@@ -42,7 +43,25 @@
       <ListBox x:Name="Strip" ItemsSource="{Binding Entries}" SelectedItem="{Binding SelectedEntry}">
         <ListBox.ItemTemplate>
           <DataTemplate x:DataType="app:StripEntry">
-            <TextBlock Text="{Binding Name}" TextTrimming="CharacterEllipsis" />
+            <!-- A fixed-size box, so the strip does not jump as placeholders turn into thumbnails. -->
+            <StackPanel Spacing="4" HorizontalAlignment="Center">
+              <Border Width="{x:Static imaging:ThumbnailCache.BoxWidth}" Height="{x:Static imaging:ThumbnailCache.BoxHeight}"
+                      CornerRadius="2" Background="{DynamicResource SystemControlBackgroundBaseLowBrush}">
+                <Panel>
+                  <Image Source="{Binding Thumbnail}" Stretch="None"
+                         HorizontalAlignment="Center" VerticalAlignment="Center" />
+                  <StackPanel IsVisible="{Binding IsUnreadable}" Spacing="4"
+                              HorizontalAlignment="Center" VerticalAlignment="Center">
+                    <PathIcon Width="28" Height="28" Foreground="{DynamicResource SystemControlErrorTextForegroundBrush}"
+                              Data="M12,2 L23,21 L1,21 Z M11,9 L13,9 L13,15 L11,15 Z M11,17 L13,17 L13,19 L11,19 Z" />
+                    <TextBlock Text="{loc:Tr ThumbnailUnreadable}" TextAlignment="Center" TextWrapping="Wrap"
+                               FontSize="12" Foreground="{DynamicResource SystemControlForegroundBaseMediumBrush}" />
+                  </StackPanel>
+                </Panel>
+              </Border>
+              <TextBlock Text="{Binding Name}" TextTrimming="CharacterEllipsis" TextAlignment="Center"
+                         Width="{x:Static imaging:ThumbnailCache.BoxWidth}" ToolTip.Tip="{Binding Name}" />
+            </StackPanel>
           </DataTemplate>
         </ListBox.ItemTemplate>
       </ListBox>

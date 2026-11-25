@@ -12,6 +12,7 @@ public partial class MainWindow : Window, IPathPicker
 {
     private string? _lastFolder;
     private MainWindowViewModel? _viewModel;
+    private readonly Dictionary<Control, StripEntry> _shownEntries = [];
 
     public MainWindow()
     {
@@ -21,6 +22,8 @@ public partial class MainWindow : Window, IPathPicker
         AddHandler(DragDrop.DropEvent, OnDrop);
         // Tunnel, so the strip's own Page Up / Page Down handling does not jump a whole page.
         AddHandler(KeyDownEvent, OnPreviewKeyDown, RoutingStrategies.Tunnel);
+        Strip.ContainerPrepared += OnStripContainerPrepared;
+        Strip.ContainerClearing += OnStripContainerClearing;
     }
 
     /// <summary>Shows <paramref name="workspace"/> in this window, which picks the paths it opens.</summary>
@@ -107,6 +110,20 @@ public partial class MainWindow : Window, IPathPicker
         else
             return;
         e.Handled = true;
+    }
+
+    // The strip recycles its containers as it scrolls; remembering which entry each one shows tells an entry when it
+    // leaves the view, so thumbnails queued for entries scrolled past are not decoded.
+    private void OnStripContainerPrepared(object? sender, ContainerPreparedEventArgs e)
+    {
+        if (Strip.ItemFromContainer(e.Container) is StripEntry entry)
+            _shownEntries[e.Container] = entry;
+    }
+
+    private void OnStripContainerClearing(object? sender, ContainerClearingEventArgs e)
+    {
+        if (_shownEntries.Remove(e.Container, out var entry))
+            entry.Hidden();
     }
 
     private void OnViewModelPropertyChanged(object? sender, PropertyChangedEventArgs e)

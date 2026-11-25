@@ -21,4 +21,5 @@
   <data name="PathsNotFound" xml:space="preserve"><value>Пропуснати са несъществуващи пътища: {0}</value></data>
   <data name="ImageUnreadable" xml:space="preserve"><value>Това изображение не може да бъде прочетено: {0}</value></data>
   <data name="Dismiss" xml:space="preserve"><value>Затваряне</value></data>
+  <data name="ThumbnailUnreadable" xml:space="preserve"><value>Не може да бъде прочетено</value></data>
 </root>
