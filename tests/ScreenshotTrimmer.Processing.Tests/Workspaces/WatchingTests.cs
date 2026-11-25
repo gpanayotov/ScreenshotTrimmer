@@ -197,4 +197,39 @@ public class WatchingTests
         Touch(folder, "d.png");
         Assert.Equal(["a.png", "c.png", "d.png"], Names((await added).Images));
     }
+
+    [Fact]
+    public async Task A_burst_of_changes_gives_one_update()
+    {
+        using var folder = new TempFolder();
+        Touch(folder, "a.png");
+        // A long delay, so that a slow machine still writes the whole burst within it.
+        using var workspace = new Workspace(new UserSettings(), TimeSpan.FromSeconds(1));
+        workspace.Open([folder.Path]);
+        var changes = new List<WorkspaceChange>();
+        workspace.Changed += (_, change) => { lock (changes) changes.Add(change); };
+        var all = ChangeWhere(workspace, c => c.Images.Count == 21);
+
+        for (var i = 1; i <= 20; i++)
+            Touch(folder, $"shot-{i}.png");
+        await all;
+        await Task.Delay(TimeSpan.FromSeconds(2));
+
+        lock (changes)
+            Assert.Equal(21, Assert.Single(changes).Images.Count);
+    }
+
+    [Fact]
+    public async Task A_change_that_lists_the_same_images_gives_no_update()
+    {
+        using var folder = new TempFolder();
+        using var workspace = OpenFolder(folder, "a.png");
+        var first = ChangeWhere(workspace, _ => true);
+
+        Touch(folder, "notes.txt");
+        await Task.Delay(TimeSpan.FromSeconds(1));
+        Touch(folder, "b.png");
+
+        Assert.Equal(["a.png", "b.png"], Names((await first).Images));
+    }
 }

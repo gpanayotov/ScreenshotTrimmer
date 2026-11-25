@@ -323,10 +323,21 @@ public sealed class Workspace : IDisposable
                 _openedPaths = [Path.GetDirectoryName(file)!];
                 _openedOneFile = false;
             }
-            var before = Images.Select(image => renamed(image.Path)).ToList();
+            var old = Images;
+            var oldSelected = Selected;
             var selectedIndex = SelectedIndex;
             List();
-            Selected = selectedIndex < 0 ? Images.FirstOrDefault() : SurvivorNear(before, selectedIndex);
+            Selected = selectedIndex < 0
+                ? Images.FirstOrDefault()
+                : SurvivorNear(old.Select(image => renamed(image.Path)).ToList(), selectedIndex);
+
+            // Events for files that are not listed, or writes that left a file as it was, change nothing to show.
+            if (Images.SequenceEqual(old) && Selected == oldSelected)
+            {
+                Images = old;
+                Selected = oldSelected;
+                return;
+            }
             RaiseChanged();
         }
     }
