@@ -1,8 +1,11 @@
 using System.ComponentModel;
+using System.Windows.Input;
+using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Input;
 using Avalonia.Interactivity;
 using Avalonia.Platform.Storage;
+using ScreenshotTrimmer.App.Controls;
 using ScreenshotTrimmer.App.Localization;
 using ScreenshotTrimmer.App.Mvvm;
 using ScreenshotTrimmer.Processing.Settings;
@@ -29,8 +32,27 @@ public partial class MainWindow : Window, IPathPicker
         AddHandler(DragDrop.DropEvent, OnDrop);
         // Tunnel, so the strip's own Page Up / Page Down handling does not jump a whole page.
         AddHandler(KeyDownEvent, OnPreviewKeyDown, RoutingStrategies.Tunnel);
+        AddHandler(KeyUpEvent, OnPreviewKeyUp, RoutingStrategies.Tunnel);
+        Deactivated += (_, _) => Viewer.IsSpaceHeld = false;
+        Viewer.PropertyChanged += OnViewerPropertyChanged;
+        AddViewerShortcuts();
         Strip.ContainerPrepared += OnStripContainerPrepared;
         Strip.ContainerClearing += OnStripContainerClearing;
+    }
+
+    /// <summary>The zoom shortcuts, with the numeric keypad's keys and Ctrl+Shift+= for Ctrl+Plus too.</summary>
+    private void AddViewerShortcuts()
+    {
+        void Add(ICommand command, params string[] gestures)
+        {
+            foreach (var gesture in gestures)
+                KeyBindings.Add(new KeyBinding { Gesture = KeyGesture.Parse(gesture), Command = command });
+        }
+
+        Add(Viewer.FitCommand, "Ctrl+D0", "Ctrl+NumPad0");
+        Add(Viewer.ActualSizeCommand, "Ctrl+D1", "Ctrl+NumPad1");
+        Add(Viewer.ZoomInCommand, "Ctrl+OemPlus", "Ctrl+Shift+OemPlus", "Ctrl+Add");
+        Add(Viewer.ZoomOutCommand, "Ctrl+OemMinus", "Ctrl+Subtract");
     }
 
     /// <summary>
@@ -120,6 +142,13 @@ public partial class MainWindow : Window, IPathPicker
 
     private void OnPreviewKeyDown(object? sender, KeyEventArgs e)
     {
+        if (e.Key == Key.Space)
+        {
+            // Space with a left-drag pans. Claim the key only over the viewer, so it still works elsewhere.
+            Viewer.IsSpaceHeld = true;
+            e.Handled = Viewer.IsPointerOver;
+            return;
+        }
         if (_viewModel is null || e.KeyModifiers != KeyModifiers.None)
             return;
         if (e.Key == Key.PageDown)
@@ -129,6 +158,18 @@ public partial class MainWindow : Window, IPathPicker
         else
             return;
         e.Handled = true;
+    }
+
+    private void OnPreviewKeyUp(object? sender, KeyEventArgs e)
+    {
+        if (e.Key == Key.Space)
+            Viewer.IsSpaceHeld = false;
+    }
+
+    private void OnViewerPropertyChanged(object? sender, AvaloniaPropertyChangedEventArgs e)
+    {
+        if (e.Property == ImageViewer.ZoomProperty && _viewModel is not null)
+            _viewModel.Zoom = Viewer.Zoom;
     }
 
     // The strip recycles its containers as it scrolls; remembering which entry each one shows tells an entry when it

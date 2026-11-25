@@ -3,6 +3,7 @@ using System.ComponentModel;
 using System.Windows.Input;
 using Avalonia.Media.Imaging;
 using Avalonia.Threading;
+using ScreenshotTrimmer.App.Controls;
 using ScreenshotTrimmer.App.Imaging;
 using ScreenshotTrimmer.App.Localization;
 using ScreenshotTrimmer.App.Mvvm;
@@ -24,6 +25,8 @@ public sealed class MainWindowViewModel : Observable
     private Message? _viewerMessage;
     private int _loadNumber;
     private string? _shownPath;
+    private double _zoom;
+    private ViewerBackground _background;
     private string? _openFolder;
 
     public MainWindowViewModel(Workspace workspace, IPathPicker picker, SettingsSession settings)
@@ -74,10 +77,66 @@ public sealed class MainWindowViewModel : Observable
         private set
         {
             var old = _image;
-            if (Set(ref _image, value))
-                old?.Dispose();
+            if (!Set(ref _image, value))
+                return;
+            old?.Dispose();
+            RaiseStatus();
         }
     }
+
+    /// <summary>The viewer's zoom, 1 for 100%, as the viewer reports it.</summary>
+    public double Zoom
+    {
+        get => _zoom;
+        set
+        {
+            if (Set(ref _zoom, value))
+                Raise(nameof(StatusZoom));
+        }
+    }
+
+    /// <summary>What the viewer draws behind the image. Session-only; starts as the checkerboard.</summary>
+    public ViewerBackground Background
+    {
+        get => _background;
+        set
+        {
+            if (!Set(ref _background, value))
+                return;
+            Raise(nameof(IsCheckerboardBackground));
+            Raise(nameof(IsWhiteBackground));
+            Raise(nameof(IsDarkGreyBackground));
+        }
+    }
+
+    public bool IsCheckerboardBackground
+    {
+        get => Background == ViewerBackground.Checkerboard;
+        set => SetBackgroundIf(value, ViewerBackground.Checkerboard);
+    }
+
+    public bool IsWhiteBackground
+    {
+        get => Background == ViewerBackground.White;
+        set => SetBackgroundIf(value, ViewerBackground.White);
+    }
+
+    public bool IsDarkGreyBackground
+    {
+        get => Background == ViewerBackground.DarkGrey;
+        set => SetBackgroundIf(value, ViewerBackground.DarkGrey);
+    }
+
+    /// <summary>The selected image's file name for the status bar.</summary>
+    public string? StatusFileName => _shownPath is null ? null : Path.GetFileName(_shownPath);
+
+    /// <summary>The shown image's size in pixels for the status bar, formatted for the current language.</summary>
+    public string? StatusImageSize =>
+        Image is { } image ? Localizer.Instance.Format("ImageSize", image.PixelSize.Width, image.PixelSize.Height) : null;
+
+    /// <summary>The viewer's zoom for the status bar, formatted for the current language.</summary>
+    public string? StatusZoom =>
+        Image is not null && Zoom > 0 ? Localizer.Instance.Format("ZoomPercent", Zoom * 100) : null;
 
     /// <summary>The message shown in the viewer instead of the image, if any.</summary>
     public string? ViewerMessage => _viewerMessage?.Text;
@@ -195,6 +254,7 @@ public sealed class MainWindowViewModel : Observable
     {
         var load = ++_loadNumber;
         _shownPath = path;
+        Raise(nameof(StatusFileName));
         Image = null;
         SetViewerMessage(null);
         if (path is null)
@@ -238,9 +298,22 @@ public sealed class MainWindowViewModel : Observable
         Raise(nameof(HasNotices));
     }
 
+    private void SetBackgroundIf(bool chosen, ViewerBackground background)
+    {
+        if (chosen)
+            Background = background;
+    }
+
+    private void RaiseStatus()
+    {
+        Raise(nameof(StatusImageSize));
+        Raise(nameof(StatusZoom));
+    }
+
     private void OnLanguageChanged(object? sender, PropertyChangedEventArgs e)
     {
         RaiseNotices();
+        RaiseStatus();
         Raise(nameof(ViewerMessage));
         Raise(nameof(Title));
     }
