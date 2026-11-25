@@ -43,6 +43,9 @@
   <data name="SettingsTitle" xml:space="preserve"><value>Настройки</value></data>
   <data name="LanguageLabel" xml:space="preserve"><value>Език</value></data>
   <data name="LanguageSystem" xml:space="preserve"><value>Езикът на системата</value></data>
+  <!-- Each language is named in itself, so the same in every language. -->
+  <data name="LanguageEnglish" xml:space="preserve"><value>English</value></data>
+  <data name="LanguageBulgarian" xml:space="preserve"><value>Български</value></data>
   <data name="SaveModeLabel" xml:space="preserve"><value>Записване</value></data>
   <data name="SuffixMode" xml:space="preserve"><value>Режим с наставка</value></data>
   <data name="SuffixModeHint" xml:space="preserve"><value>Оригиналът остава непроменен, а Резултатът се записва до него с името му и наставката за Резултат.</value></data>

@@ -43,6 +43,9 @@
   <data name="SettingsTitle" xml:space="preserve"><value>Settings</value></data>
   <data name="LanguageLabel" xml:space="preserve"><value>Language</value></data>
   <data name="LanguageSystem" xml:space="preserve"><value>System language</value></data>
+  <!-- Each language is named in itself, so the same in every language. -->
+  <data name="LanguageEnglish" xml:space="preserve"><value>English</value></data>
+  <data name="LanguageBulgarian" xml:space="preserve"><value>Български</value></data>
   <data name="SaveModeLabel" xml:space="preserve"><value>Saving</value></data>
   <data name="SuffixMode" xml:space="preserve"><value>Suffix mode</value></data>
   <data name="SuffixModeHint" xml:space="preserve"><value>Keep the Original and save the Result beside it under its name plus the Result suffix.</value></data>

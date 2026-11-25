@@ -14,8 +14,8 @@
       <ComboBox x:Name="LanguageBox" HorizontalAlignment="Stretch"
                 SelectedIndex="{Binding SelectedLanguageIndex}">
         <ComboBoxItem Content="{loc:Tr LanguageSystem}" />
-        <ComboBoxItem Content="English" />
-        <ComboBoxItem Content="Български" />
+        <ComboBoxItem Content="{loc:Tr LanguageEnglish}" />
+        <ComboBoxItem Content="{loc:Tr LanguageBulgarian}" />
       </ComboBox>
     </StackPanel>
 
