@@ -75,8 +75,11 @@ public class SuffixModeSaveTests
         // A folder squatting on the target name makes the final rename fail on every platform.
         Directory.CreateDirectory(folder.File("shot-trimmed.png"));
 
-        Assert.ThrowsAny<Exception>(() => ResultFiles.Save(Synthetic.Gradient(4, 4), originalPath, new SaveOptions()));
+        var failure = Assert.Throws<SaveFailedException>(
+            () => ResultFiles.Save(Synthetic.Gradient(4, 4), originalPath, new SaveOptions()));
 
+        Assert.Equal(folder.File("shot-trimmed.png"), failure.TargetPath);
+        Assert.Equal(SaveFailureReason.TargetIsFolder, failure.Reason);
         Assert.Equal(["shot-trimmed.png", "shot.png"], folder.Entries());
         Assert.True(Directory.Exists(folder.File("shot-trimmed.png")));
     }
