@@ -17,8 +17,8 @@ public static class ResultFiles
     /// and leaves the Original untouched. Backup mode moves the Original to
     /// <c>name&lt;backup suffix&gt;.&lt;original extension&gt;</c>, then writes the Result as <c>name.png</c>;
     /// if that backup already exists, neither it nor the Original is moved and the report notes it.
-    /// With no backup yet, an existing <c>name.png</c> that is not the Original itself fails the save
-    /// (<see cref="SaveFailureReason.TargetExists"/>) and nothing changes.
+    /// An existing <c>name.png</c> beside a different Original that is still in place (e.g. <c>shot.png</c>
+    /// beside <c>shot.jpg</c>) fails the save (<see cref="SaveFailureReason.TargetExists"/>) and nothing changes.
     /// </remarks>
     /// <exception cref="SaveFailedException">The target could not be written. Nothing is left behind.</exception>
     /// <exception cref="ArgumentException">The suffix the mode uses is not a valid <see cref="FileSuffix"/>. Nothing changes.</exception>
@@ -36,12 +36,12 @@ public static class ResultFiles
             FileSuffix.Require(options.BackupSuffix, nameof(options));
             var backupPath = Path.Combine(folder, name + options.BackupSuffix + Path.GetExtension(fullOriginal));
             var targetPath = Path.Combine(folder, name + ".png");
-            return Failing(targetPath, () => SaveWithBackup(result, fullOriginal, backupPath, targetPath));
+            return WithFailureReason(targetPath, () => SaveWithBackup(result, fullOriginal, backupPath, targetPath));
         }
 
         FileSuffix.Require(options.ResultSuffix, nameof(options));
         var resultPath = Path.Combine(folder, name + options.ResultSuffix + ".png");
-        return Failing(resultPath, () =>
+        return WithFailureReason(resultPath, () =>
         {
             AtomicFile.Write(resultPath, stream => PngEncoder.Write(result, stream));
             return new SaveReport { Written = [resultPath] };
@@ -58,17 +58,13 @@ public static class ResultFiles
         ArgumentNullException.ThrowIfNull(result);
 
         var fullTarget = Path.GetFullPath(targetPath);
-        return Failing(fullTarget, () =>
+        return WithFailureReason(fullTarget, () =>
         {
             using var pending = AtomicFile.Prepare(fullTarget, stream => PngEncoder.Write(result, stream));
-            try
-            {
-                pending.Commit(overwrite);
-            }
-            catch (IOException e) when (!overwrite && File.Exists(fullTarget))
-            {
-                throw new SaveFailedException(fullTarget, SaveFailureReason.TargetExists, e);
-            }
+            if (overwrite)
+                pending.Commit(overwrite: true);
+            else
+                CommitNew(pending, fullTarget);
             return new SaveReport { Written = [fullTarget] };
         });
     }
@@ -77,26 +73,22 @@ public static class ResultFiles
     {
         using var pending = AtomicFile.Prepare(targetPath, stream => PngEncoder.Write(result, stream));
 
+        // A file at the target beside a different Original that is still in place is someone else's
+        // (e.g. shot.png beside shot.jpg), and the library never deletes a file. Once a Backup-mode save has
+        // moved the Original away, the file at the target is the earlier Result and is replaced.
+        if (File.Exists(targetPath) && !FileNames.Same(targetPath, originalPath) && File.Exists(originalPath))
+            throw new SaveFailedException(targetPath, SaveFailureReason.TargetExists);
+
         if (File.Exists(backupPath))
         {
             pending.Commit(overwrite: true);
             return new SaveReport { Written = [targetPath], ExistingBackup = backupPath };
         }
 
-        // With no backup yet, a file at the target that is not the Original itself is someone else's
-        // (e.g. shot.png beside shot.jpg), and the library never deletes a file.
-        if (File.Exists(targetPath) && !SamePath(targetPath, originalPath))
-            throw new SaveFailedException(targetPath, SaveFailureReason.TargetExists);
-
         File.Move(originalPath, backupPath);
         try
         {
-            pending.Commit(overwrite: false);
-        }
-        catch (IOException e) when (File.Exists(targetPath))
-        {
-            File.Move(backupPath, originalPath);
-            throw new SaveFailedException(targetPath, SaveFailureReason.TargetExists, e);
+            CommitNew(pending, targetPath);
         }
         catch
         {
@@ -106,13 +98,21 @@ public static class ResultFiles
         return new SaveReport { Written = [targetPath], Moved = [new FileMove(originalPath, backupPath)] };
     }
 
-    private static bool SamePath(string a, string b) =>
-        string.Equals(a, b, OperatingSystem.IsWindows() || OperatingSystem.IsMacOS()
-            ? StringComparison.OrdinalIgnoreCase
-            : StringComparison.Ordinal);
+    /// <summary>Commits <paramref name="pending"/> without replacing a file, failing with <see cref="SaveFailureReason.TargetExists"/> if one appeared.</summary>
+    private static void CommitNew(AtomicFile.PendingFile pending, string targetPath)
+    {
+        try
+        {
+            pending.Commit(overwrite: false);
+        }
+        catch (IOException e) when (File.Exists(targetPath))
+        {
+            throw new SaveFailedException(targetPath, SaveFailureReason.TargetExists, e);
+        }
+    }
 
     /// <summary>Runs a save, turning any file-system failure into a <see cref="SaveFailedException"/> with a reason.</summary>
-    private static SaveReport Failing(string targetPath, Func<SaveReport> save)
+    private static SaveReport WithFailureReason(string targetPath, Func<SaveReport> save)
     {
         try
         {
