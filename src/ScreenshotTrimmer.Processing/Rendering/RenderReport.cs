@@ -19,6 +19,12 @@ public sealed record RenderReport
     /// agree and applying any manual radius; null when rounded corners were not applied.
     /// </summary>
     public CornerRadii? AppliedRadii { get; init; }
+
+    /// <summary>
+    /// The transparent padding the Shadow added on every side, in pixels; 0 when Shadow is off.
+    /// The Subject starts this many pixels in from the Result's left and top edges.
+    /// </summary>
+    public int ShadowPadding { get; init; }
 }
 
 /// <summary>The number of frame lines removed on each side of the crop.</summary>

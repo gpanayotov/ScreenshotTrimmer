@@ -29,6 +29,12 @@ public static class Renderer
             report = report with { MeasuredRadii = measured, AppliedRadii = applied };
         }
 
+        if (steps.Shadow is not null)
+        {
+            (result, var padding) = ShadowDrawing.Apply(result, steps.Shadow);
+            report = report with { ShadowPadding = padding };
+        }
+
         return new RenderOutput(result, report);
     }
 
