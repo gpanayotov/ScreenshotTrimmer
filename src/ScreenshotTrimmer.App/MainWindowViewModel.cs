@@ -29,13 +29,14 @@ public sealed class MainWindowViewModel : Observable, IDisposable
     private double _zoom;
     private ViewerBackground _background;
     private string? _openFolder;
+    private string? _lastFolder;
 
     public MainWindowViewModel(Workspace workspace, IPathPicker picker, SettingsSession settings)
     {
         _workspace = workspace;
         _settings = settings;
-        OpenFilesCommand = new RelayCommand(() => OpenPicked(picker.PickFilesAsync));
-        OpenFolderCommand = new RelayCommand(() => OpenPicked(picker.PickFolderAsync));
+        OpenFilesCommand = new RelayCommand(() => OpenPicked(() => picker.PickFilesAsync(_lastFolder)));
+        OpenFolderCommand = new RelayCommand(() => OpenPicked(() => picker.PickFolderAsync(_lastFolder)));
         _workspace.Changed += OnWorkspaceChanged;
         Localizer.Instance.PropertyChanged += OnLanguageChanged;
         NextCommand = new RelayCommand(_workspace.Next);
@@ -174,12 +175,16 @@ public sealed class MainWindowViewModel : Observable, IDisposable
 
     /// <summary>
     /// Opens <paramref name="paths"/> in the workspace, replacing the list, and reports any path that does not exist
-    /// and an empty result as notices.
+    /// and an empty result as notices. The pickers then start in the folder of the first path that exists, however
+    /// the paths were opened.
     /// </summary>
     public void Open(IReadOnlyList<string> paths)
     {
         var missing = _workspace.Open(paths);
-        _openFolder = OpenFolder(paths.Select(Path.GetFullPath).Except(missing));
+        var opened = paths.Select(Path.GetFullPath).Except(missing, FileNames.Comparer).ToList();
+        _openFolder = OpenFolder(opened);
+        if (opened.Count > 0)
+            _lastFolder = FolderOf(opened[0]) ?? _lastFolder;
         Raise(nameof(Title));
 
         _notices.Clear();

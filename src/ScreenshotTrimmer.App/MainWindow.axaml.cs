@@ -15,7 +15,6 @@ namespace ScreenshotTrimmer.App;
 
 public partial class MainWindow : Window, IPathPicker
 {
-    private string? _lastFolder;
     private MainWindowViewModel? _viewModel;
     private readonly Dictionary<Control, StripEntry> _shownEntries = [];
 
@@ -90,13 +89,13 @@ public partial class MainWindow : Window, IPathPicker
         }
     }
 
-    public async Task<IReadOnlyList<string>> PickFilesAsync()
+    public async Task<IReadOnlyList<string>> PickFilesAsync(string? startFolder)
     {
         var files = await StorageProvider.OpenFilePickerAsync(new FilePickerOpenOptions
         {
             Title = Localizer.Instance["OpenFilesTitle"],
             AllowMultiple = true,
-            SuggestedStartLocation = await LastFolderAsync(),
+            SuggestedStartLocation = await FolderAsync(startFolder),
             FileTypeFilter =
             [
                 new FilePickerFileType(Localizer.Instance["ImagesFilter"])
@@ -107,28 +106,22 @@ public partial class MainWindow : Window, IPathPicker
                 new FilePickerFileType(Localizer.Instance["AllFilesFilter"]) { Patterns = ["*"] },
             ],
         });
-        var paths = LocalPaths(files);
-        if (paths.Count > 0)
-            _lastFolder = Path.GetDirectoryName(paths[0]);
-        return paths;
+        return LocalPaths(files);
     }
 
-    public async Task<IReadOnlyList<string>> PickFolderAsync()
+    public async Task<IReadOnlyList<string>> PickFolderAsync(string? startFolder)
     {
         var folders = await StorageProvider.OpenFolderPickerAsync(new FolderPickerOpenOptions
         {
             Title = Localizer.Instance["OpenFolderTitle"],
             AllowMultiple = false,
-            SuggestedStartLocation = await LastFolderAsync(),
+            SuggestedStartLocation = await FolderAsync(startFolder),
         });
-        var paths = LocalPaths(folders);
-        if (paths.Count > 0)
-            _lastFolder = paths[0];
-        return paths;
+        return LocalPaths(folders);
     }
 
-    private async Task<IStorageFolder?> LastFolderAsync() =>
-        _lastFolder is null ? null : await StorageProvider.TryGetFolderFromPathAsync(_lastFolder);
+    private async Task<IStorageFolder?> FolderAsync(string? path) =>
+        path is null ? null : await StorageProvider.TryGetFolderFromPathAsync(path);
 
     private static List<string> LocalPaths(IEnumerable<IStorageItem> items) =>
         items.Select(item => item.TryGetLocalPath()).OfType<string>().ToList();
