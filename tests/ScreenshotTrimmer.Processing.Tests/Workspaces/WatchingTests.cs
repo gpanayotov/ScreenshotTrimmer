@@ -249,10 +249,11 @@ public class WatchingTests
     }
 
     [Fact]
-    public async Task A_deleted_empty_folder_says_why()
+    public async Task A_deleted_empty_folder_opened_with_a_trailing_separator_says_why()
     {
         using var folder = new TempFolder();
-        using var workspace = OpenFolder(folder);
+        using var workspace = new Workspace(new UserSettings(), WatchDelay);
+        workspace.Open([folder.Path + Path.DirectorySeparatorChar]);
         var change = ChangeWhere(workspace, c => c.UnavailableFolders.Count > 0);
 
         Directory.Delete(folder.Path);

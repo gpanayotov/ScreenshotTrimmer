@@ -78,6 +78,7 @@ public sealed class Workspace : IDisposable
             _openedOneFile = existing is [var only] && File.Exists(only);
             _homeFolders = existing
                 .Select(path => Directory.Exists(path) ? path : Path.GetDirectoryName(path)!)
+                .Select(Path.TrimEndingDirectorySeparator)
                 .Distinct(FileNames.Comparer)
                 .ToList();
             _unavailableFolders = new HashSet<string>();
