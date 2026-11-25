@@ -23,8 +23,18 @@
   <data name="FolderUnavailable" xml:space="preserve"><value>Папката вече не е достъпна: {0}</value></data>
   <data name="ImageUnreadable" xml:space="preserve"><value>Това изображение не може да бъде прочетено: {0}</value></data>
   <data name="Dismiss" xml:space="preserve"><value>Затваряне</value></data>
-  <data name="ThumbnailUnreadable" xml:space="preserve"><value>Не може да бъде прочетено</value></data>
   <data name="ViewMenu" xml:space="preserve"><value>_Изглед</value></data>
+  <data name="FitToWindow" xml:space="preserve"><value>_Побиране в прозореца</value></data>
+  <data name="ActualSize" xml:space="preserve"><value>_Действителен размер (100%)</value></data>
+  <data name="ZoomIn" xml:space="preserve"><value>_Увеличаване</value></data>
+  <data name="ZoomOut" xml:space="preserve"><value>_Намаляване</value></data>
+  <data name="BackgroundMenu" xml:space="preserve"><value>_Фон</value></data>
+  <data name="BackgroundCheckerboard" xml:space="preserve"><value>_Шахматна дъска</value></data>
+  <data name="BackgroundWhite" xml:space="preserve"><value>_Бял</value></data>
+  <data name="BackgroundDarkGrey" xml:space="preserve"><value>_Тъмносив</value></data>
+  <data name="ImageSize" xml:space="preserve"><value>{0:N0} × {1:N0} пиксела</value></data>
+  <data name="ZoomPercent" xml:space="preserve"><value>{0:0.#}%</value></data>
+  <data name="ThumbnailUnreadable" xml:space="preserve"><value>Не може да бъде прочетено</value></data>
   <data name="ShowResults" xml:space="preserve"><value>Показване на _резултатите</value></data>
   <data name="HasResultBadge" xml:space="preserve"><value>Резултат</value></data>
   <data name="HasResultTip" xml:space="preserve"><value>Има резултат от това изображение</value></data>
