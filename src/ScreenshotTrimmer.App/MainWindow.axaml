@@ -5,7 +5,7 @@
         xmlns:loc="using:ScreenshotTrimmer.App.Localization"
         x:Class="ScreenshotTrimmer.App.MainWindow"
         x:DataType="app:MainWindowViewModel"
-        Title="{loc:Tr AppTitle}"
+        Title="{Binding Title}"
         Width="1100" Height="750" MinWidth="500" MinHeight="350"
         DragDrop.AllowDrop="True">
 
@@ -44,7 +44,13 @@
       </DockPanel>
     </Border>
 
-    <Grid ColumnDefinitions="240,4,*">
+    <Grid x:Name="Panes">
+      <Grid.ColumnDefinitions>
+        <!-- The strip; its width is remembered between sessions. -->
+        <ColumnDefinition Width="240" MinWidth="120" MaxWidth="800" />
+        <ColumnDefinition Width="4" />
+        <ColumnDefinition Width="*" />
+      </Grid.ColumnDefinitions>
       <ListBox x:Name="Strip" ItemsSource="{Binding Entries}" SelectedItem="{Binding SelectedEntry}">
         <ListBox.ItemTemplate>
           <DataTemplate x:DataType="app:StripEntry">
