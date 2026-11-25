@@ -13,6 +13,7 @@
   <data name="ImageMenu" xml:space="preserve"><value>_Image</value></data>
   <data name="NextImage" xml:space="preserve"><value>_Next image</value></data>
   <data name="PreviousImage" xml:space="preserve"><value>_Previous image</value></data>
+  <data name="RemoveFromList" xml:space="preserve"><value>_Remove from list</value></data>
   <data name="OpenFilesTitle" xml:space="preserve"><value>Open files</value></data>
   <data name="OpenFolderTitle" xml:space="preserve"><value>Open folder</value></data>
   <data name="ImagesFilter" xml:space="preserve"><value>Images</value></data>

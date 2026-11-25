@@ -39,6 +39,8 @@ public sealed class MainWindowViewModel : Observable
         Localizer.Instance.PropertyChanged += OnLanguageChanged;
         NextCommand = new RelayCommand(_workspace.Next);
         PreviousCommand = new RelayCommand(_workspace.Previous);
+        RemoveSelectedCommand = new RelayCommand(RemoveSelected);
+        RemoveEntryCommand = new RelayCommand<StripEntry>(Remove);
         DismissNoticesCommand = new RelayCommand(DismissNotices);
     }
 
@@ -170,6 +172,12 @@ public sealed class MainWindowViewModel : Observable
 
     public ICommand PreviousCommand { get; }
 
+    /// <summary>Removes the selected entry from the strip; its file is not touched.</summary>
+    public ICommand RemoveSelectedCommand { get; }
+
+    /// <summary>Removes the strip entry given as the parameter from the strip; its file is not touched.</summary>
+    public ICommand RemoveEntryCommand { get; }
+
     public ICommand DismissNoticesCommand { get; }
 
     /// <summary>
@@ -225,6 +233,30 @@ public sealed class MainWindowViewModel : Observable
     /// <summary>The folder's own name; a root folder such as <c>C:\</c> or <c>/</c>, which has none, shows in full.</summary>
     private static string FolderName(string folder) =>
         Path.GetFileName(folder) is { Length: > 0 } name ? name : folder;
+
+    private void RemoveSelected()
+    {
+        if (_workspace.Selected is { } selected)
+            Remove(selected);
+    }
+
+    private void Remove(StripEntry? entry)
+    {
+        if (entry is not null)
+            Remove(entry.Image);
+    }
+
+    private void Remove(WorkspaceImage image)
+    {
+        try
+        {
+            _workspace.Remove(image);
+        }
+        catch (ArgumentException)
+        {
+            // The file left the list on disk; the strip catches up with the update already posted.
+        }
+    }
 
     private void OpenPicked(IReadOnlyList<string> paths)
     {

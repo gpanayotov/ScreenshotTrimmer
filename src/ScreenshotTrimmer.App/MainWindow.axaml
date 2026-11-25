@@ -13,6 +13,8 @@
   <Window.KeyBindings>
     <KeyBinding Gesture="Ctrl+O" Command="{Binding OpenFilesCommand}" />
     <KeyBinding Gesture="Ctrl+Shift+O" Command="{Binding OpenFolderCommand}" />
+    <!-- A key binding only sees a Delete that the focused control left unhandled, so text boxes keep theirs. -->
+    <KeyBinding Gesture="Delete" Command="{Binding RemoveSelectedCommand}" />
   </Window.KeyBindings>
 
   <DockPanel>
@@ -46,6 +48,8 @@
       <MenuItem Header="{loc:Tr ImageMenu}">
         <MenuItem Header="{loc:Tr NextImage}" InputGesture="PageDown" Command="{Binding NextCommand}" />
         <MenuItem Header="{loc:Tr PreviousImage}" InputGesture="PageUp" Command="{Binding PreviousCommand}" />
+        <Separator />
+        <MenuItem Header="{loc:Tr RemoveFromList}" InputGesture="Delete" Command="{Binding RemoveSelectedCommand}" />
       </MenuItem>
     </Menu>
 
@@ -81,7 +85,14 @@
           <DataTemplate x:DataType="app:StripEntry">
             <!-- A fixed-size box, so the strip does not jump as placeholders turn into thumbnails.
                  A listed Result is dimmed; an Original whose Result exists carries the "has result" badge. -->
-            <StackPanel Spacing="4" HorizontalAlignment="Center" Opacity="{Binding Opacity}">
+            <StackPanel Spacing="4" HorizontalAlignment="Center" Opacity="{Binding Opacity}" Background="Transparent">
+              <StackPanel.ContextMenu>
+                <ContextMenu>
+                  <MenuItem Header="{loc:Tr RemoveFromList}" InputGesture="Delete"
+                            Command="{Binding $parent[ListBox].((app:MainWindowViewModel)DataContext).RemoveEntryCommand}"
+                            CommandParameter="{Binding}" />
+                </ContextMenu>
+              </StackPanel.ContextMenu>
               <Border Width="{x:Static imaging:ThumbnailCache.BoxWidth}" Height="{x:Static imaging:ThumbnailCache.BoxHeight}"
                       CornerRadius="2" Background="{DynamicResource SystemControlBackgroundBaseLowBrush}">
                 <Panel>
