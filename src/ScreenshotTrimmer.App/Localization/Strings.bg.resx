@@ -20,6 +20,7 @@
   <data name="EmptyHint" xml:space="preserve"><value>Отворете екранни снимки с Файл › Отваряне на файлове (Ctrl+O) или Файл › Отваряне на папка (Ctrl+Shift+O), или плъзнете файлове или папка в този прозорец.</value></data>
   <data name="NoImagesFound" xml:space="preserve"><value>Не са намерени изображения.</value></data>
   <data name="PathsNotFound" xml:space="preserve"><value>Пропуснати са несъществуващи пътища: {0}</value></data>
+  <data name="FolderUnavailable" xml:space="preserve"><value>Папката вече не е достъпна: {0}</value></data>
   <data name="ImageUnreadable" xml:space="preserve"><value>Това изображение не може да бъде прочетено: {0}</value></data>
   <data name="Dismiss" xml:space="preserve"><value>Затваряне</value></data>
   <data name="ViewMenu" xml:space="preserve"><value>_Изглед</value></data>

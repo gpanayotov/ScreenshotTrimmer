@@ -51,7 +51,16 @@ public sealed class MainWindowViewModel : Observable
         set
         {
             if (value is not null && value.Image.Path != _workspace.Selected?.Path)
-                _workspace.Select(value.Image);
+            {
+                try
+                {
+                    _workspace.Select(value.Image);
+                }
+                catch (ArgumentException)
+                {
+                    // The file left the list on disk; the strip catches up with the update already posted.
+                }
+            }
             else
                 Set(ref _selectedEntry, value);
         }
@@ -247,6 +256,21 @@ public sealed class MainWindowViewModel : Observable
         if (change.Selected?.Path != _shownPath)
             LoadImage(change.Selected?.Path);
         Set(ref _selectedEntry, selected, nameof(SelectedEntry));
+
+        if (change.UnavailableFolders.Count > 0)
+            ReportUnavailable(change.UnavailableFolders);
+    }
+
+    /// <summary>Tells the user which folders went away; the title stops naming the open folder once it is gone.</summary>
+    private void ReportUnavailable(IReadOnlyList<string> folders)
+    {
+        _notices.Add(new Message("FolderUnavailable", string.Join(", ", folders)));
+        RaiseNotices();
+        if (_openFolder is not null && folders.Any(folder => Path.TrimEndingDirectorySeparator(folder) == _openFolder))
+        {
+            _openFolder = null;
+            Raise(nameof(Title));
+        }
     }
 
     /// <summary>Decodes <paramref name="path"/> off the interface thread; a newer selection wins over an older load.</summary>

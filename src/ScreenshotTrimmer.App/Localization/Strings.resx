@@ -20,6 +20,7 @@
   <data name="EmptyHint" xml:space="preserve"><value>Open screenshots with File › Open files (Ctrl+O) or File › Open folder (Ctrl+Shift+O), or drag files or a folder onto this window.</value></data>
   <data name="NoImagesFound" xml:space="preserve"><value>No images found.</value></data>
   <data name="PathsNotFound" xml:space="preserve"><value>Skipped paths that do not exist: {0}</value></data>
+  <data name="FolderUnavailable" xml:space="preserve"><value>The folder is no longer available: {0}</value></data>
   <data name="ImageUnreadable" xml:space="preserve"><value>This image cannot be read: {0}</value></data>
   <data name="Dismiss" xml:space="preserve"><value>Dismiss</value></data>
   <data name="ViewMenu" xml:space="preserve"><value>_View</value></data>
