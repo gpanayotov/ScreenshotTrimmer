@@ -21,6 +21,7 @@ public sealed class MainWindowViewModel : Observable
     private Message? _viewerMessage;
     private int _loadNumber;
     private string? _shownPath;
+    private string? _openFolder;
 
     public MainWindowViewModel(Workspace workspace, IPathPicker picker)
     {
@@ -67,6 +68,11 @@ public sealed class MainWindowViewModel : Observable
     /// <summary>Whether nothing is listed, so the window shows how to open screenshots.</summary>
     public bool ShowsHint => Entries.Count == 0;
 
+    /// <summary>The window title: the open folder's name, or the app's name when no single folder is open.</summary>
+    public string Title => _openFolder is null
+        ? Localizer.Instance["AppTitle"]
+        : Localizer.Instance.Format("TitleWithFolder", FolderName(_openFolder));
+
     public string NoticeText => string.Join(Environment.NewLine, _notices.Select(notice => notice.Text));
 
     public bool HasNotices => _notices.Count > 0;
@@ -88,6 +94,8 @@ public sealed class MainWindowViewModel : Observable
     public void Open(IReadOnlyList<string> paths)
     {
         var missing = _workspace.Open(paths);
+        _openFolder = OpenFolder(paths.Select(Path.GetFullPath).Except(missing));
+        Raise(nameof(Title));
 
         _notices.Clear();
         if (missing.Count > 0)
@@ -96,6 +104,24 @@ public sealed class MainWindowViewModel : Observable
             _notices.Add(new Message("NoImagesFound"));
         RaiseNotices();
     }
+
+    /// <summary>
+    /// The folder the opened <paramref name="paths"/> share: a folder itself, or the folder holding a file. <c>null</c>
+    /// when nothing was opened or the paths lie in different folders.
+    /// </summary>
+    private static string? OpenFolder(IEnumerable<string> paths)
+    {
+        var folders = paths
+            .Select(path => Directory.Exists(path) ? path : Path.GetDirectoryName(path))
+            .Select(folder => folder is null ? null : Path.TrimEndingDirectorySeparator(folder))
+            .Distinct()
+            .ToList();
+        return folders.Count == 1 ? folders[0] : null;
+    }
+
+    /// <summary>The folder's own name; a root folder such as <c>C:\</c> or <c>/</c>, which has none, shows in full.</summary>
+    private static string FolderName(string folder) =>
+        Path.GetFileName(folder) is { Length: > 0 } name ? name : folder;
 
     private void OpenPicked(IReadOnlyList<string> paths)
     {
@@ -181,6 +207,7 @@ public sealed class MainWindowViewModel : Observable
     {
         RaiseNotices();
         Raise(nameof(ViewerMessage));
+        Raise(nameof(Title));
     }
 
     /// <summary>A string from the resources with its arguments, formatted in the current language when shown.</summary>

@@ -21,6 +21,7 @@ public partial class App : Application
 
             var workspace = new Workspace(settings);
             var window = new MainWindow();
+            window.RememberPlacement(WindowPlacementStore.ForCurrentUser());
             window.Attach(workspace);
             window.Closed += (_, _) => workspace.Dispose();
             desktop.MainWindow = window;
