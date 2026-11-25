@@ -22,6 +22,10 @@
         <Separator />
         <MenuItem x:Name="ExitItem" Header="{loc:Tr Exit}" />
       </MenuItem>
+      <MenuItem Header="{loc:Tr ViewMenu}">
+        <MenuItem Header="{loc:Tr ShowResults}" ToggleType="CheckBox"
+                  IsChecked="{Binding ShowResults, Mode=TwoWay}" />
+      </MenuItem>
       <MenuItem Header="{loc:Tr ImageMenu}">
         <MenuItem Header="{loc:Tr NextImage}" InputGesture="PageDown" Command="{Binding NextCommand}" />
         <MenuItem Header="{loc:Tr PreviousImage}" InputGesture="PageUp" Command="{Binding PreviousCommand}" />
@@ -42,7 +46,16 @@
       <ListBox x:Name="Strip" ItemsSource="{Binding Entries}" SelectedItem="{Binding SelectedEntry}">
         <ListBox.ItemTemplate>
           <DataTemplate x:DataType="app:StripEntry">
-            <TextBlock Text="{Binding Name}" TextTrimming="CharacterEllipsis" />
+            <!-- A listed Result is dimmed; an Original whose Result exists carries the "has result" badge. -->
+            <DockPanel Opacity="{Binding Opacity}">
+              <Border DockPanel.Dock="Right" IsVisible="{Binding HasResult}" Margin="6,0,0,0" Padding="5,1"
+                      CornerRadius="3" VerticalAlignment="Center"
+                      Background="{DynamicResource SystemControlBackgroundAccentBrush}"
+                      ToolTip.Tip="{loc:Tr HasResultTip}">
+                <TextBlock Text="{loc:Tr HasResultBadge}" FontSize="11" Foreground="White" />
+              </Border>
+              <TextBlock Text="{Binding Name}" TextTrimming="CharacterEllipsis" VerticalAlignment="Center" />
+            </DockPanel>
           </DataTemplate>
         </ListBox.ItemTemplate>
       </ListBox>
