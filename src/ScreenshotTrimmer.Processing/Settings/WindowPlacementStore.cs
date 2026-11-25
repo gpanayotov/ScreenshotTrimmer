@@ -1,5 +1,4 @@
 using System.Text.Json;
-using ScreenshotTrimmer.Processing.Files;
 
 namespace ScreenshotTrimmer.Processing.Settings;
 
@@ -24,7 +23,7 @@ public sealed class WindowPlacementStore
 
     /// <summary>The store in the same per-user folder as <see cref="SettingsStore.ForCurrentUser"/>.</summary>
     public static WindowPlacementStore ForCurrentUser() =>
-        new(Path.GetDirectoryName(SettingsStore.ForCurrentUser().FilePath)!);
+        new(SettingsStore.CurrentUserFolder);
 
     /// <summary>The window placement file's full path.</summary>
     public string FilePath { get; }
@@ -33,25 +32,13 @@ public sealed class WindowPlacementStore
     /// The saved placement, or <c>null</c> when there is none to use: the file is missing or damaged, or any field is
     /// missing, of the wrong type or out of range. Unknown fields are ignored. Never throws for a bad file.
     /// </summary>
-    public WindowPlacement? Load()
-    {
-        try
-        {
-            using var document = JsonDocument.Parse(File.ReadAllText(FilePath));
-            return document.RootElement.ValueKind == JsonValueKind.Object ? Read(document.RootElement) : null;
-        }
-        catch (Exception e) when (e is IOException or UnauthorizedAccessException or JsonException)
-        {
-            return null;
-        }
-    }
+    public WindowPlacement? Load() => JsonFile.Read(FilePath, Read);
 
     /// <summary>Writes the placement atomically, creating the folder if needed.</summary>
     public void Save(WindowPlacement placement)
     {
         ArgumentNullException.ThrowIfNull(placement);
-        Directory.CreateDirectory(Path.GetDirectoryName(FilePath)!);
-        AtomicFile.Write(FilePath, stream => JsonSerializer.Serialize(stream, placement, JsonOptions));
+        JsonFile.Write(FilePath, placement, JsonOptions);
     }
 
     private static WindowPlacement? Read(JsonElement root) =>
@@ -59,7 +46,7 @@ public sealed class WindowPlacementStore
         && Integer(root, "y") is { } y
         && Size(root, "width") is { } width
         && Size(root, "height") is { } height
-        && Bool(root, "maximized") is { } maximized
+        && JsonFile.Bool(root, "maximized") is { } maximized
         && Size(root, "stripWidth") is { } stripWidth
             ? new WindowPlacement
             {
@@ -80,10 +67,5 @@ public sealed class WindowPlacementStore
         && double.IsFinite(number)
         && number > 0
             ? number
-            : null;
-
-    private static bool? Bool(JsonElement root, string name) =>
-        root.TryGetProperty(name, out var value) && value.ValueKind is JsonValueKind.True or JsonValueKind.False
-            ? value.GetBoolean()
             : null;
 }

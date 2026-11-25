@@ -34,28 +34,18 @@ public sealed class SettingsStore
     /// The store in the operating system's per-user application-data folder
     /// (<c>%APPDATA%</c> on Windows, <c>~/.config</c> on Linux), in a subfolder named after the app.
     /// </summary>
-    public static SettingsStore ForCurrentUser() =>
-        new(Path.Combine(
+    public static SettingsStore ForCurrentUser() => new(CurrentUserFolder);
+
+    /// <summary>The per-user folder <see cref="ForCurrentUser"/> keeps the settings in.</summary>
+    internal static string CurrentUserFolder =>
+        Path.Combine(
             Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData, Environment.SpecialFolderOption.DoNotVerify),
-            AppFolderName));
+            AppFolderName);
 
     /// <summary>The settings file's full path.</summary>
     public string FilePath { get; }
 
-    public UserSettings Load()
-    {
-        try
-        {
-            using var document = JsonDocument.Parse(File.ReadAllText(FilePath));
-            return document.RootElement.ValueKind == JsonValueKind.Object
-                ? Read(document.RootElement)
-                : new UserSettings();
-        }
-        catch (Exception e) when (e is IOException or UnauthorizedAccessException or JsonException)
-        {
-            return new UserSettings();
-        }
-    }
+    public UserSettings Load() => JsonFile.Read(FilePath, Read) ?? new UserSettings();
 
     /// <summary>Writes the settings atomically, creating the folder if needed.</summary>
     /// <exception cref="ArgumentException">A suffix is not a valid <see cref="FileSuffix"/>. Nothing is written.</exception>
@@ -64,8 +54,7 @@ public sealed class SettingsStore
         ArgumentNullException.ThrowIfNull(settings);
         FileSuffix.Require(settings.ResultSuffix, nameof(settings));
         FileSuffix.Require(settings.BackupSuffix, nameof(settings));
-        Directory.CreateDirectory(Path.GetDirectoryName(FilePath)!);
-        AtomicFile.Write(FilePath, stream => JsonSerializer.Serialize(stream, settings, JsonOptions));
+        JsonFile.Write(FilePath, settings, JsonOptions);
     }
 
     private static UserSettings Read(JsonElement root)
@@ -114,8 +103,5 @@ public sealed class SettingsStore
             ? number
             : fallback;
 
-    private static bool Bool(JsonElement root, string name, bool fallback) =>
-        root.TryGetProperty(name, out var value) && value.ValueKind is JsonValueKind.True or JsonValueKind.False
-            ? value.GetBoolean()
-            : fallback;
+    private static bool Bool(JsonElement root, string name, bool fallback) => JsonFile.Bool(root, name) ?? fallback;
 }
