@@ -64,6 +64,7 @@ public partial class MainWindow : Window, IPathPicker
         _viewModel = new MainWindowViewModel(workspace, this, settings);
         _viewModel.PropertyChanged += OnViewModelPropertyChanged;
         DataContext = _viewModel;
+        Closed += (_, _) => _viewModel.Dispose();
     }
 
     /// <summary>Opens the paths given on the command line, relative to the current folder, like any other open.</summary>
@@ -77,9 +78,16 @@ public partial class MainWindow : Window, IPathPicker
     {
         if (_viewModel is null)
             return;
-        var edited = await new SettingsWindow(_viewModel.Settings).ShowDialog<UserSettings?>(this);
-        if (edited is not null)
-            _viewModel.ApplySettings(edited);
+        try
+        {
+            var edited = await new SettingsWindow(_viewModel.Settings).ShowDialog<UserSettings?>(this);
+            if (edited is not null)
+                _viewModel.ApplySettings(edited);
+        }
+        catch (Exception e)
+        {
+            _viewModel.ReportFailure(e);
+        }
     }
 
     public async Task<IReadOnlyList<string>> PickFilesAsync()

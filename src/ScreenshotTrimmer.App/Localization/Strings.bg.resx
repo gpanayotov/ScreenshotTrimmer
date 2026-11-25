@@ -55,4 +55,5 @@
   <data name="Save" xml:space="preserve"><value>Запис</value></data>
   <data name="Cancel" xml:space="preserve"><value>Отказ</value></data>
   <data name="SettingsNotSaved" xml:space="preserve"><value>Настройките не могат да бъдат записани в {0}: {1} Те важат, докато затворите приложението.</value></data>
+  <data name="UnexpectedError" xml:space="preserve"><value>Възникна грешка: {0}</value></data>
 </root>

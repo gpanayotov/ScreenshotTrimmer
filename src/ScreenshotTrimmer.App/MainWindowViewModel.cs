@@ -14,7 +14,7 @@ using ScreenshotTrimmer.Processing.Workspaces;
 namespace ScreenshotTrimmer.App;
 
 /// <summary>The main window's state: the strip, the selected image, the viewer and the notices.</summary>
-public sealed class MainWindowViewModel : Observable
+public sealed class MainWindowViewModel : Observable, IDisposable
 {
     private readonly Workspace _workspace;
     private readonly SettingsSession _settings;
@@ -34,8 +34,8 @@ public sealed class MainWindowViewModel : Observable
     {
         _workspace = workspace;
         _settings = settings;
-        OpenFilesCommand = new RelayCommand(async () => OpenPicked(await picker.PickFilesAsync()));
-        OpenFolderCommand = new RelayCommand(async () => OpenPicked(await picker.PickFolderAsync()));
+        OpenFilesCommand = new RelayCommand(() => OpenPicked(picker.PickFilesAsync));
+        OpenFolderCommand = new RelayCommand(() => OpenPicked(picker.PickFolderAsync));
         _workspace.Changed += OnWorkspaceChanged;
         Localizer.Instance.PropertyChanged += OnLanguageChanged;
         NextCommand = new RelayCommand(_workspace.Next);
@@ -208,6 +208,23 @@ public sealed class MainWindowViewModel : Observable
         }
     }
 
+    /// <summary>Reports something that went wrong unexpectedly as a notice, instead of letting it end the app.</summary>
+    public void ReportFailure(Exception failure)
+    {
+        _notices.Add(new Message("UnexpectedError", failure.Message));
+        RaiseNotices();
+    }
+
+    /// <summary>Lets go of the language, the workspace and the shown image; the window is closing.</summary>
+    public void Dispose()
+    {
+        Localizer.Instance.PropertyChanged -= OnLanguageChanged;
+        _workspace.Changed -= OnWorkspaceChanged;
+        // A load still running sees it is outdated and disposes its bitmap.
+        _loadNumber++;
+        Image = null;
+    }
+
     /// <summary>
     /// The folder the opened <paramref name="paths"/> share: a folder itself, or the folder holding a file. <c>null</c>
     /// when nothing was opened or the paths lie in different folders.
@@ -264,10 +281,19 @@ public sealed class MainWindowViewModel : Observable
         }
     }
 
-    private void OpenPicked(IReadOnlyList<string> paths)
+    /// <summary>Opens what <paramref name="pick"/> asks the user for; a picker that fails is reported as a notice.</summary>
+    private async void OpenPicked(Func<Task<IReadOnlyList<string>>> pick)
     {
-        if (paths.Count > 0)
-            Open(paths);
+        try
+        {
+            var paths = await pick();
+            if (paths.Count > 0)
+                Open(paths);
+        }
+        catch (Exception e)
+        {
+            ReportFailure(e);
+        }
     }
 
     private void OnWorkspaceChanged(object? sender, WorkspaceChange change)
@@ -331,8 +357,9 @@ public sealed class MainWindowViewModel : Observable
         {
             bitmap = await Task.Run(() => BitmapLoading.Load(path));
         }
-        catch (Exception e) when (e is IOException or UnauthorizedAccessException or InvalidDataException)
+        catch (Exception)
         {
+            // Unreadable, not an image, or anything unforeseen while decoding: the viewer says so instead.
             failure = new Message("ImageUnreadable", Path.GetFileName(path));
         }
 

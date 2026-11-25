@@ -55,4 +55,5 @@
   <data name="Save" xml:space="preserve"><value>Save</value></data>
   <data name="Cancel" xml:space="preserve"><value>Cancel</value></data>
   <data name="SettingsNotSaved" xml:space="preserve"><value>The settings could not be saved to {0}: {1} They apply until you close the app.</value></data>
+  <data name="UnexpectedError" xml:space="preserve"><value>Something went wrong: {0}</value></data>
 </root>
