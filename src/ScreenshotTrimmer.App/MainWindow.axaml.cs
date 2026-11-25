@@ -173,7 +173,7 @@ public partial class MainWindow : Window, IPathPicker
     }
 
     // The strip recycles its containers as it scrolls; remembering which entry each one shows tells an entry when it
-    // leaves the view, so thumbnails queued for entries scrolled past are not decoded.
+    // leaves the view, so thumbnails queued for entries scrolled past are not decoded and shown ones can be let go.
     private void OnStripContainerPrepared(object? sender, ContainerPreparedEventArgs e)
     {
         if (Strip.ItemFromContainer(e.Container) is StripEntry entry)
@@ -183,7 +183,7 @@ public partial class MainWindow : Window, IPathPicker
     private void OnStripContainerClearing(object? sender, ContainerClearingEventArgs e)
     {
         if (_shownEntries.Remove(e.Container, out var entry))
-            entry.Hidden();
+            entry.Unload();
     }
 
     private void OnViewModelPropertyChanged(object? sender, PropertyChangedEventArgs e)

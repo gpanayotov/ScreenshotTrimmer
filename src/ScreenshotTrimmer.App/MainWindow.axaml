@@ -93,7 +93,7 @@
                             CommandParameter="{Binding}" />
                 </ContextMenu>
               </StackPanel.ContextMenu>
-              <Border Width="{x:Static imaging:ThumbnailCache.BoxWidth}" Height="{x:Static imaging:ThumbnailCache.BoxHeight}"
+              <Border Width="{x:Static imaging:ThumbnailCache.Width}" Height="{x:Static imaging:ThumbnailCache.Height}"
                       CornerRadius="2" Background="{DynamicResource SystemControlBackgroundBaseLowBrush}">
                 <Panel>
                   <Image Source="{Binding Thumbnail}" Stretch="None"
@@ -107,7 +107,7 @@
                   </StackPanel>
                 </Panel>
               </Border>
-              <DockPanel Width="{x:Static imaging:ThumbnailCache.BoxWidth}">
+              <DockPanel Width="{x:Static imaging:ThumbnailCache.Width}">
                 <Border DockPanel.Dock="Right" IsVisible="{Binding HasResult}" Margin="6,0,0,0" Padding="5,1"
                         CornerRadius="3" VerticalAlignment="Center"
                         Background="{DynamicResource SystemControlBackgroundAccentBrush}"
