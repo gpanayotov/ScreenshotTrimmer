@@ -27,6 +27,7 @@ public sealed class Workspace : IDisposable
     private IReadOnlySet<string> _unavailableFolders = new HashSet<string>();
     private bool _lastRelistFailed;
     private bool _showResults;
+    private HashSet<string> _removed = new(FileNames.Comparer);
 
     public Workspace(UserSettings settings)
         : this(settings, DefaultWatchDelay)
@@ -141,6 +142,26 @@ public sealed class Workspace : IDisposable
         }
     }
 
+    /// <summary>
+    /// Hides <paramref name="image"/>, which must be one of <see cref="Images"/>, for as long as this list is open; its
+    /// file is not touched.
+    /// </summary>
+    public void Remove(WorkspaceImage image)
+    {
+        ArgumentNullException.ThrowIfNull(image);
+        lock (_lock)
+        {
+            if (IndexOf(image) < 0)
+                throw new ArgumentException("The image is not listed in this workspace.", nameof(image));
+            var before = Images.Select(listed => listed.Path).ToList();
+            var selectedIndex = SelectedIndex;
+            _removed.Add(image.Path);
+            List();
+            Selected = SurvivorNear(before, selectedIndex);
+            RaiseChanged();
+        }
+    }
+
     /// <summary>Selects <paramref name="image"/>, which must be one of <see cref="Images"/>.</summary>
     public void Select(WorkspaceImage image)
     {
@@ -241,6 +262,7 @@ public sealed class Workspace : IDisposable
     {
         var listing = ImageListing.List(_openedPaths, ListingOptionsFor(_settings, _showResults));
         Images = listing.Images
+            .Where(image => !_removed.Contains(image.Path))
             .Select(image => new WorkspaceImage
             {
                 Path = image.Path, IsResult = image.IsResult, HasResult = image.HasResult,
