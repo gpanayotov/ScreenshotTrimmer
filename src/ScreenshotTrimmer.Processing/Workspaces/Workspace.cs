@@ -159,6 +159,7 @@ public sealed class Workspace : IDisposable
             .Select(image => new WorkspaceImage
             {
                 Path = image.Path, IsResult = image.IsResult, HasResult = image.HasResult,
+                ContentVersion = ContentVersion.Of(image.Path),
             })
             .ToList();
         return listing;

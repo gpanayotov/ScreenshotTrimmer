@@ -17,6 +17,7 @@ public sealed class MainWindowViewModel : Observable
     private readonly Workspace _workspace;
     private readonly SettingsSession _settings;
     private readonly List<Message> _notices = [];
+    private readonly ThumbnailCache _thumbnails = new();
     private IReadOnlyList<WorkspaceImage>? _listedImages;
     private StripEntry? _selectedEntry;
     private Bitmap? _image;
@@ -179,7 +180,7 @@ public sealed class MainWindowViewModel : Observable
             _listedImages = change.Images;
             Entries.Clear();
             foreach (var image in change.Images)
-                Entries.Add(new StripEntry(image));
+                Entries.Add(new StripEntry(image, _thumbnails));
             Raise(nameof(ShowsHint));
         }
 
