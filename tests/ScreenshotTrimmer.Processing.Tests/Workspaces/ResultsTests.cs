@@ -1,3 +1,4 @@
+using ScreenshotTrimmer.Processing.Files;
 using ScreenshotTrimmer.Processing.Settings;
 using ScreenshotTrimmer.Processing.Workspaces;
 
@@ -16,6 +17,80 @@ public class ResultsTests
 
     private static WorkspaceImage Entry(Workspace workspace, string name) =>
         workspace.Images.Single(i => Path.GetFileName(i.Path) == name);
+
+    [Fact]
+    public void Results_are_hidden_by_default_and_their_originals_have_the_badge()
+    {
+        using var folder = new TempFolder();
+        Touch(folder, "a.png", "a-trimmed.png", "b.png");
+        using var workspace = new Workspace(new UserSettings());
+
+        workspace.Open([folder.Path]);
+
+        Assert.False(workspace.ShowResults);
+        Assert.Equal(["a.png", "b.png"], Names(workspace));
+        Assert.True(Entry(workspace, "a.png").HasResult);
+        Assert.False(Entry(workspace, "b.png").HasResult);
+        Assert.All(workspace.Images, image => Assert.False(image.IsResult));
+    }
+
+    [Fact]
+    public void A_suffixed_file_with_no_original_is_shown_as_a_normal_image()
+    {
+        using var folder = new TempFolder();
+        Touch(folder, "a.png", "lonely-trimmed.png");
+        using var workspace = new Workspace(new UserSettings());
+
+        workspace.Open([folder.Path]);
+
+        Assert.Equal(["a.png", "lonely-trimmed.png"], Names(workspace));
+        Assert.False(Entry(workspace, "lonely-trimmed.png").IsResult);
+    }
+
+    [Fact]
+    public void A_result_opened_on_its_own_stays_listed_and_selected()
+    {
+        using var folder = new TempFolder();
+        Touch(folder, "a.png", "a-trimmed.png", "b.png");
+        using var workspace = new Workspace(new UserSettings());
+
+        workspace.Open([folder.File("a-trimmed.png")]);
+
+        Assert.Equal(["a.png", "a-trimmed.png", "b.png"], Names(workspace));
+        Assert.True(Entry(workspace, "a-trimmed.png").IsResult);
+        Assert.Equal(folder.File("a-trimmed.png"), workspace.Selected?.Path);
+    }
+
+    [Fact]
+    public void In_backup_mode_no_file_is_a_result()
+    {
+        using var folder = new TempFolder();
+        Touch(folder, "a.png", "a-trimmed.png");
+        using var workspace = new Workspace(new UserSettings { SaveMode = SaveMode.Backup });
+
+        workspace.Open([folder.Path]);
+
+        Assert.Equal(["a.png", "a-trimmed.png"], Names(workspace));
+        Assert.All(workspace.Images, image => Assert.False(image.IsResult || image.HasResult));
+    }
+
+    [Fact]
+    public void Toggling_results_announces_one_change_and_setting_the_same_value_none()
+    {
+        using var folder = new TempFolder();
+        Touch(folder, "a.png", "a-trimmed.png");
+        using var workspace = new Workspace(new UserSettings());
+        workspace.Open([folder.Path]);
+        var changes = new List<WorkspaceChange>();
+        workspace.Changed += (_, change) => changes.Add(change);
+
+        workspace.ShowResults = false;
+        workspace.ShowResults = true;
+
+        var change = Assert.Single(changes);
+        Assert.Equal([folder.File("a.png"), folder.File("a-trimmed.png")], change.Images.Select(i => i.Path));
+        Assert.Equal(folder.File("a.png"), change.Selected?.Path);
+    }
 
     [Fact]
     public void Showing_results_lists_them_in_their_sorted_place_and_keeps_the_selection()
