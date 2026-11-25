@@ -21,4 +21,15 @@
   <data name="PathsNotFound" xml:space="preserve"><value>Skipped paths that do not exist: {0}</value></data>
   <data name="ImageUnreadable" xml:space="preserve"><value>This image cannot be read: {0}</value></data>
   <data name="Dismiss" xml:space="preserve"><value>Dismiss</value></data>
+  <data name="ViewMenu" xml:space="preserve"><value>_View</value></data>
+  <data name="FitToWindow" xml:space="preserve"><value>_Fit to window</value></data>
+  <data name="ActualSize" xml:space="preserve"><value>_Actual size (100%)</value></data>
+  <data name="ZoomIn" xml:space="preserve"><value>Zoom _in</value></data>
+  <data name="ZoomOut" xml:space="preserve"><value>Zoom _out</value></data>
+  <data name="BackgroundMenu" xml:space="preserve"><value>_Background</value></data>
+  <data name="BackgroundCheckerboard" xml:space="preserve"><value>_Checkerboard</value></data>
+  <data name="BackgroundWhite" xml:space="preserve"><value>_White</value></data>
+  <data name="BackgroundDarkGrey" xml:space="preserve"><value>_Dark grey</value></data>
+  <data name="ImageSize" xml:space="preserve"><value>{0:N0} × {1:N0} px</value></data>
+  <data name="ZoomPercent" xml:space="preserve"><value>{0:0.#}%</value></data>
 </root>

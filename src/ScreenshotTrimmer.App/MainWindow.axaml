@@ -26,6 +26,21 @@
         <MenuItem Header="{loc:Tr NextImage}" InputGesture="PageDown" Command="{Binding NextCommand}" />
         <MenuItem Header="{loc:Tr PreviousImage}" InputGesture="PageUp" Command="{Binding PreviousCommand}" />
       </MenuItem>
+      <MenuItem Header="{loc:Tr ViewMenu}">
+        <MenuItem Header="{loc:Tr FitToWindow}" InputGesture="Ctrl+D0" Command="{Binding #Viewer.FitCommand}" />
+        <MenuItem Header="{loc:Tr ActualSize}" InputGesture="Ctrl+D1" Command="{Binding #Viewer.ActualSizeCommand}" />
+        <MenuItem Header="{loc:Tr ZoomIn}" InputGesture="Ctrl+OemPlus" Command="{Binding #Viewer.ZoomInCommand}" />
+        <MenuItem Header="{loc:Tr ZoomOut}" InputGesture="Ctrl+OemMinus" Command="{Binding #Viewer.ZoomOutCommand}" />
+        <Separator />
+        <MenuItem Header="{loc:Tr BackgroundMenu}">
+          <MenuItem Header="{loc:Tr BackgroundCheckerboard}" ToggleType="Radio" GroupName="ViewerBackground"
+                    IsChecked="{Binding IsCheckerboardBackground}" />
+          <MenuItem Header="{loc:Tr BackgroundWhite}" ToggleType="Radio" GroupName="ViewerBackground"
+                    IsChecked="{Binding IsWhiteBackground}" />
+          <MenuItem Header="{loc:Tr BackgroundDarkGrey}" ToggleType="Radio" GroupName="ViewerBackground"
+                    IsChecked="{Binding IsDarkGreyBackground}" />
+        </MenuItem>
+      </MenuItem>
     </Menu>
 
     <!-- Non-blocking notices, such as "No images found". -->
@@ -36,6 +51,16 @@
                 Command="{Binding DismissNoticesCommand}" />
         <SelectableTextBlock Text="{Binding NoticeText}" TextWrapping="Wrap" VerticalAlignment="Center" />
       </DockPanel>
+    </Border>
+
+    <!-- Status bar: file name, size in pixels and zoom. -->
+    <Border DockPanel.Dock="Bottom" Padding="8,3" BorderThickness="0,1,0,0"
+            BorderBrush="{DynamicResource SystemControlForegroundBaseLowBrush}">
+      <StackPanel Orientation="Horizontal" Spacing="24">
+        <TextBlock Text="{Binding StatusFileName}" TextTrimming="CharacterEllipsis" MaxWidth="480" />
+        <TextBlock Text="{Binding StatusImageSize}" />
+        <TextBlock Text="{Binding StatusZoom}" />
+      </StackPanel>
     </Border>
 
     <Grid ColumnDefinitions="240,4,*">
@@ -50,7 +75,17 @@
       <GridSplitter Grid.Column="1" ResizeDirection="Columns" />
 
       <Panel Grid.Column="2">
-        <controls:ImageViewer Source="{Binding Image}" Margin="8" />
+        <Grid ColumnDefinitions="*,Auto" RowDefinitions="*,Auto">
+          <controls:ImageViewer x:Name="Viewer" Source="{Binding Image}" BackgroundKind="{Binding Background}" />
+          <ScrollBar Grid.Column="1" Orientation="Vertical" Visibility="Auto" AllowAutoHide="False"
+                     Maximum="{Binding #Viewer.VerticalScrollMax}" ViewportSize="{Binding #Viewer.ViewHeight}"
+                     LargeChange="{Binding #Viewer.ViewHeight}" SmallChange="48"
+                     Value="{Binding #Viewer.VerticalScroll, Mode=TwoWay}" />
+          <ScrollBar Grid.Row="1" Orientation="Horizontal" Visibility="Auto" AllowAutoHide="False"
+                     Maximum="{Binding #Viewer.HorizontalScrollMax}" ViewportSize="{Binding #Viewer.ViewWidth}"
+                     LargeChange="{Binding #Viewer.ViewWidth}" SmallChange="48"
+                     Value="{Binding #Viewer.HorizontalScroll, Mode=TwoWay}" />
+        </Grid>
         <TextBlock Text="{Binding ViewerMessage}" IsVisible="{Binding ViewerMessage, Converter={x:Static StringConverters.IsNotNullOrEmpty}}"
                    HorizontalAlignment="Center" VerticalAlignment="Center" TextWrapping="Wrap" Margin="24" />
         <TextBlock Text="{loc:Tr EmptyHint}" IsVisible="{Binding ShowsHint}" MaxWidth="480"
