@@ -22,7 +22,7 @@ public static class Renderer
         // Frame lines narrow the window inside the Original, so the popups are kept whole whatever is removed.
         if (steps.FrameLines)
         {
-            (window, var removed) = FrameLines.Trim(original, window, overhang);
+            (window, var removed) = FrameLines.Trim(original, window, Overhang.Reaching(window, popups));
             report = report with { FrameLinesRemoved = removed };
         }
 

@@ -130,6 +130,28 @@ public class PopupOverhangTests
         Assert.Equal(default, result[0, 74]);
     }
 
+    [Fact]
+    public void No_frame_lines_are_removed_on_a_side_a_popup_reaches_flush()
+    {
+        // The window of SloppyWindowWithMenuBelow, with a narrow menu at 45..50 x 40..63 whose bottom edge
+        // is flush with the crop's bottom edge: removing the bottom strip would leave the menu sticking out.
+        var original = Synthetic.WindowWithStrips(60, 40, left: 20, top: 20, right: 20, bottom: 60);
+        for (var y = 40; y < 63; y++)
+            for (var x = 45; x < 50; x++)
+                original[x, y] = Menu;
+        var crop = Crop.WithPopups(new PixelRect(17, 17, 66, 46), new PixelRect(45, 40, 5, 23));
+
+        var output = Renderer.Render(original, new Steps { Crop = crop, FrameLines = true });
+
+        Assert.Equal(new FrameLinesRemoved(3, 3, 3, 0), output.Report.FrameLinesRemoved);
+        var result = output.Result;
+        Assert.Equal(60, result.Width);
+        Assert.Equal(43, result.Height);
+        Assert.Equal(Synthetic.Background, result[0, 42]);
+        Assert.Equal(Synthetic.Background, result[59, 42]);
+        Assert.Equal(Menu, result[27, 42]);
+    }
+
     /// <summary>
     /// A 160x120 window with 12px rounded corners at 40..200 x 40..160 on a page, and a menu at the given
     /// rectangle sticking out past one of its sides.
