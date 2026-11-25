@@ -40,14 +40,20 @@ public static class Renderer
 
     private static RgbaImage ApplyCrop(RgbaImage source, Crop crop)
     {
-        var area = crop.Window.Intersect(new PixelRect(0, 0, source.Width, source.Height));
-        if (area.IsEmpty)
+        var bounds = new PixelRect(0, 0, source.Width, source.Height);
+        var window = crop.Window.Intersect(bounds);
+        if (window.IsEmpty)
             throw new ArgumentException($"The crop {crop.Window} lies entirely outside the {source.Width}x{source.Height} image.", nameof(crop));
 
+        var popups = crop.Popups.Select(p => p.Intersect(bounds)).Where(p => !p.IsEmpty).ToArray();
+        var area = popups.Aggregate(window, (union, popup) => union.Union(popup));
+
+        // Start fully transparent and copy in the window and each popup, so nothing beside them shows.
         var result = new RgbaImage(area.Width, area.Height);
-        for (var y = 0; y < area.Height; y++)
-            for (var x = 0; x < area.Width; x++)
-                result[x, y] = source[area.X + x, area.Y + y];
+        foreach (var part in popups.Prepend(window))
+            for (var y = part.Y; y < part.Bottom; y++)
+                for (var x = part.X; x < part.Right; x++)
+                    result[x - area.X, y - area.Y] = source[x, y];
         return result;
     }
 }
