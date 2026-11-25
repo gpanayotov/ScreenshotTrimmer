@@ -19,6 +19,9 @@ public sealed class Workspace : IDisposable
     private readonly Dictionary<string, FileSystemWatcher> _watchers = new(FileNames.Comparer);
     private readonly Dictionary<string, FileSystemWatcher> _parentWatchers = new(FileNames.Comparer);
     private readonly ConcurrentQueue<(string From, string To)> _renames = new();
+    private readonly Queue<WorkspaceChange> _pendingChanges = new();
+    private readonly Lock _announceLock = new();
+    private bool _announcing;
     private bool _disposed;
     private UserSettings _settings;
     private IReadOnlyList<string> _openedPaths = [];
@@ -47,15 +50,21 @@ public sealed class Workspace : IDisposable
         _relistTimer = new Timer(_ => OnDiskQuiet());
     }
 
-    /// <summary>The listed images in strip order.</summary>
+    /// <summary>
+    /// The listed images in strip order. The same list instance is kept until the listed images change, so a caller
+    /// can tell an update that only moved the selection by comparing references.
+    /// </summary>
     public IReadOnlyList<WorkspaceImage> Images { get; private set; } = [];
 
     /// <summary>The selected image, or <c>null</c> when nothing is listed.</summary>
     public WorkspaceImage? Selected { get; private set; }
 
     /// <summary>
-    /// Raised once per update to the list or the selection. Updates the caller makes are raised on its thread; updates
-    /// that follow the disk are raised on a thread-pool thread.
+    /// Raised once per update to the list or the selection, in the order the updates were made, after the workspace has
+    /// released its lock, so a handler may read or update it from any thread. An update is announced on the thread that
+    /// made it (a thread-pool thread for updates that follow the disk), unless another thread is announcing at the time:
+    /// that thread then announces it after the ones before it. An update made from a handler is announced once every
+    /// handler has seen the current one.
     /// </summary>
     public event EventHandler<WorkspaceChange>? Changed;
 
@@ -94,6 +103,7 @@ public sealed class Workspace : IDisposable
                 : Images.FirstOrDefault();
             RaiseChanged();
         }
+        Announce();
         return missing;
     }
 
@@ -119,6 +129,7 @@ public sealed class Workspace : IDisposable
                     ?? Images.FirstOrDefault();
                 RaiseChanged();
             }
+            Announce();
         }
     }
 
@@ -144,6 +155,7 @@ public sealed class Workspace : IDisposable
                 ?? (Images.Count == 0 ? null : Images[Math.Clamp(selectedIndex, 0, Images.Count - 1)]);
             RaiseChanged();
         }
+        Announce();
     }
 
     /// <summary>
@@ -165,6 +177,7 @@ public sealed class Workspace : IDisposable
             Selected = SurvivorNear(before, selectedIndex);
             RaiseChanged();
         }
+        Announce();
     }
 
     /// <summary>Selects <paramref name="image"/>, which must be one of <see cref="Images"/>.</summary>
@@ -179,6 +192,7 @@ public sealed class Workspace : IDisposable
                 throw new ArgumentException("The image is not listed in this workspace.", nameof(image));
             SelectAt(index);
         }
+        Announce();
     }
 
     /// <summary>Selects the next image; does nothing on the last one.</summary>
@@ -189,6 +203,7 @@ public sealed class Workspace : IDisposable
             ObjectDisposedException.ThrowIf(_disposed, this);
             SelectAt(SelectedIndex + 1);
         }
+        Announce();
     }
 
     /// <summary>Selects the previous image; does nothing on the first one.</summary>
@@ -199,6 +214,7 @@ public sealed class Workspace : IDisposable
             ObjectDisposedException.ThrowIf(_disposed, this);
             SelectAt(SelectedIndex - 1);
         }
+        Announce();
     }
 
     /// <summary>Stops watching the disk. Every later update throws <see cref="ObjectDisposedException"/>.</summary>
@@ -268,12 +284,12 @@ public sealed class Workspace : IDisposable
     /// <summary>
     /// Replaces <see cref="Images"/> with the current listing of the opened paths under the current settings and
     /// <see cref="ShowResults"/>, less the removed entries; the one re-list path, so removed entries stay hidden
-    /// through every update.
+    /// through every update. A listing equal to the current one keeps the current list instance.
     /// </summary>
     private Listing List()
     {
         var listing = ImageListing.List(_openedPaths, ListingOptionsFor(_settings, _showResults));
-        Images = listing.Images
+        var images = listing.Images
             .Where(image => !_removed.Contains(image.Path))
             .Select(image => new WorkspaceImage
             {
@@ -281,6 +297,8 @@ public sealed class Workspace : IDisposable
                 ContentVersion = ContentVersion.Of(image.Path),
             })
             .ToList();
+        if (!images.SequenceEqual(Images))
+            Images = images;
         Watch();
         return listing;
     }
@@ -394,6 +412,12 @@ public sealed class Workspace : IDisposable
     private void OnDiskQuiet()
     {
         lock (_lock)
+            FollowDisk();
+        Announce();
+    }
+
+    private void FollowDisk()
+    {
         {
             if (_disposed)
                 return;
@@ -424,7 +448,8 @@ public sealed class Workspace : IDisposable
                     RelistSoon();
                     return;
                 }
-                Images = [];
+                if (Images.Count > 0)
+                    Images = [];
                 Watch();
                 unavailable = _homeFolders.ToHashSet(FileNames.Comparer);
             }
@@ -437,21 +462,46 @@ public sealed class Workspace : IDisposable
             _unavailableFolders = unavailable;
 
             // Events for files that are not listed, or writes that left a file as it was, change nothing to show.
-            if (Images.SequenceEqual(old) && Selected == oldSelected && newlyUnavailable.Count == 0)
-            {
-                Images = old;
-                Selected = oldSelected;
+            if (ReferenceEquals(Images, old) && Selected == oldSelected && newlyUnavailable.Count == 0)
                 return;
-            }
             RaiseChanged(newlyUnavailable);
         }
     }
 
+    /// <summary>Queues the current list and selection to be announced; call under the lock, then <see cref="Announce"/>.</summary>
     private void RaiseChanged(IReadOnlyList<string>? unavailableFolders = null) =>
-        Changed?.Invoke(this, new WorkspaceChange
+        _pendingChanges.Enqueue(new WorkspaceChange
         {
             Images = Images, Selected = Selected, UnavailableFolders = unavailableFolders ?? [],
         });
+
+    /// <summary>
+    /// Raises <see cref="Changed"/> for every queued update, in order, outside the workspace's lock. Only one thread
+    /// announces at a time; a call while another is announcing, or from a handler, leaves its update to that one.
+    /// </summary>
+    private void Announce()
+    {
+        lock (_announceLock)
+        {
+            if (_announcing)
+                return;
+            _announcing = true;
+        }
+        while (true)
+        {
+            WorkspaceChange? change;
+            lock (_lock)
+            {
+                if (!_pendingChanges.TryDequeue(out change))
+                {
+                    lock (_announceLock)
+                        _announcing = false;
+                    return;
+                }
+            }
+            Changed?.Invoke(this, change);
+        }
+    }
 
     private static ListingOptions ListingOptionsFor(UserSettings settings, bool includeResults) =>
         ListingOptions.For(
