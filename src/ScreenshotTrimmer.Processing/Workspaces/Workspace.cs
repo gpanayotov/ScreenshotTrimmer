@@ -108,6 +108,7 @@ public sealed class Workspace : IDisposable
         {
             lock (_lock)
             {
+                ObjectDisposedException.ThrowIf(_disposed, this);
                 if (value == _showResults)
                     return;
                 _showResults = value;
@@ -131,6 +132,7 @@ public sealed class Workspace : IDisposable
         ArgumentNullException.ThrowIfNull(settings);
         lock (_lock)
         {
+            ObjectDisposedException.ThrowIf(_disposed, this);
             _settings = settings;
             if (_openedPaths.Count == 0)
                 return;
@@ -153,6 +155,7 @@ public sealed class Workspace : IDisposable
         ArgumentNullException.ThrowIfNull(image);
         lock (_lock)
         {
+            ObjectDisposedException.ThrowIf(_disposed, this);
             if (IndexOf(image) < 0)
                 throw new ArgumentException("The image is not listed in this workspace.", nameof(image));
             var before = Images.Select(listed => listed.Path).ToList();
@@ -170,6 +173,7 @@ public sealed class Workspace : IDisposable
         ArgumentNullException.ThrowIfNull(image);
         lock (_lock)
         {
+            ObjectDisposedException.ThrowIf(_disposed, this);
             var index = IndexOf(image);
             if (index < 0)
                 throw new ArgumentException("The image is not listed in this workspace.", nameof(image));
@@ -181,17 +185,23 @@ public sealed class Workspace : IDisposable
     public void Next()
     {
         lock (_lock)
+        {
+            ObjectDisposedException.ThrowIf(_disposed, this);
             SelectAt(SelectedIndex + 1);
+        }
     }
 
     /// <summary>Selects the previous image; does nothing on the first one.</summary>
     public void Previous()
     {
         lock (_lock)
+        {
+            ObjectDisposedException.ThrowIf(_disposed, this);
             SelectAt(SelectedIndex - 1);
+        }
     }
 
-    /// <summary>Stops watching the disk.</summary>
+    /// <summary>Stops watching the disk. Every later update throws <see cref="ObjectDisposedException"/>.</summary>
     public void Dispose()
     {
         lock (_lock)
