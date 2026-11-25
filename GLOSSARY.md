@@ -7,8 +7,12 @@ A desktop app that turns raw screenshot files into clean, publishable images by 
 ### Finding the subject
 
 **Subject**:
-The window, dialog, menu or button a screenshot is about; a window together with a **Popup overhang** counts as one Subject.
+The window, dialog, menu or button a screenshot is about; a window together with a **Popup overhang** counts as one Subject. In a browser screenshot with no dialog, maximised or not, the Subject is the web page below the **Browser bar**.
 _Avoid_: Target, object, element
+
+**Browser bar**:
+The browser's tab strip, address bar and any bookmarks bar above the web page in a browser screenshot.
+_Avoid_: Browser chrome, toolbar, header
 
 **Popup overhang**:
 The part of a menu or popup that extends past the border of the window it belongs to.
