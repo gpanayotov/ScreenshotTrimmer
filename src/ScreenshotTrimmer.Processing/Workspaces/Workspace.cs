@@ -402,7 +402,7 @@ public sealed class Workspace : IDisposable
         {
             foreach (var (from, to) in moves)
             {
-                if (path == from)
+                if (FileNames.Same(path, from))
                     path = to;
             }
             return path;
