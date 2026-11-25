@@ -9,7 +9,8 @@ namespace ScreenshotTrimmer.Processing.Workspaces;
 /// </summary>
 public sealed class Workspace : IDisposable
 {
-    private readonly UserSettings _settings;
+    private UserSettings _settings;
+    private IReadOnlyList<string> _openedPaths = [];
 
     public Workspace(UserSettings settings)
     {
@@ -39,19 +40,34 @@ public sealed class Workspace : IDisposable
         var missing = fullPaths.Where(path => !File.Exists(path) && !Directory.Exists(path)).ToList();
         var existing = fullPaths.Except(missing).ToList();
 
-        var listing = ImageListing.List(existing, ListingOptionsFor(_settings));
-        Images = listing.Images
-            .Select(image => new WorkspaceImage
-            {
-                Path = image.Path, IsResult = image.IsResult, HasResult = image.HasResult,
-            })
-            .ToList();
+        _openedPaths = existing;
+        var listing = List();
         Selected = listing.Selected is { } opened
             ? Images.First(image => image.Path == opened.Path)
             : Images.FirstOrDefault();
 
         RaiseChanged();
         return missing;
+    }
+
+    /// <summary>
+    /// Lists the opened paths again with <paramref name="settings"/>' save mode and Result suffix, which decide which
+    /// files are Results. The selection stays where the selected file is still listed; otherwise it passes to the
+    /// entry now in its place.
+    /// </summary>
+    public void ApplySettings(UserSettings settings)
+    {
+        ArgumentNullException.ThrowIfNull(settings);
+        _settings = settings;
+        if (_openedPaths.Count == 0)
+            return;
+
+        var selectedIndex = SelectedIndex;
+        var selectedPath = Selected?.Path;
+        List();
+        Selected = Images.FirstOrDefault(image => image.Path == selectedPath)
+            ?? (Images.Count == 0 ? null : Images[Math.Clamp(selectedIndex, 0, Images.Count - 1)]);
+        RaiseChanged();
     }
 
     /// <summary>Selects <paramref name="image"/>, which must be one of <see cref="Images"/>.</summary>
@@ -93,6 +109,19 @@ public sealed class Workspace : IDisposable
             return;
         Selected = Images[index];
         RaiseChanged();
+    }
+
+    /// <summary>Replaces <see cref="Images"/> with the current listing of the opened paths.</summary>
+    private Listing List()
+    {
+        var listing = ImageListing.List(_openedPaths, ListingOptionsFor(_settings));
+        Images = listing.Images
+            .Select(image => new WorkspaceImage
+            {
+                Path = image.Path, IsResult = image.IsResult, HasResult = image.HasResult,
+            })
+            .ToList();
+        return listing;
     }
 
     private void RaiseChanged() =>
