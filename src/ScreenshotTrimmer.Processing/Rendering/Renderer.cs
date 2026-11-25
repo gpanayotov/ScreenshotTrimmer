@@ -15,7 +15,15 @@ public static class Renderer
         ArgumentNullException.ThrowIfNull(steps);
 
         var result = steps.Crop is null ? original.Clone() : ApplyCrop(original, steps.Crop);
-        return new RenderOutput(result, new RenderReport());
+        var report = new RenderReport();
+
+        if (steps.FrameLines)
+        {
+            (result, var removed) = FrameLines.Remove(result);
+            report = report with { FrameLinesRemoved = removed };
+        }
+
+        return new RenderOutput(result, report);
     }
 
     private static RgbaImage ApplyCrop(RgbaImage source, Crop crop)
