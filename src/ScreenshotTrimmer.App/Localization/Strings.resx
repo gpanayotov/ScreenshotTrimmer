@@ -22,4 +22,8 @@
   <data name="PathsNotFound" xml:space="preserve"><value>Skipped paths that do not exist: {0}</value></data>
   <data name="ImageUnreadable" xml:space="preserve"><value>This image cannot be read: {0}</value></data>
   <data name="Dismiss" xml:space="preserve"><value>Dismiss</value></data>
+  <data name="ViewMenu" xml:space="preserve"><value>_View</value></data>
+  <data name="ShowResults" xml:space="preserve"><value>Show _results</value></data>
+  <data name="HasResultBadge" xml:space="preserve"><value>Result</value></data>
+  <data name="HasResultTip" xml:space="preserve"><value>A result of this image exists</value></data>
 </root>

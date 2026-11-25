@@ -50,6 +50,19 @@ public sealed class MainWindowViewModel : Observable
         }
     }
 
+    /// <summary>Whether Results are listed in the strip; session-only, off by default.</summary>
+    public bool ShowResults
+    {
+        get => _workspace.ShowResults;
+        set
+        {
+            if (value == _workspace.ShowResults)
+                return;
+            _workspace.ShowResults = value;
+            Raise();
+        }
+    }
+
     /// <summary>The decoded selected image, or <c>null</c> while it loads or when it cannot be read.</summary>
     public Bitmap? Image
     {
