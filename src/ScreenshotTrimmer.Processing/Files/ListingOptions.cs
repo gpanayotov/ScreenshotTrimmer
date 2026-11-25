@@ -7,7 +7,7 @@ public sealed record ListingOptions
     /// The Suffix-mode suffix: a file whose base name is another listed image's base name plus this suffix is a
     /// Result. <c>null</c> (or empty) when the save mode is not Suffix mode, so no file is treated as a Result.
     /// </summary>
-    public string? ResultSuffix { get; init; } = "-trimmed";
+    public string? ResultSuffix { get; init; } = SaveOptions.DefaultResultSuffix;
 
     /// <summary>Whether Results are listed (marked <see cref="ListedImage.IsResult"/>) instead of hidden.</summary>
     public bool IncludeResults { get; init; }
