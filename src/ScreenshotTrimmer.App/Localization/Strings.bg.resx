@@ -5,6 +5,7 @@
   <resheader name="reader"><value>System.Resources.ResXResourceReader, System.Windows.Forms, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value></resheader>
   <resheader name="writer"><value>System.Resources.ResXResourceWriter, System.Windows.Forms, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value></resheader>
   <data name="AppTitle" xml:space="preserve"><value>Screenshot Trimmer</value></data>
+  <data name="TitleWithFolder" xml:space="preserve"><value>{0} — Screenshot Trimmer</value></data>
   <data name="FileMenu" xml:space="preserve"><value>_Файл</value></data>
   <data name="OpenFiles" xml:space="preserve"><value>_Отваряне на файлове…</value></data>
   <data name="OpenFolder" xml:space="preserve"><value>Отваряне на _папка…</value></data>
@@ -32,4 +33,24 @@
   <data name="BackgroundDarkGrey" xml:space="preserve"><value>_Тъмносив</value></data>
   <data name="ImageSize" xml:space="preserve"><value>{0:N0} × {1:N0} пиксела</value></data>
   <data name="ZoomPercent" xml:space="preserve"><value>{0:0.#}%</value></data>
+  <data name="ThumbnailUnreadable" xml:space="preserve"><value>Не може да бъде прочетено</value></data>
+  <data name="ShowResults" xml:space="preserve"><value>Показване на _резултатите</value></data>
+  <data name="HasResultBadge" xml:space="preserve"><value>Резултат</value></data>
+  <data name="HasResultTip" xml:space="preserve"><value>Има резултат от това изображение</value></data>
+  <data name="SettingsMenu" xml:space="preserve"><value>_Настройки…</value></data>
+  <data name="SettingsTitle" xml:space="preserve"><value>Настройки</value></data>
+  <data name="LanguageLabel" xml:space="preserve"><value>Език</value></data>
+  <data name="LanguageSystem" xml:space="preserve"><value>Езикът на системата</value></data>
+  <data name="SaveModeLabel" xml:space="preserve"><value>Записване</value></data>
+  <data name="SuffixMode" xml:space="preserve"><value>Режим с наставка</value></data>
+  <data name="SuffixModeHint" xml:space="preserve"><value>Оригиналът остава непроменен, а Резултатът се записва до него с името му и наставката за Резултат.</value></data>
+  <data name="BackupMode" xml:space="preserve"><value>Режим с резервно копие</value></data>
+  <data name="BackupModeHint" xml:space="preserve"><value>Резултатът се записва с името на Оригинала, а Оригиналът се запазва до него с името си и наставката за резервно копие.</value></data>
+  <data name="ResultSuffixLabel" xml:space="preserve"><value>Наставка за Резултат</value></data>
+  <data name="BackupSuffixLabel" xml:space="preserve"><value>Наставка за резервно копие</value></data>
+  <data name="SuffixEmpty" xml:space="preserve"><value>Въведете наставка.</value></data>
+  <data name="SuffixInvalid" xml:space="preserve"><value>Наставката не може да съдържа управляващи знаци или някой от знаците &lt; &gt; : " / \ | ? *</value></data>
+  <data name="Save" xml:space="preserve"><value>Запис</value></data>
+  <data name="Cancel" xml:space="preserve"><value>Отказ</value></data>
+  <data name="SettingsNotSaved" xml:space="preserve"><value>Настройките не могат да бъдат записани в {0}: {1} Те важат, докато затворите приложението.</value></data>
 </root>

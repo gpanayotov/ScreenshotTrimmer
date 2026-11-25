@@ -9,7 +9,9 @@ namespace ScreenshotTrimmer.Processing.Workspaces;
 /// </summary>
 public sealed class Workspace : IDisposable
 {
-    private readonly UserSettings _settings;
+    private UserSettings _settings;
+    private IReadOnlyList<string> _openedPaths = [];
+    private bool _showResults;
 
     public Workspace(UserSettings settings)
     {
@@ -39,19 +41,55 @@ public sealed class Workspace : IDisposable
         var missing = fullPaths.Where(path => !File.Exists(path) && !Directory.Exists(path)).ToList();
         var existing = fullPaths.Except(missing).ToList();
 
-        var listing = ImageListing.List(existing, ListingOptionsFor(_settings));
-        Images = listing.Images
-            .Select(image => new WorkspaceImage
-            {
-                Path = image.Path, IsResult = image.IsResult, HasResult = image.HasResult,
-            })
-            .ToList();
+        _openedPaths = existing;
+        var listing = List();
         Selected = listing.Selected is { } opened
             ? Images.First(image => image.Path == opened.Path)
             : Images.FirstOrDefault();
 
         RaiseChanged();
         return missing;
+    }
+
+    /// <summary>
+    /// Whether Suffix-mode Results are listed in their sorted place instead of hidden. Session-only and off by default;
+    /// changing it keeps the selection, except that a selected Result being hidden gives way to its Original.
+    /// </summary>
+    public bool ShowResults
+    {
+        get => _showResults;
+        set
+        {
+            if (value == _showResults)
+                return;
+            _showResults = value;
+            var selected = Selected;
+            List();
+            Selected = Images.FirstOrDefault(image => image.Path == selected?.Path)
+                ?? (selected is { IsResult: true } ? OriginalOf(selected) : null)
+                ?? Images.FirstOrDefault();
+            RaiseChanged();
+        }
+    }
+
+    /// <summary>
+    /// Lists the opened paths again with <paramref name="settings"/>' save mode and Result suffix, which decide which
+    /// files are Results. The selection stays where the selected file is still listed; otherwise it passes to the
+    /// entry now in its place.
+    /// </summary>
+    public void ApplySettings(UserSettings settings)
+    {
+        ArgumentNullException.ThrowIfNull(settings);
+        _settings = settings;
+        if (_openedPaths.Count == 0)
+            return;
+
+        var selectedIndex = SelectedIndex;
+        var selectedPath = Selected?.Path;
+        List();
+        Selected = Images.FirstOrDefault(image => image.Path == selectedPath)
+            ?? (Images.Count == 0 ? null : Images[Math.Clamp(selectedIndex, 0, Images.Count - 1)]);
+        RaiseChanged();
     }
 
     /// <summary>Selects <paramref name="image"/>, which must be one of <see cref="Images"/>.</summary>
@@ -74,6 +112,20 @@ public sealed class Workspace : IDisposable
     {
     }
 
+    /// <summary>The listed Original of the Result <paramref name="result"/>, if any.</summary>
+    private WorkspaceImage? OriginalOf(WorkspaceImage result)
+    {
+        var stem = StemOf(result.Path);
+        var suffix = _settings.ResultSuffix;
+        if (!stem.EndsWith(suffix, FileNames.Comparison))
+            return null;
+        var originalStem = stem[..^suffix.Length];
+        return Images.FirstOrDefault(image => FileNames.Same(StemOf(image.Path), originalStem));
+    }
+
+    private static string StemOf(string path) =>
+        Path.Combine(Path.GetDirectoryName(path)!, Path.GetFileNameWithoutExtension(path));
+
     private int SelectedIndex => Selected is null ? -1 : IndexOf(Selected);
 
     private int IndexOf(WorkspaceImage image)
@@ -95,14 +147,34 @@ public sealed class Workspace : IDisposable
         RaiseChanged();
     }
 
+    /// <summary>
+    /// Replaces <see cref="Images"/> with the current listing of the opened paths under the current settings and
+    /// <see cref="ShowResults"/>; the one re-list path for <see cref="Open"/>, <see cref="ShowResults"/> and
+    /// <see cref="ApplySettings"/>.
+    /// </summary>
+    private Listing List()
+    {
+        var listing = ImageListing.List(_openedPaths, ListingOptionsFor(_settings, _showResults));
+        Images = listing.Images
+            .Select(image => new WorkspaceImage
+            {
+                Path = image.Path, IsResult = image.IsResult, HasResult = image.HasResult,
+                ContentVersion = ContentVersion.Of(image.Path),
+            })
+            .ToList();
+        return listing;
+    }
+
     private void RaiseChanged() =>
         Changed?.Invoke(this, new WorkspaceChange { Images = Images, Selected = Selected });
 
-    private static ListingOptions ListingOptionsFor(UserSettings settings) =>
-        ListingOptions.For(new SaveOptions
-        {
-            Mode = settings.SaveMode,
-            ResultSuffix = settings.ResultSuffix,
-            BackupSuffix = settings.BackupSuffix,
-        });
+    private static ListingOptions ListingOptionsFor(UserSettings settings, bool includeResults) =>
+        ListingOptions.For(
+            new SaveOptions
+            {
+                Mode = settings.SaveMode,
+                ResultSuffix = settings.ResultSuffix,
+                BackupSuffix = settings.BackupSuffix,
+            },
+            includeResults);
 }

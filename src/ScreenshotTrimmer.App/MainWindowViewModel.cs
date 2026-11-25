@@ -7,6 +7,7 @@ using ScreenshotTrimmer.App.Controls;
 using ScreenshotTrimmer.App.Imaging;
 using ScreenshotTrimmer.App.Localization;
 using ScreenshotTrimmer.App.Mvvm;
+using ScreenshotTrimmer.Processing.Settings;
 using ScreenshotTrimmer.Processing.Workspaces;
 
 namespace ScreenshotTrimmer.App;
@@ -15,7 +16,9 @@ namespace ScreenshotTrimmer.App;
 public sealed class MainWindowViewModel : Observable
 {
     private readonly Workspace _workspace;
+    private readonly SettingsSession _settings;
     private readonly List<Message> _notices = [];
+    private readonly ThumbnailCache _thumbnails = new();
     private IReadOnlyList<WorkspaceImage>? _listedImages;
     private StripEntry? _selectedEntry;
     private Bitmap? _image;
@@ -24,10 +27,12 @@ public sealed class MainWindowViewModel : Observable
     private string? _shownPath;
     private double _zoom;
     private ViewerBackground _background;
+    private string? _openFolder;
 
-    public MainWindowViewModel(Workspace workspace, IPathPicker picker)
+    public MainWindowViewModel(Workspace workspace, IPathPicker picker, SettingsSession settings)
     {
         _workspace = workspace;
+        _settings = settings;
         OpenFilesCommand = new RelayCommand(async () => OpenPicked(await picker.PickFilesAsync()));
         OpenFolderCommand = new RelayCommand(async () => OpenPicked(await picker.PickFolderAsync()));
         _workspace.Changed += OnWorkspaceChanged;
@@ -49,6 +54,19 @@ public sealed class MainWindowViewModel : Observable
                 _workspace.Select(value.Image);
             else
                 Set(ref _selectedEntry, value);
+        }
+    }
+
+    /// <summary>Whether Results are listed in the strip; session-only, off by default.</summary>
+    public bool ShowResults
+    {
+        get => _workspace.ShowResults;
+        set
+        {
+            if (value == _workspace.ShowResults)
+                return;
+            _workspace.ShowResults = value;
+            Raise();
         }
     }
 
@@ -126,6 +144,11 @@ public sealed class MainWindowViewModel : Observable
     /// <summary>Whether nothing is listed, so the window shows how to open screenshots.</summary>
     public bool ShowsHint => Entries.Count == 0;
 
+    /// <summary>The window title: the open folder's name, or the app's name when no single folder is open.</summary>
+    public string Title => _openFolder is null
+        ? Localizer.Instance["AppTitle"]
+        : Localizer.Instance.Format("TitleWithFolder", FolderName(_openFolder));
+
     public string NoticeText => string.Join(Environment.NewLine, _notices.Select(notice => notice.Text));
 
     public bool HasNotices => _notices.Count > 0;
@@ -147,6 +170,8 @@ public sealed class MainWindowViewModel : Observable
     public void Open(IReadOnlyList<string> paths)
     {
         var missing = _workspace.Open(paths);
+        _openFolder = OpenFolder(paths.Select(Path.GetFullPath).Except(missing));
+        Raise(nameof(Title));
 
         _notices.Clear();
         if (missing.Count > 0)
@@ -155,6 +180,42 @@ public sealed class MainWindowViewModel : Observable
             _notices.Add(new Message("NoImagesFound"));
         RaiseNotices();
     }
+
+    /// <summary>The settings in use.</summary>
+    public UserSettings Settings => _settings.Current;
+
+    /// <summary>
+    /// Makes <paramref name="settings"/> current: switches the language, lists the strip again and saves them, reporting
+    /// a settings file that cannot be written as a notice.
+    /// </summary>
+    public void ApplySettings(UserSettings settings)
+    {
+        var failure = _settings.Change(settings);
+        _workspace.ApplySettings(settings);
+        if (failure is not null)
+        {
+            _notices.Add(new Message("SettingsNotSaved", _settings.FilePath, failure));
+            RaiseNotices();
+        }
+    }
+
+    /// <summary>
+    /// The folder the opened <paramref name="paths"/> share: a folder itself, or the folder holding a file. <c>null</c>
+    /// when nothing was opened or the paths lie in different folders.
+    /// </summary>
+    private static string? OpenFolder(IEnumerable<string> paths)
+    {
+        var folders = paths
+            .Select(path => Directory.Exists(path) ? path : Path.GetDirectoryName(path))
+            .Select(folder => folder is null ? null : Path.TrimEndingDirectorySeparator(folder))
+            .Distinct()
+            .ToList();
+        return folders.Count == 1 ? folders[0] : null;
+    }
+
+    /// <summary>The folder's own name; a root folder such as <c>C:\</c> or <c>/</c>, which has none, shows in full.</summary>
+    private static string FolderName(string folder) =>
+        Path.GetFileName(folder) is { Length: > 0 } name ? name : folder;
 
     private void OpenPicked(IReadOnlyList<string> paths)
     {
@@ -178,7 +239,7 @@ public sealed class MainWindowViewModel : Observable
             _listedImages = change.Images;
             Entries.Clear();
             foreach (var image in change.Images)
-                Entries.Add(new StripEntry(image));
+                Entries.Add(new StripEntry(image, _thumbnails));
             Raise(nameof(ShowsHint));
         }
 
@@ -254,6 +315,7 @@ public sealed class MainWindowViewModel : Observable
         RaiseNotices();
         RaiseStatus();
         Raise(nameof(ViewerMessage));
+        Raise(nameof(Title));
     }
 
     /// <summary>A string from the resources with its arguments, formatted in the current language when shown.</summary>

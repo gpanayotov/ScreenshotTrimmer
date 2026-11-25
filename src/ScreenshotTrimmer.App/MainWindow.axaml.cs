@@ -7,6 +7,8 @@ using Avalonia.Interactivity;
 using Avalonia.Platform.Storage;
 using ScreenshotTrimmer.App.Controls;
 using ScreenshotTrimmer.App.Localization;
+using ScreenshotTrimmer.App.Mvvm;
+using ScreenshotTrimmer.Processing.Settings;
 using ScreenshotTrimmer.Processing.Workspaces;
 
 namespace ScreenshotTrimmer.App;
@@ -15,11 +17,17 @@ public partial class MainWindow : Window, IPathPicker
 {
     private string? _lastFolder;
     private MainWindowViewModel? _viewModel;
+    private readonly Dictionary<Control, StripEntry> _shownEntries = [];
 
     public MainWindow()
     {
         InitializeComponent();
         ExitItem.Click += (_, _) => Close();
+        SettingsItem.Click += (_, _) => EditSettings();
+        KeyBindings.Add(new KeyBinding
+        {
+            Gesture = new KeyGesture(Key.OemComma, KeyModifiers.Control), Command = new RelayCommand(EditSettings),
+        });
         AddHandler(DragDrop.DragOverEvent, OnDragOver);
         AddHandler(DragDrop.DropEvent, OnDrop);
         // Tunnel, so the strip's own Page Up / Page Down handling does not jump a whole page.
@@ -28,6 +36,8 @@ public partial class MainWindow : Window, IPathPicker
         Deactivated += (_, _) => Viewer.IsSpaceHeld = false;
         Viewer.PropertyChanged += OnViewerPropertyChanged;
         AddViewerShortcuts();
+        Strip.ContainerPrepared += OnStripContainerPrepared;
+        Strip.ContainerClearing += OnStripContainerClearing;
     }
 
     /// <summary>The zoom shortcuts, with the numeric keypad's keys and Ctrl+Shift+= for Ctrl+Plus too.</summary>
@@ -45,10 +55,13 @@ public partial class MainWindow : Window, IPathPicker
         Add(Viewer.ZoomOutCommand, "Ctrl+OemMinus", "Ctrl+Subtract");
     }
 
-    /// <summary>Shows <paramref name="workspace"/> in this window, which picks the paths it opens.</summary>
-    public void Attach(Workspace workspace)
+    /// <summary>
+    /// Shows <paramref name="workspace"/> in this window, which picks the paths it opens and edits
+    /// <paramref name="settings"/>.
+    /// </summary>
+    public void Attach(Workspace workspace, SettingsSession settings)
     {
-        _viewModel = new MainWindowViewModel(workspace, this);
+        _viewModel = new MainWindowViewModel(workspace, this, settings);
         _viewModel.PropertyChanged += OnViewModelPropertyChanged;
         DataContext = _viewModel;
     }
@@ -58,6 +71,15 @@ public partial class MainWindow : Window, IPathPicker
     {
         if (args.Count > 0)
             _viewModel?.Open(args.Select(Path.GetFullPath).ToList());
+    }
+
+    private async void EditSettings()
+    {
+        if (_viewModel is null)
+            return;
+        var edited = await new SettingsWindow(_viewModel.Settings).ShowDialog<UserSettings?>(this);
+        if (edited is not null)
+            _viewModel.ApplySettings(edited);
     }
 
     public async Task<IReadOnlyList<string>> PickFilesAsync()
@@ -148,6 +170,20 @@ public partial class MainWindow : Window, IPathPicker
     {
         if (e.Property == ImageViewer.ZoomProperty && _viewModel is not null)
             _viewModel.Zoom = Viewer.Zoom;
+    }
+
+    // The strip recycles its containers as it scrolls; remembering which entry each one shows tells an entry when it
+    // leaves the view, so thumbnails queued for entries scrolled past are not decoded.
+    private void OnStripContainerPrepared(object? sender, ContainerPreparedEventArgs e)
+    {
+        if (Strip.ItemFromContainer(e.Container) is StripEntry entry)
+            _shownEntries[e.Container] = entry;
+    }
+
+    private void OnStripContainerClearing(object? sender, ContainerClearingEventArgs e)
+    {
+        if (_shownEntries.Remove(e.Container, out var entry))
+            entry.Hidden();
     }
 
     private void OnViewModelPropertyChanged(object? sender, PropertyChangedEventArgs e)

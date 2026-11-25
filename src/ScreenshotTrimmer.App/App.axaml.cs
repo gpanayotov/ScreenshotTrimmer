@@ -2,7 +2,6 @@ using System.Globalization;
 using Avalonia;
 using Avalonia.Controls.ApplicationLifetimes;
 using Avalonia.Markup.Xaml;
-using ScreenshotTrimmer.App.Localization;
 using ScreenshotTrimmer.Processing.Settings;
 using ScreenshotTrimmer.Processing.Workspaces;
 
@@ -16,12 +15,14 @@ public partial class App : Application
     {
         if (ApplicationLifetime is IClassicDesktopStyleApplicationLifetime desktop)
         {
-            var settings = SettingsStore.ForCurrentUser().Load();
-            Localizer.Instance.SetCulture(StartCulture(settings.Language));
+            // Captured before the app sets its own culture, so "System" keeps meaning the system's language.
+            var settings = new SettingsSession(SettingsStore.ForCurrentUser(), CultureInfo.CurrentUICulture);
+            settings.ApplyLanguage();
 
-            var workspace = new Workspace(settings);
+            var workspace = new Workspace(settings.Current);
             var window = new MainWindow();
-            window.Attach(workspace);
+            window.RememberPlacement(WindowPlacementStore.ForCurrentUser());
+            window.Attach(workspace, settings);
             window.Closed += (_, _) => workspace.Dispose();
             desktop.MainWindow = window;
             window.OpenCommandLine(desktop.Args ?? []);
@@ -29,8 +30,4 @@ public partial class App : Application
 
         base.OnFrameworkInitializationCompleted();
     }
-
-    // English when the setting is System, until the System rule comes in with the settings window.
-    private static CultureInfo StartCulture(Language language) =>
-        CultureInfo.GetCultureInfo(language == Language.Bg ? "bg" : "en");
 }
