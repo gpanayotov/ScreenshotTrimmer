@@ -1,6 +1,7 @@
 using System.Text.Json;
 using System.Text.Json.Serialization;
 using ScreenshotTrimmer.Processing.Files;
+using ScreenshotTrimmer.Processing.Rendering;
 
 namespace ScreenshotTrimmer.Processing.Settings;
 
@@ -15,9 +16,6 @@ public sealed class SettingsStore
 
     /// <summary>The subfolder of the per-user application-data folder the settings live in.</summary>
     public const string AppFolderName = "ScreenshotTrimmer";
-
-    public const double MinShadowSize = 0.0;   // exclusive
-    public const double MaxShadowSize = 4.0;   // inclusive
 
     private static readonly JsonSerializerOptions JsonOptions = new()
     {
@@ -78,8 +76,8 @@ public sealed class SettingsStore
             SaveMode = Enum(root, "saveMode", defaults.SaveMode),
             ResultSuffix = Suffix(root, "resultSuffix", defaults.ResultSuffix),
             BackupSuffix = Suffix(root, "backupSuffix", defaults.BackupSuffix),
-            ShadowSize = Number(root, "shadowSize", defaults.ShadowSize, v => v > MinShadowSize && v <= MaxShadowSize),
-            ShadowOpacity = Number(root, "shadowOpacity", defaults.ShadowOpacity, v => v >= 0 && v <= 1),
+            ShadowSize = Number(root, "shadowSize", defaults.ShadowSize, Shadow.IsAllowedSize),
+            ShadowOpacity = Number(root, "shadowOpacity", defaults.ShadowOpacity, Shadow.IsAllowedOpacity),
             FrameLines = Bool(root, "frameLines", defaults.FrameLines),
             RoundedCorners = Bool(root, "roundedCorners", defaults.RoundedCorners),
             Language = Enum(root, "language", defaults.Language),
