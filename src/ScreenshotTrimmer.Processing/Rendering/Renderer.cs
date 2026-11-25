@@ -14,14 +14,19 @@ public static class Renderer
         ArgumentNullException.ThrowIfNull(original);
         ArgumentNullException.ThrowIfNull(steps);
 
-        var result = steps.Crop is null ? original.Clone() : ApplyCrop(original, steps.Crop);
+        var bounds = new PixelRect(0, 0, original.Width, original.Height);
+        var (window, popups) = steps.Crop is null ? (bounds, []) : Clip(steps.Crop, bounds);
+        var overhang = Overhang.Of(window, Union(window, popups));
         var report = new RenderReport();
 
+        // Frame lines narrow the window inside the Original, so the popups are kept whole whatever is removed.
         if (steps.FrameLines)
         {
-            (result, var removed) = FrameLines.Remove(result);
+            (window, var removed) = FrameLines.Trim(original, window, overhang);
             report = report with { FrameLinesRemoved = removed };
         }
+
+        var result = Compose(original, window, popups);
 
         if (steps.RoundedCorners is not null)
         {
@@ -38,17 +43,25 @@ public static class Renderer
         return new RenderOutput(result, report);
     }
 
-    private static RgbaImage ApplyCrop(RgbaImage source, Crop crop)
+    /// <summary>The crop's window and popups clipped to the image, leaving out popups wholly outside it.</summary>
+    private static (PixelRect Window, PixelRect[] Popups) Clip(Crop crop, PixelRect bounds)
     {
-        var bounds = new PixelRect(0, 0, source.Width, source.Height);
         var window = crop.Window.Intersect(bounds);
         if (window.IsEmpty)
-            throw new ArgumentException($"The crop {crop.Window} lies entirely outside the {source.Width}x{source.Height} image.", nameof(crop));
+            throw new ArgumentException($"The crop {crop.Window} lies entirely outside the {bounds.Width}x{bounds.Height} image.", nameof(crop));
+        return (window, crop.Popups.Select(p => p.Intersect(bounds)).Where(p => !p.IsEmpty).ToArray());
+    }
 
-        var popups = crop.Popups.Select(p => p.Intersect(bounds)).Where(p => !p.IsEmpty).ToArray();
-        var area = popups.Aggregate(window, (union, popup) => union.Union(popup));
+    private static PixelRect Union(PixelRect window, PixelRect[] popups) =>
+        popups.Aggregate(window, (union, popup) => union.Union(popup));
 
-        // Start fully transparent and copy in the window and each popup, so nothing beside them shows.
+    /// <summary>
+    /// Copies the window and each popup into a fully transparent image of their bounding rectangle,
+    /// so nothing beside them shows.
+    /// </summary>
+    private static RgbaImage Compose(RgbaImage source, PixelRect window, PixelRect[] popups)
+    {
+        var area = Union(window, popups);
         var result = new RgbaImage(area.Width, area.Height);
         foreach (var part in popups.Prepend(window))
             for (var y = part.Y; y < part.Bottom; y++)

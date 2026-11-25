@@ -96,5 +96,39 @@ public class PopupOverhangTests
         Assert.Empty(Crop.Classic(rectangle).Popups);
     }
 
+    private static readonly Rgba Menu = new(250, 250, 255, 255);
+
+    /// <summary>
+    /// A window of busy content at 20..80 x 20..60 with background around it, cropped 3px too wide
+    /// on every side, and a menu at 35..65 x 55..95 that drops below the window.
+    /// </summary>
+    private static (RgbaImage Original, Crop Crop) SloppyWindowWithMenuBelow()
+    {
+        var original = Synthetic.WindowWithStrips(60, 40, left: 20, top: 20, right: 20, bottom: 60);
+        for (var y = 55; y < 95; y++)
+            for (var x = 35; x < 65; x++)
+                original[x, y] = Menu;
+        return (original, Crop.WithPopups(new PixelRect(17, 17, 66, 46), new PixelRect(35, 55, 30, 40)));
+    }
+
+    [Fact]
+    public void No_frame_lines_are_removed_on_the_side_with_an_overhang()
+    {
+        var (original, crop) = SloppyWindowWithMenuBelow();
+
+        var output = Renderer.Render(original, new Steps { Crop = crop, FrameLines = true });
+
+        // The 3px strips on the left, top and right go; the bottom keeps its strip and the menu below it.
+        Assert.Equal(new FrameLinesRemoved(3, 3, 3, 0), output.Report.FrameLinesRemoved);
+        var result = output.Result;
+        Assert.Equal(60, result.Width);
+        Assert.Equal(75, result.Height);
+        Assert.Equal(Synthetic.CheckerAt(0, 0), result[0, 0]);
+        Assert.Equal(Synthetic.CheckerAt(59, 39), result[59, 39]);
+        Assert.Equal(Synthetic.Background, result[0, 42]);
+        Assert.Equal(Menu, result[15, 74]);
+        Assert.Equal(default, result[0, 74]);
+    }
+
     private static bool Inside(PixelRect r, int x, int y) => x >= r.X && x < r.Right && y >= r.Y && y < r.Bottom;
 }

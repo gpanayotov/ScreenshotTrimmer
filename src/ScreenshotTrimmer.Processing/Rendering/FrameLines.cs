@@ -18,10 +18,14 @@ internal static class FrameLines
 
     private enum Side { Left, Top, Right, Bottom }
 
-    public static (RgbaImage Result, FrameLinesRemoved Removed) Remove(RgbaImage image)
+    /// <summary>
+    /// Narrows <paramref name="area"/> of <paramref name="image"/> by the frame lines found along its edges.
+    /// Sides with a Popup overhang are skipped, so the popup's edge is not mistaken for a frame.
+    /// </summary>
+    public static (PixelRect Area, FrameLinesRemoved Removed) Trim(RgbaImage image, PixelRect area, Overhang overhang)
     {
-        var area = new PixelRect(0, 0, image.Width, image.Height);
         var removed = new int[4];
+        bool[] skip = [overhang.Left, overhang.Top, overhang.Right, overhang.Bottom];
 
         // Peel one line at a time from each side in turn, so a strip on one side
         // is judged on the area left after its neighbours' strips are gone.
@@ -31,7 +35,7 @@ internal static class FrameLines
             peeled = false;
             foreach (var side in Enum.GetValues<Side>())
             {
-                if (removed[(int)side] >= MaxLinesPerSide || !IsFrameLine(image, area, side))
+                if (skip[(int)side] || removed[(int)side] >= MaxLinesPerSide || !IsFrameLine(image, area, side))
                     continue;
                 area = Shrink(area, side);
                 removed[(int)side]++;
@@ -42,7 +46,7 @@ internal static class FrameLines
 
         var counts = new FrameLinesRemoved(
             removed[(int)Side.Left], removed[(int)Side.Top], removed[(int)Side.Right], removed[(int)Side.Bottom]);
-        return (Copy(image, area), counts);
+        return (area, counts);
     }
 
     private static bool IsFrameLine(RgbaImage image, PixelRect area, Side side)
@@ -117,15 +121,4 @@ internal static class FrameLines
         _ => area with { Height = area.Height - 1 },
     };
 
-    private static RgbaImage Copy(RgbaImage source, PixelRect area)
-    {
-        if (area.X == 0 && area.Y == 0 && area.Width == source.Width && area.Height == source.Height)
-            return source;
-
-        var result = new RgbaImage(area.Width, area.Height);
-        for (var y = 0; y < area.Height; y++)
-            for (var x = 0; x < area.Width; x++)
-                result[x, y] = source[area.X + x, area.Y + y];
-        return result;
-    }
 }
