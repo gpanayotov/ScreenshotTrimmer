@@ -54,8 +54,45 @@ public sealed class Workspace : IDisposable
         return missing;
     }
 
+    /// <summary>Selects <paramref name="image"/>, which must be one of <see cref="Images"/>.</summary>
+    public void Select(WorkspaceImage image)
+    {
+        ArgumentNullException.ThrowIfNull(image);
+        var index = IndexOf(image);
+        if (index < 0)
+            throw new ArgumentException("The image is not listed in this workspace.", nameof(image));
+        SelectAt(index);
+    }
+
+    /// <summary>Selects the next image; does nothing on the last one.</summary>
+    public void Next() => SelectAt(SelectedIndex + 1);
+
+    /// <summary>Selects the previous image; does nothing on the first one.</summary>
+    public void Previous() => SelectAt(SelectedIndex - 1);
+
     public void Dispose()
     {
+    }
+
+    private int SelectedIndex => Selected is null ? -1 : IndexOf(Selected);
+
+    private int IndexOf(WorkspaceImage image)
+    {
+        for (var i = 0; i < Images.Count; i++)
+        {
+            if (Images[i].Path == image.Path)
+                return i;
+        }
+        return -1;
+    }
+
+    /// <summary>Selects the image at <paramref name="index"/>; an index outside the list, or the selection itself, changes nothing.</summary>
+    private void SelectAt(int index)
+    {
+        if (index < 0 || index >= Images.Count || index == SelectedIndex)
+            return;
+        Selected = Images[index];
+        RaiseChanged();
     }
 
     private void RaiseChanged() =>
