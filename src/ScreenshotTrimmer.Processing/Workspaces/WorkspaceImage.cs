@@ -11,4 +11,7 @@ public sealed record WorkspaceImage
 
     /// <summary>Whether this image's Suffix-mode Result exists beside it.</summary>
     public bool HasResult { get; init; }
+
+    /// <summary>The file's content version when it was listed; it changes when the file is overwritten.</summary>
+    public ContentVersion ContentVersion { get; init; }
 }
