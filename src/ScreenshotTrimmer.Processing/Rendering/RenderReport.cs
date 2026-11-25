@@ -25,6 +25,12 @@ public sealed record RenderReport
     /// The Subject starts this many pixels in from the Result's left and top edges.
     /// </summary>
     public int ShadowPadding { get; init; }
+
+    /// <summary>
+    /// Whether the Original already had shadow padding, i.e. was already processed
+    /// (see <see cref="AlreadyProcessed.HasShadowPadding"/>), so the interface can warn and leave Shadow off.
+    /// </summary>
+    public bool InputHasShadowPadding { get; init; }
 }
 
 /// <summary>The number of frame lines removed on each side of the crop.</summary>

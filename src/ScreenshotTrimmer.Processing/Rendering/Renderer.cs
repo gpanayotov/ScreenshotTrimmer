@@ -17,7 +17,7 @@ public static class Renderer
         var bounds = new PixelRect(0, 0, original.Width, original.Height);
         var (window, popups) = steps.Crop is null ? (bounds, []) : Clip(steps.Crop, bounds);
         var overhang = Overhang.Of(window, Union(window, popups));
-        var report = new RenderReport();
+        var report = new RenderReport { InputHasShadowPadding = AlreadyProcessed.HasShadowPadding(original) };
 
         // Frame lines narrow the window inside the Original, so the popups are kept whole whatever is removed.
         if (steps.FrameLines)
