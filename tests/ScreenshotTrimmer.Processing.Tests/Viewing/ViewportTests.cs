@@ -93,4 +93,89 @@ public class ViewportTests
 
         Assert.Equal(250, panned.ImageTop, 9);
     }
+
+    [Fact]
+    public void The_scroll_range_is_the_part_of_the_image_outside_the_view()
+    {
+        var viewport = Viewport.Fitted(2000, 1000, viewWidth: 800, viewHeight: 600).ZoomAt(1, 0, 0);
+
+        Assert.Equal(1200, viewport.HorizontalScrollMax, 9);
+        Assert.Equal(400, viewport.VerticalScrollMax, 9);
+        Assert.Equal(0, viewport.HorizontalScroll, 9);
+        Assert.Equal(0, viewport.VerticalScroll, 9);
+    }
+
+    [Fact]
+    public void Scrolling_moves_the_view_over_the_image()
+    {
+        var viewport = Viewport.Fitted(2000, 1000, viewWidth: 800, viewHeight: 600).ZoomAt(1, 0, 0);
+
+        var scrolled = viewport.ScrollTo(300, 100);
+
+        Assert.Equal(-300, scrolled.ImageLeft, 9);
+        Assert.Equal(-100, scrolled.ImageTop, 9);
+        Assert.Equal(300, scrolled.HorizontalScroll, 9);
+        Assert.Equal(100, scrolled.VerticalScroll, 9);
+    }
+
+    [Fact]
+    public void A_fitted_image_has_nothing_to_scroll()
+    {
+        var viewport = Viewport.Fitted(2000, 1000, viewWidth: 800, viewHeight: 600);
+
+        Assert.Equal(0, viewport.HorizontalScrollMax, 9);
+        Assert.Equal(0, viewport.VerticalScrollMax, 9);
+    }
+
+    [Fact]
+    public void A_fitted_viewport_fits_again_when_the_view_is_resized()
+    {
+        var viewport = Viewport.Fitted(2000, 1000, viewWidth: 800, viewHeight: 600);
+
+        var resized = viewport.Resize(400, 600);
+
+        Assert.True(resized.IsFitted);
+        Assert.Equal(0.2, resized.Zoom, 9);
+    }
+
+    [Fact]
+    public void A_zoomed_viewport_keeps_its_zoom_and_position_when_the_view_is_resized()
+    {
+        var viewport = Viewport.Fitted(2000, 1000, viewWidth: 800, viewHeight: 600).ZoomAt(1, 0, 0).ScrollTo(300, 100);
+
+        var resized = viewport.Resize(1000, 700);
+
+        Assert.False(resized.IsFitted);
+        Assert.Equal(1, resized.Zoom, 9);
+        Assert.Equal(-300, resized.ImageLeft, 9);
+        Assert.Equal(-100, resized.ImageTop, 9);
+    }
+
+    [Fact]
+    public void Zooming_leaves_the_fitted_view_and_fitting_returns_to_it()
+    {
+        var viewport = Viewport.Fitted(2000, 1000, viewWidth: 800, viewHeight: 600);
+
+        Assert.True(viewport.IsFitted);
+        Assert.False(viewport.ZoomAt(1, 0, 0).IsFitted);
+        Assert.True(viewport.ZoomAt(1, 0, 0).Fit().IsFitted);
+    }
+
+    [Fact]
+    public void Fitting_a_huge_image_stops_at_5_percent()
+    {
+        var viewport = Viewport.Fitted(100_000, 1000, viewWidth: 800, viewHeight: 600);
+
+        Assert.Equal(0.05, viewport.Zoom, 9);
+    }
+
+    [Fact]
+    public void An_empty_view_does_not_break_the_viewport()
+    {
+        var viewport = Viewport.Fitted(2000, 1000, viewWidth: 0, viewHeight: 0);
+
+        Assert.True(viewport.Zoom > 0);
+        Assert.True(double.IsFinite(viewport.ImageLeft));
+        Assert.True(double.IsFinite(viewport.ImageTop));
+    }
 }

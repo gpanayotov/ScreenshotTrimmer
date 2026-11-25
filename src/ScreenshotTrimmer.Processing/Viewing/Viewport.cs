@@ -16,8 +16,8 @@ public sealed record Viewport
     {
         ImageWidth = imageWidth;
         ImageHeight = imageHeight;
-        ViewWidth = viewWidth;
-        ViewHeight = viewHeight;
+        ViewWidth = Math.Max(1, viewWidth);
+        ViewHeight = Math.Max(1, viewHeight);
     }
 
     public int ImageWidth { get; }
@@ -30,6 +30,9 @@ public sealed record Viewport
 
     /// <summary>Screen pixels per image pixel.</summary>
     public double Zoom { get; private init; }
+
+    /// <summary>Whether this viewport shows the whole image fitted, and so fits again when the view is resized.</summary>
+    public bool IsFitted { get; private init; }
 
     /// <summary>The image x coordinate shown at the view's left edge.</summary>
     public double OriginX { get; private init; }
@@ -47,15 +50,40 @@ public sealed record Viewport
 
     public double ShownHeight => ImageHeight * Zoom;
 
+    /// <summary>How far the view is scrolled from the image's left edge, in screen pixels.</summary>
+    public double HorizontalScroll => Math.Max(0, OriginX * Zoom);
+
+    /// <summary>How far the view is scrolled from the image's top edge, in screen pixels.</summary>
+    public double VerticalScroll => Math.Max(0, OriginY * Zoom);
+
+    /// <summary>The largest <see cref="HorizontalScroll"/>; 0 when the image is no wider than the view.</summary>
+    public double HorizontalScrollMax => Math.Max(0, ShownWidth - ViewWidth);
+
+    /// <summary>The largest <see cref="VerticalScroll"/>; 0 when the image is no taller than the view.</summary>
+    public double VerticalScrollMax => Math.Max(0, ShownHeight - ViewHeight);
+
     /// <summary>The whole image in a view of the given size, centred, shrunk to fit but never enlarged past 100%.</summary>
     public static Viewport Fitted(int imageWidth, int imageHeight, double viewWidth, double viewHeight) =>
         new Viewport(imageWidth, imageHeight, viewWidth, viewHeight).Fit();
 
-    /// <summary>This viewport showing the whole image, centred, shrunk to fit but never enlarged past 100%.</summary>
+    /// <summary>
+    /// This viewport showing the whole image, centred, shrunk to fit but never enlarged past 100% nor shrunk
+    /// below <see cref="MinZoom"/>.
+    /// </summary>
     public Viewport Fit()
     {
         var zoom = Math.Min(1, Math.Min(ViewWidth / ImageWidth, ViewHeight / ImageHeight));
-        return (this with { Zoom = zoom }).Clamped();
+        return (this with { Zoom = Math.Max(MinZoom, zoom), IsFitted = true }).Clamped();
+    }
+
+    /// <summary>
+    /// This viewport in a view of the new size: fitted again when it was fitted, otherwise with the same zoom and the
+    /// same image point at the top-left, within the image's edges.
+    /// </summary>
+    public Viewport Resize(double viewWidth, double viewHeight)
+    {
+        var resized = this with { ViewWidth = Math.Max(1, viewWidth), ViewHeight = Math.Max(1, viewHeight) };
+        return IsFitted ? resized.Fit() : resized.Clamped();
     }
 
     /// <summary>
@@ -67,8 +95,14 @@ public sealed record Viewport
         zoom = Math.Clamp(zoom, MinZoom, MaxZoom);
         var imageX = OriginX + anchorX / Zoom;
         var imageY = OriginY + anchorY / Zoom;
-        return (this with { Zoom = zoom, OriginX = imageX - anchorX / zoom, OriginY = imageY - anchorY / zoom })
-            .Clamped();
+        var zoomed = this with
+        {
+            Zoom = zoom,
+            IsFitted = false,
+            OriginX = imageX - anchorX / zoom,
+            OriginY = imageY - anchorY / zoom,
+        };
+        return zoomed.Clamped();
     }
 
     /// <summary>
@@ -85,6 +119,9 @@ public sealed record Viewport
     /// <summary>Moves the image by (<paramref name="dx"/>, <paramref name="dy"/>) screen pixels, within its edges.</summary>
     public Viewport PanBy(double dx, double dy) =>
         (this with { OriginX = OriginX - dx / Zoom, OriginY = OriginY - dy / Zoom }).Clamped();
+
+    /// <summary>Scrolls the view to (<paramref name="x"/>, <paramref name="y"/>) screen pixels from the image's top-left.</summary>
+    public Viewport ScrollTo(double x, double y) => (this with { OriginX = x / Zoom, OriginY = y / Zoom }).Clamped();
 
     /// <summary>
     /// Centres the image on an axis where it is smaller than the view; elsewhere keeps the view covered by the image.
