@@ -19,4 +19,7 @@ public sealed record Steps
 
     /// <summary>Rounded-corner clearing, or null to leave the corners as they are.</summary>
     public RoundedCorners? RoundedCorners { get; init; }
+
+    /// <summary>The Shadow, or null for none. Applied last, after Clean edges.</summary>
+    public Shadow? Shadow { get; init; }
 }
