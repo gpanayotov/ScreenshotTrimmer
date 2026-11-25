@@ -88,4 +88,6 @@ The Bulgarian interface uses exactly these names for the terms above.
 | **Loupe** | Лупа |
 | **Original** | Оригинал |
 | **Result** | Резултат |
+| **Suffix mode** | Режим с наставка |
+| **Backup mode** | Режим с резервно копие |
 | **Batch** | Пакетна обработка |
