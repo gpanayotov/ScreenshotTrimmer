@@ -7,6 +7,7 @@ using ScreenshotTrimmer.App.Controls;
 using ScreenshotTrimmer.App.Imaging;
 using ScreenshotTrimmer.App.Localization;
 using ScreenshotTrimmer.App.Mvvm;
+using ScreenshotTrimmer.Processing.Files;
 using ScreenshotTrimmer.Processing.Settings;
 using ScreenshotTrimmer.Processing.Workspaces;
 
@@ -52,17 +53,8 @@ public sealed class MainWindowViewModel : Observable
         get => _selectedEntry;
         set
         {
-            if (value is not null && value.Image.Path != _workspace.Selected?.Path)
-            {
-                try
-                {
-                    _workspace.Select(value.Image);
-                }
-                catch (ArgumentException)
-                {
-                    // The file left the list on disk; the strip catches up with the update already posted.
-                }
-            }
+            if (value is not null && !SamePath(value.Image.Path, _workspace.Selected?.Path))
+                IfStillListed(value.Image, _workspace.Select);
             else
                 Set(ref _selectedEntry, value);
         }
@@ -223,12 +215,21 @@ public sealed class MainWindowViewModel : Observable
     private static string? OpenFolder(IEnumerable<string> paths)
     {
         var folders = paths
-            .Select(path => Directory.Exists(path) ? path : Path.GetDirectoryName(path))
-            .Select(folder => folder is null ? null : Path.TrimEndingDirectorySeparator(folder))
-            .Distinct()
+            .Select(FolderOf)
+            .OfType<string>()
+            .Distinct(FileNames.Comparer)
             .ToList();
         return folders.Count == 1 ? folders[0] : null;
     }
+
+    /// <summary>The folder <paramref name="path"/> names, or the folder holding the file it names, without a trailing separator.</summary>
+    private static string? FolderOf(string path) =>
+        (Directory.Exists(path) ? path : Path.GetDirectoryName(path)) is { } folder
+            ? Path.TrimEndingDirectorySeparator(folder)
+            : null;
+
+    private static bool SamePath(string? a, string? b) =>
+        a is null || b is null ? a == b : FileNames.Same(a, b);
 
     /// <summary>The folder's own name; a root folder such as <c>C:\</c> or <c>/</c>, which has none, shows in full.</summary>
     private static string FolderName(string folder) =>
@@ -246,15 +247,20 @@ public sealed class MainWindowViewModel : Observable
             Remove(entry.Image);
     }
 
-    private void Remove(WorkspaceImage image)
+    private void Remove(WorkspaceImage image) => IfStillListed(image, _workspace.Remove);
+
+    /// <summary>
+    /// Runs <paramref name="action"/> on <paramref name="image"/> unless the file has left the list on disk meanwhile;
+    /// then the strip catches up with the update already posted.
+    /// </summary>
+    private static void IfStillListed(WorkspaceImage image, Action<WorkspaceImage> action)
     {
         try
         {
-            _workspace.Remove(image);
+            action(image);
         }
         catch (ArgumentException)
         {
-            // The file left the list on disk; the strip catches up with the update already posted.
         }
     }
 
@@ -284,8 +290,8 @@ public sealed class MainWindowViewModel : Observable
             Raise(nameof(ShowsHint));
         }
 
-        var selected = Entries.FirstOrDefault(entry => entry.Image.Path == change.Selected?.Path);
-        if (change.Selected?.Path != _shownPath)
+        var selected = Entries.FirstOrDefault(entry => SamePath(entry.Image.Path, change.Selected?.Path));
+        if (!SamePath(change.Selected?.Path, _shownPath))
             LoadImage(change.Selected?.Path);
         Set(ref _selectedEntry, selected, nameof(SelectedEntry));
 
@@ -293,12 +299,15 @@ public sealed class MainWindowViewModel : Observable
             ReportUnavailable(change.UnavailableFolders);
     }
 
-    /// <summary>Tells the user which folders went away; the title stops naming the open folder once it is gone.</summary>
+    /// <summary>
+    /// Tells the user which folders went away; the title stops naming the open folder once it is gone. The workspace
+    /// reports folders without a trailing separator, as <see cref="FolderOf"/> gives them.
+    /// </summary>
     private void ReportUnavailable(IReadOnlyList<string> folders)
     {
         _notices.Add(new Message("FolderUnavailable", string.Join(", ", folders)));
         RaiseNotices();
-        if (_openFolder is not null && folders.Any(folder => Path.TrimEndingDirectorySeparator(folder) == _openFolder))
+        if (_openFolder is not null && folders.Any(folder => FileNames.Same(folder, _openFolder)))
         {
             _openFolder = null;
             Raise(nameof(Title));
