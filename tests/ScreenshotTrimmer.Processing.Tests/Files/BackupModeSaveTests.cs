@@ -161,4 +161,23 @@ public class BackupModeSaveTests
             File.SetUnixFileMode(folder.Path, writable);
         }
     }
+
+    [Theory]
+    [InlineData("")]
+    [InlineData("a/b")]
+    [InlineData("x*")]
+    public void An_invalid_backup_suffix_fails_clearly_and_moves_nothing(string suffix)
+    {
+        using var folder = new TempFolder();
+        var originalPath = folder.File("photo.jpg");
+        EncodedImages.Write(originalPath, EncodedImages.HalfAndHalf(8, 8, SKColors.Red, SKColors.Blue));
+        var originalBytes = File.ReadAllBytes(originalPath);
+
+        var failure = Assert.Throws<ArgumentException>(
+            () => ResultFiles.Save(Synthetic.Gradient(4, 4), originalPath, Backup with { BackupSuffix = suffix }));
+
+        Assert.Contains("suffix", failure.Message, StringComparison.OrdinalIgnoreCase);
+        Assert.Equal(["photo.jpg"], folder.Entries());
+        Assert.Equal(originalBytes, File.ReadAllBytes(originalPath));
+    }
 }

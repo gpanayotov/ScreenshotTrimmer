@@ -19,8 +19,6 @@ public sealed class SettingsStore
     public const double MinShadowSize = 0.0;   // exclusive
     public const double MaxShadowSize = 4.0;   // inclusive
 
-    private static readonly char[] ForbiddenSuffixChars = ['<', '>', ':', '"', '/', '\\', '|', '?', '*'];
-
     private static readonly JsonSerializerOptions JsonOptions = new()
     {
         PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
@@ -62,8 +60,12 @@ public sealed class SettingsStore
     }
 
     /// <summary>Writes the settings atomically, creating the folder if needed.</summary>
+    /// <exception cref="ArgumentException">A suffix is not a valid <see cref="FileSuffix"/>. Nothing is written.</exception>
     public void Save(UserSettings settings)
     {
+        ArgumentNullException.ThrowIfNull(settings);
+        FileSuffix.Require(settings.ResultSuffix, nameof(settings));
+        FileSuffix.Require(settings.BackupSuffix, nameof(settings));
         Directory.CreateDirectory(Path.GetDirectoryName(FilePath)!);
         AtomicFile.Write(FilePath, stream => JsonSerializer.Serialize(stream, settings, JsonOptions));
     }
@@ -101,9 +103,8 @@ public sealed class SettingsStore
     private static string Suffix(JsonElement root, string name, string fallback) =>
         root.TryGetProperty(name, out var value)
         && value.ValueKind == JsonValueKind.String
-        && value.GetString() is { Length: > 0 } suffix
-        && suffix.IndexOfAny(ForbiddenSuffixChars) < 0
-        && !suffix.Any(char.IsControl)
+        && value.GetString() is { } suffix
+        && FileSuffix.IsValid(suffix)
             ? suffix
             : fallback;
 

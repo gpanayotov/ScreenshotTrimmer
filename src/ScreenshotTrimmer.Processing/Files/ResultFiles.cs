@@ -21,6 +21,7 @@ public static class ResultFiles
     /// (<see cref="SaveFailureReason.TargetExists"/>) and nothing changes.
     /// </remarks>
     /// <exception cref="SaveFailedException">The target could not be written. Nothing is left behind.</exception>
+    /// <exception cref="ArgumentException">The suffix the mode uses is not a valid <see cref="FileSuffix"/>. Nothing changes.</exception>
     public static SaveReport Save(RgbaImage result, string originalPath, SaveOptions options)
     {
         ArgumentNullException.ThrowIfNull(result);
@@ -32,11 +33,13 @@ public static class ResultFiles
 
         if (options.Mode == SaveMode.Backup)
         {
+            FileSuffix.Require(options.BackupSuffix, nameof(options));
             var backupPath = Path.Combine(folder, name + options.BackupSuffix + Path.GetExtension(fullOriginal));
             var targetPath = Path.Combine(folder, name + ".png");
             return Failing(targetPath, () => SaveWithBackup(result, fullOriginal, backupPath, targetPath));
         }
 
+        FileSuffix.Require(options.ResultSuffix, nameof(options));
         var resultPath = Path.Combine(folder, name + options.ResultSuffix + ".png");
         return Failing(resultPath, () =>
         {
