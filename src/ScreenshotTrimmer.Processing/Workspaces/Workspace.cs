@@ -17,11 +17,15 @@ public sealed class Workspace : IDisposable
     private readonly TimeSpan _watchDelay;
     private readonly Timer _relistTimer;
     private readonly Dictionary<string, FileSystemWatcher> _watchers = new(FileNames.Comparer);
+    private readonly Dictionary<string, FileSystemWatcher> _parentWatchers = new(FileNames.Comparer);
     private readonly ConcurrentQueue<(string From, string To)> _renames = new();
     private bool _disposed;
     private UserSettings _settings;
     private IReadOnlyList<string> _openedPaths = [];
     private bool _openedOneFile;
+    private IReadOnlyList<string> _homeFolders = [];
+    private IReadOnlySet<string> _unavailableFolders = new HashSet<string>();
+    private bool _lastRelistFailed;
     private bool _showResults;
 
     public Workspace(UserSettings settings)
@@ -72,6 +76,14 @@ public sealed class Workspace : IDisposable
             ObjectDisposedException.ThrowIf(_disposed, this);
             _openedPaths = existing;
             _openedOneFile = existing is [var only] && File.Exists(only);
+            _homeFolders = existing
+                .Select(path => Directory.Exists(path) ? path : Path.GetDirectoryName(path)!)
+                .Distinct(FileNames.Comparer)
+                .ToList();
+            _unavailableFolders = new HashSet<string>();
+            _lastRelistFailed = false;
+            _renames.Clear();
+            _relistTimer.Change(Timeout.InfiniteTimeSpan, Timeout.InfiniteTimeSpan);
             var listing = List();
             Selected = listing.Selected is { } opened
                 ? Images.First(image => image.Path == opened.Path)
@@ -164,9 +176,10 @@ public sealed class Workspace : IDisposable
                 return;
             _disposed = true;
             _relistTimer.Dispose();
-            foreach (var watcher in _watchers.Values)
+            foreach (var watcher in _watchers.Values.Concat(_parentWatchers.Values))
                 watcher.Dispose();
             _watchers.Clear();
+            _parentWatchers.Clear();
         }
     }
 
@@ -233,47 +246,81 @@ public sealed class Workspace : IDisposable
                 ContentVersion = ContentVersion.Of(image.Path),
             })
             .ToList();
-        Watch(FoldersToWatch());
+        Watch();
         return listing;
     }
 
-    /// <summary>The folders whose changes can change the list: each opened folder and every folder holding an image.</summary>
-    private IEnumerable<string> FoldersToWatch() =>
-        _openedPaths.Select(path => Directory.Exists(path) ? path : Path.GetDirectoryName(path)!)
-            .Concat(Images.Select(image => Path.GetDirectoryName(image.Path)!))
+    /// <summary>
+    /// Watches the home folders and every folder holding a listed image for changes to their files, and each home
+    /// folder's parent for the home folder itself being deleted, renamed or created again. Subfolders are not watched.
+    /// </summary>
+    private void Watch()
+    {
+        var folders = _homeFolders.Concat(Images.Select(image => Path.GetDirectoryName(image.Path)!))
             .Where(Directory.Exists);
+        Sync(_watchers, folders, folder => new FileSystemWatcher(folder)
+        {
+            NotifyFilter = NotifyFilters.FileName | NotifyFilters.DirectoryName
+                | NotifyFilters.LastWrite | NotifyFilters.Size,
+        });
+        Sync(_parentWatchers, _homeFolders, folder =>
+            Path.GetDirectoryName(folder) is { } parent && Directory.Exists(parent)
+                ? new FileSystemWatcher(parent, Path.GetFileName(folder)) { NotifyFilter = NotifyFilters.DirectoryName }
+                : null);
+    }
 
-    /// <summary>Watches exactly <paramref name="folders"/>, without their subfolders.</summary>
-    private void Watch(IEnumerable<string> folders)
+    /// <summary>
+    /// Makes <paramref name="watchers"/> hold one running watcher per folder in <paramref name="folders"/>, made by
+    /// <paramref name="create"/>; a watcher that stopped after an error is replaced, and a folder that cannot be
+    /// watched is skipped.
+    /// </summary>
+    private void Sync(
+        Dictionary<string, FileSystemWatcher> watchers,
+        IEnumerable<string> folders,
+        Func<string, FileSystemWatcher?> create)
     {
         var wanted = folders.ToHashSet(FileNames.Comparer);
-        foreach (var folder in _watchers.Keys.Where(folder => !wanted.Contains(folder)).ToList())
+        var stale = watchers.Where(pair => !wanted.Contains(pair.Key) || !pair.Value.EnableRaisingEvents).ToList();
+        foreach (var (folder, watcher) in stale)
         {
-            _watchers[folder].Dispose();
-            _watchers.Remove(folder);
+            watcher.Dispose();
+            watchers.Remove(folder);
         }
-        foreach (var folder in wanted.Where(folder => !_watchers.ContainsKey(folder)))
+        foreach (var folder in wanted.Where(folder => !watchers.ContainsKey(folder)))
         {
-            var watcher = new FileSystemWatcher(folder)
+            FileSystemWatcher? watcher = null;
+            try
             {
-                IncludeSubdirectories = false,
-                NotifyFilter = NotifyFilters.FileName | NotifyFilters.DirectoryName
-                    | NotifyFilters.LastWrite | NotifyFilters.Size,
-            };
-            watcher.Created += OnDiskChanged;
-            watcher.Deleted += OnDiskChanged;
-            watcher.Changed += OnDiskChanged;
-            watcher.Renamed += OnRenamed;
-            watcher.EnableRaisingEvents = true;
-            _watchers.Add(folder, watcher);
+                watcher = create(folder);
+                if (watcher is null)
+                    continue;
+                watcher.IncludeSubdirectories = false;
+                watcher.Created += OnDiskChanged;
+                watcher.Deleted += OnDiskChanged;
+                watcher.Changed += OnDiskChanged;
+                watcher.Renamed += OnRenamed;
+                watcher.Error += OnWatcherError;
+                watcher.EnableRaisingEvents = true;
+                watchers.Add(folder, watcher);
+            }
+            catch (Exception e) when (e is IOException or UnauthorizedAccessException or ArgumentException)
+            {
+                // Gone or unreadable since it was checked; the next re-list reports it.
+                watcher?.Dispose();
+            }
         }
     }
+
+    /// <summary>A watcher overflowed or lost its folder: list again, which also replaces a watcher that stopped.</summary>
+    private void OnWatcherError(object sender, ErrorEventArgs e) => RelistSoon();
 
     /// <summary>Puts the re-list off until the disk has been quiet for the watch delay, so a burst gives one update.</summary>
     /// <remarks>
     /// Takes no lock: disposing a watcher waits for its event handlers, and watchers are disposed under the lock.
     /// </remarks>
-    private void OnDiskChanged(object sender, FileSystemEventArgs e)
+    private void OnDiskChanged(object sender, FileSystemEventArgs e) => RelistSoon();
+
+    private void RelistSoon()
     {
         try
         {
@@ -289,7 +336,7 @@ public sealed class Workspace : IDisposable
     private void OnRenamed(object sender, RenamedEventArgs e)
     {
         _renames.Enqueue((e.OldFullPath, e.FullPath));
-        OnDiskChanged(sender, e);
+        RelistSoon();
     }
 
     /// <summary>Maps a path to where the renames reported since the last re-list moved it.</summary>
@@ -326,24 +373,49 @@ public sealed class Workspace : IDisposable
             var old = Images;
             var oldSelected = Selected;
             var selectedIndex = SelectedIndex;
-            List();
+            var unavailable = _homeFolders.Where(folder => !Directory.Exists(folder)).ToHashSet(FileNames.Comparer);
+            try
+            {
+                List();
+                _lastRelistFailed = false;
+            }
+            catch (Exception e) when (e is IOException or UnauthorizedAccessException)
+            {
+                // A folder vanished while it was being listed: try once more after the delay, then give up on all of them.
+                if (!_lastRelistFailed)
+                {
+                    _lastRelistFailed = true;
+                    RelistSoon();
+                    return;
+                }
+                Images = [];
+                Watch();
+                unavailable = _homeFolders.ToHashSet(FileNames.Comparer);
+            }
             Selected = selectedIndex < 0
                 ? Images.FirstOrDefault()
                 : SurvivorNear(old.Select(image => renamed(image.Path)).ToList(), selectedIndex);
+            var newlyUnavailable = _homeFolders
+                .Where(folder => unavailable.Contains(folder) && !_unavailableFolders.Contains(folder))
+                .ToList();
+            _unavailableFolders = unavailable;
 
             // Events for files that are not listed, or writes that left a file as it was, change nothing to show.
-            if (Images.SequenceEqual(old) && Selected == oldSelected)
+            if (Images.SequenceEqual(old) && Selected == oldSelected && newlyUnavailable.Count == 0)
             {
                 Images = old;
                 Selected = oldSelected;
                 return;
             }
-            RaiseChanged();
+            RaiseChanged(newlyUnavailable);
         }
     }
 
-    private void RaiseChanged() =>
-        Changed?.Invoke(this, new WorkspaceChange { Images = Images, Selected = Selected });
+    private void RaiseChanged(IReadOnlyList<string>? unavailableFolders = null) =>
+        Changed?.Invoke(this, new WorkspaceChange
+        {
+            Images = Images, Selected = Selected, UnavailableFolders = unavailableFolders ?? [],
+        });
 
     private static ListingOptions ListingOptionsFor(UserSettings settings, bool includeResults) =>
         ListingOptions.For(

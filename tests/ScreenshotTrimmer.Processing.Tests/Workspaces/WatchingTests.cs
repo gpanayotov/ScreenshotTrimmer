@@ -232,4 +232,63 @@ public class WatchingTests
 
         Assert.Equal(["a.png", "b.png"], Names((await first).Images));
     }
+
+    [Fact]
+    public async Task A_deleted_folder_empties_the_list_and_says_why()
+    {
+        using var folder = new TempFolder();
+        using var workspace = OpenFolder(folder, "a.png", "b.png");
+        var change = ChangeWhere(workspace, c => c.UnavailableFolders.Count > 0);
+
+        Directory.Delete(folder.Path, recursive: true);
+
+        var changed = await change;
+        Assert.Empty(changed.Images);
+        Assert.Null(changed.Selected);
+        Assert.Equal([folder.Path], changed.UnavailableFolders);
+    }
+
+    [Fact]
+    public async Task A_deleted_empty_folder_says_why()
+    {
+        using var folder = new TempFolder();
+        using var workspace = OpenFolder(folder);
+        var change = ChangeWhere(workspace, c => c.UnavailableFolders.Count > 0);
+
+        Directory.Delete(folder.Path);
+
+        Assert.Equal([folder.Path], (await change).UnavailableFolders);
+    }
+
+    [Fact]
+    public async Task Opening_something_else_stops_watching_the_old_folder()
+    {
+        using var oldFolder = new TempFolder();
+        using var newFolder = new TempFolder();
+        using var workspace = OpenFolder(oldFolder, "old.png");
+        Touch(newFolder, "a.png");
+        workspace.Open([newFolder.Path]);
+        var first = ChangeWhere(workspace, _ => true);
+
+        Touch(oldFolder, "old-2.png");
+        await Task.Delay(TimeSpan.FromSeconds(1));
+        Touch(newFolder, "b.png");
+
+        Assert.Equal(["a.png", "b.png"], Names((await first).Images));
+    }
+
+    [Fact]
+    public async Task A_disposed_workspace_stops_watching()
+    {
+        using var folder = new TempFolder();
+        var workspace = OpenFolder(folder, "a.png");
+        var changes = 0;
+        workspace.Changed += (_, _) => Interlocked.Increment(ref changes);
+
+        workspace.Dispose();
+        Touch(folder, "b.png");
+        await Task.Delay(TimeSpan.FromSeconds(1));
+
+        Assert.Equal(0, changes);
+    }
 }
