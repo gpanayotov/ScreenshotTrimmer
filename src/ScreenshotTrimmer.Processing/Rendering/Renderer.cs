@@ -30,7 +30,7 @@ public static class Renderer
 
         if (steps.RoundedCorners is not null)
         {
-            var (measured, applied) = CornerRounding.Apply(result, steps.RoundedCorners);
+            var (measured, applied) = CornerRounding.Apply(result, steps.RoundedCorners, overhang);
             report = report with { MeasuredRadii = measured, AppliedRadii = applied };
         }
 

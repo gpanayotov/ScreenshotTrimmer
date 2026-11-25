@@ -17,9 +17,18 @@ internal static class CornerRounding
     /// <summary>Samples per pixel side when working out how much of a pixel lies inside the arc.</summary>
     private const int Subsamples = 8;
 
-    public static (CornerRadii Measured, CornerRadii Applied) Apply(RgbaImage image, RoundedCorners settings)
+    /// <summary>
+    /// Measures and clears the corners. The corners on a side with a Popup overhang are not the window's
+    /// corners, so they are not measured (reported as square) and stay square.
+    /// </summary>
+    public static (CornerRadii Measured, CornerRadii Applied) Apply(RgbaImage image, RoundedCorners settings, Overhang overhang)
     {
         var measured = Measure(image);
+        measured = new CornerRadii(
+            overhang.Left || overhang.Top ? 0 : measured.TopLeft,
+            overhang.Right || overhang.Top ? 0 : measured.TopRight,
+            overhang.Right || overhang.Bottom ? 0 : measured.BottomRight,
+            overhang.Left || overhang.Bottom ? 0 : measured.BottomLeft);
         var applied = Group(measured);
         if (settings.ManualRadius is { } manual)
             applied = new CornerRadii(

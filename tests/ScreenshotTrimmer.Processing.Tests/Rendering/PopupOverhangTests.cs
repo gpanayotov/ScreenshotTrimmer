@@ -130,5 +130,66 @@ public class PopupOverhangTests
         Assert.Equal(default, result[0, 74]);
     }
 
+    /// <summary>
+    /// A 160x120 window with 12px rounded corners at 40..200 x 40..160 on a page, and a menu at the given
+    /// rectangle sticking out past one of its sides.
+    /// </summary>
+    private static (RgbaImage Original, Crop Crop) RoundedWindowWithMenu(PixelRect menu)
+    {
+        var window = Synthetic.RoundedWindow(160, 120, 12, 12, 12, 12);
+        var original = new RgbaImage(240, 200);
+        for (var y = 0; y < 200; y++)
+            for (var x = 0; x < 240; x++)
+                original[x, y] = Synthetic.Page;
+        for (var y = 0; y < 120; y++)
+            for (var x = 0; x < 160; x++)
+                original[40 + x, 40 + y] = window[x, y];
+        for (var y = menu.Y; y < menu.Bottom; y++)
+            for (var x = menu.X; x < menu.Right; x++)
+                original[x, y] = Menu;
+        return (original, Crop.WithPopups(new PixelRect(40, 40, 160, 120), menu));
+    }
+
+    public enum Side { Left, Top, Right, Bottom }
+
+    [Theory]
+    [InlineData(Side.Left, 10, 70, 40, 40)]
+    [InlineData(Side.Top, 80, 10, 40, 40)]
+    [InlineData(Side.Right, 190, 70, 40, 40)]
+    [InlineData(Side.Bottom, 80, 150, 40, 40)]
+    public void The_corners_on_a_side_with_an_overhang_stay_square(Side side, int mx, int my, int mw, int mh)
+    {
+        var menu = new PixelRect(mx, my, mw, mh);
+        var (original, crop) = RoundedWindowWithMenu(menu);
+
+        var output = Renderer.Render(original, new Steps { Crop = crop, RoundedCorners = new RoundedCorners() });
+
+        // The window's corners in the Original, and whether each lies on the overhang side.
+        var (ox, oy) = (Math.Min(40, mx), Math.Min(40, my));
+        var applied = output.Report.AppliedRadii!;
+        var corners = new (double Radius, int X, int Y, bool OnOverhang)[]
+        {
+            (applied.TopLeft, 40, 40, side is Side.Left or Side.Top),
+            (applied.TopRight, 199, 40, side is Side.Right or Side.Top),
+            (applied.BottomRight, 199, 159, side is Side.Right or Side.Bottom),
+            (applied.BottomLeft, 40, 159, side is Side.Left or Side.Bottom),
+        };
+        foreach (var (radius, x, y, onOverhang) in corners)
+        {
+            var pixel = output.Result[x - ox, y - oy];
+            if (onOverhang)
+            {
+                Assert.Equal(0, radius);
+                Assert.Equal(Synthetic.Page, pixel);
+            }
+            else
+            {
+                Assert.InRange(radius, 11, 13);
+                Assert.Equal(0, pixel.A);
+            }
+        }
+        Assert.Equal(Menu, output.Result[mx - ox + mw / 2, my - oy + mh / 2]);
+    }
+
     private static bool Inside(PixelRect r, int x, int y) => x >= r.X && x < r.Right && y >= r.Y && y < r.Bottom;
 }
