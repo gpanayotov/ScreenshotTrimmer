@@ -1,3 +1,4 @@
+using System.Runtime.Versioning;
 using ScreenshotTrimmer.Processing.Files;
 using ScreenshotTrimmer.Processing.Imaging;
 using SkiaSharp;
@@ -138,6 +139,7 @@ public class BackupModeSaveTests
     }
 
     [UnixNonRootFact]
+    [UnsupportedOSPlatform("windows")]
     public void A_read_only_folder_is_reported_as_access_denied_and_nothing_changes()
     {
         using var folder = new TempFolder();
