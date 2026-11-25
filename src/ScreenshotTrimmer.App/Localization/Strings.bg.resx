@@ -56,4 +56,19 @@
   <data name="Cancel" xml:space="preserve"><value>Отказ</value></data>
   <data name="SettingsNotSaved" xml:space="preserve"><value>Настройките не могат да бъдат записани в {0}: {1} Те важат, докато затворите приложението.</value></data>
   <data name="UnexpectedError" xml:space="preserve"><value>Възникна грешка: {0}</value></data>
+  <data name="ToolbarOpenFiles" xml:space="preserve"><value>Отваряне на файлове</value></data>
+  <data name="ToolbarOpenFilesTip" xml:space="preserve"><value>Отваряне на файлове с екранни снимки (Ctrl+O)</value></data>
+  <data name="ToolbarOpenFolder" xml:space="preserve"><value>Отваряне на папка</value></data>
+  <data name="ToolbarOpenFolderTip" xml:space="preserve"><value>Отваряне на екранните снимки в папка (Ctrl+Shift+O)</value></data>
+  <data name="ToolbarFit" xml:space="preserve"><value>Побиране</value></data>
+  <data name="ToolbarFitTip" xml:space="preserve"><value>Побиране на изображението в прозореца (Ctrl+0)</value></data>
+  <data name="ToolbarActualSize" xml:space="preserve"><value>100%</value></data>
+  <data name="ToolbarActualSizeTip" xml:space="preserve"><value>Показване на изображението в действителен размер (Ctrl+1)</value></data>
+  <data name="ToolbarShowResults" xml:space="preserve"><value>Показване на Резултатите</value></data>
+  <data name="ToolbarShowResultsTip" xml:space="preserve"><value>Показване на Резултатите до техните Оригинали</value></data>
+  <data name="ToolbarBackground" xml:space="preserve"><value>Фон:</value></data>
+  <data name="ToolbarBackgroundTip" xml:space="preserve"><value>Какво се показва зад изображението</value></data>
+  <data name="ToolbarCheckerboard" xml:space="preserve"><value>Шахматна дъска</value></data>
+  <data name="ToolbarWhite" xml:space="preserve"><value>Бял</value></data>
+  <data name="ToolbarDarkGrey" xml:space="preserve"><value>Тъмносив</value></data>
 </root>

@@ -4,6 +4,7 @@
         xmlns:controls="using:ScreenshotTrimmer.App.Controls"
         xmlns:imaging="using:ScreenshotTrimmer.App.Imaging"
         xmlns:loc="using:ScreenshotTrimmer.App.Localization"
+        xmlns:mvvm="using:ScreenshotTrimmer.App.Mvvm"
         x:Class="ScreenshotTrimmer.App.MainWindow"
         x:DataType="app:MainWindowViewModel"
         Title="{Binding Title}"
@@ -28,8 +29,9 @@
         <MenuItem x:Name="ExitItem" Header="{loc:Tr Exit}" />
       </MenuItem>
       <MenuItem Header="{loc:Tr ViewMenu}">
+        <!-- A menu item does not check itself when clicked: its command changes the setting, and the binding shows it. -->
         <MenuItem Header="{loc:Tr ShowResults}" ToggleType="CheckBox"
-                  IsChecked="{Binding ShowResults, Mode=TwoWay}" />
+                  Command="{Binding ToggleShowResultsCommand}" IsChecked="{Binding ShowResults, Mode=OneWay}" />
         <Separator />
         <MenuItem Header="{loc:Tr FitToWindow}" InputGesture="Ctrl+D0" Command="{Binding #Viewer.FitCommand}" />
         <MenuItem Header="{loc:Tr ActualSize}" InputGesture="Ctrl+D1" Command="{Binding #Viewer.ActualSizeCommand}" />
@@ -38,11 +40,14 @@
         <Separator />
         <MenuItem Header="{loc:Tr BackgroundMenu}">
           <MenuItem Header="{loc:Tr BackgroundCheckerboard}" ToggleType="Radio" GroupName="ViewerBackground"
-                    IsChecked="{Binding IsCheckerboardBackground}" />
+                    Command="{Binding ChooseBackgroundCommand}" CommandParameter="{x:Static controls:ViewerBackground.Checkerboard}"
+                    IsChecked="{Binding Background, Mode=OneWay, Converter={x:Static mvvm:IsValueConverter.Instance}, ConverterParameter={x:Static controls:ViewerBackground.Checkerboard}}" />
           <MenuItem Header="{loc:Tr BackgroundWhite}" ToggleType="Radio" GroupName="ViewerBackground"
-                    IsChecked="{Binding IsWhiteBackground}" />
+                    Command="{Binding ChooseBackgroundCommand}" CommandParameter="{x:Static controls:ViewerBackground.White}"
+                    IsChecked="{Binding Background, Mode=OneWay, Converter={x:Static mvvm:IsValueConverter.Instance}, ConverterParameter={x:Static controls:ViewerBackground.White}}" />
           <MenuItem Header="{loc:Tr BackgroundDarkGrey}" ToggleType="Radio" GroupName="ViewerBackground"
-                    IsChecked="{Binding IsDarkGreyBackground}" />
+                    Command="{Binding ChooseBackgroundCommand}" CommandParameter="{x:Static controls:ViewerBackground.DarkGrey}"
+                    IsChecked="{Binding Background, Mode=OneWay, Converter={x:Static mvvm:IsValueConverter.Instance}, ConverterParameter={x:Static controls:ViewerBackground.DarkGrey}}" />
         </MenuItem>
       </MenuItem>
       <MenuItem Header="{loc:Tr ImageMenu}">
@@ -52,6 +57,37 @@
         <MenuItem Header="{loc:Tr RemoveFromList}" InputGesture="Delete" Command="{Binding RemoveSelectedCommand}" />
       </MenuItem>
     </Menu>
+
+    <!-- The toolbar: the most used commands of the menus, each with a tooltip. -->
+    <Border DockPanel.Dock="Top" Padding="6,4" BorderThickness="0,0,0,1"
+            BorderBrush="{DynamicResource SystemControlForegroundBaseLowBrush}">
+      <StackPanel Orientation="Horizontal" Spacing="4">
+        <Button Content="{loc:Tr ToolbarOpenFiles}" ToolTip.Tip="{loc:Tr ToolbarOpenFilesTip}"
+                Command="{Binding OpenFilesCommand}" />
+        <Button Content="{loc:Tr ToolbarOpenFolder}" ToolTip.Tip="{loc:Tr ToolbarOpenFolderTip}"
+                Command="{Binding OpenFolderCommand}" />
+        <Separator Width="1" Height="20" Margin="6,0" Background="{DynamicResource SystemControlForegroundBaseLowBrush}" />
+        <Button Content="{loc:Tr ToolbarFit}" ToolTip.Tip="{loc:Tr ToolbarFitTip}"
+                Command="{Binding #Viewer.FitCommand}" />
+        <Button Content="{loc:Tr ToolbarActualSize}" ToolTip.Tip="{loc:Tr ToolbarActualSizeTip}"
+                Command="{Binding #Viewer.ActualSizeCommand}" />
+        <Separator Width="1" Height="20" Margin="6,0" Background="{DynamicResource SystemControlForegroundBaseLowBrush}" />
+        <ToggleButton Content="{loc:Tr ToolbarShowResults}" ToolTip.Tip="{loc:Tr ToolbarShowResultsTip}"
+                      IsChecked="{Binding ShowResults, Mode=TwoWay}" />
+        <Separator Width="1" Height="20" Margin="6,0" Background="{DynamicResource SystemControlForegroundBaseLowBrush}" />
+        <TextBlock Text="{loc:Tr ToolbarBackground}" VerticalAlignment="Center" Margin="0,0,4,0"
+                   ToolTip.Tip="{loc:Tr ToolbarBackgroundTip}" />
+        <RadioButton GroupName="ToolbarBackground" Content="{loc:Tr ToolbarCheckerboard}"
+                     ToolTip.Tip="{loc:Tr ToolbarBackgroundTip}"
+                     IsChecked="{Binding Background, Mode=TwoWay, Converter={x:Static mvvm:IsValueConverter.Instance}, ConverterParameter={x:Static controls:ViewerBackground.Checkerboard}}" />
+        <RadioButton GroupName="ToolbarBackground" Content="{loc:Tr ToolbarWhite}"
+                     ToolTip.Tip="{loc:Tr ToolbarBackgroundTip}"
+                     IsChecked="{Binding Background, Mode=TwoWay, Converter={x:Static mvvm:IsValueConverter.Instance}, ConverterParameter={x:Static controls:ViewerBackground.White}}" />
+        <RadioButton GroupName="ToolbarBackground" Content="{loc:Tr ToolbarDarkGrey}"
+                     ToolTip.Tip="{loc:Tr ToolbarBackgroundTip}"
+                     IsChecked="{Binding Background, Mode=TwoWay, Converter={x:Static mvvm:IsValueConverter.Instance}, ConverterParameter={x:Static controls:ViewerBackground.DarkGrey}}" />
+      </StackPanel>
+    </Border>
 
     <!-- Non-blocking notices, such as "No images found". -->
     <Border DockPanel.Dock="Top" IsVisible="{Binding HasNotices}" Padding="12,6"

@@ -56,4 +56,19 @@
   <data name="Cancel" xml:space="preserve"><value>Cancel</value></data>
   <data name="SettingsNotSaved" xml:space="preserve"><value>The settings could not be saved to {0}: {1} They apply until you close the app.</value></data>
   <data name="UnexpectedError" xml:space="preserve"><value>Something went wrong: {0}</value></data>
+  <data name="ToolbarOpenFiles" xml:space="preserve"><value>Open files</value></data>
+  <data name="ToolbarOpenFilesTip" xml:space="preserve"><value>Open screenshot files (Ctrl+O)</value></data>
+  <data name="ToolbarOpenFolder" xml:space="preserve"><value>Open folder</value></data>
+  <data name="ToolbarOpenFolderTip" xml:space="preserve"><value>Open the screenshots in a folder (Ctrl+Shift+O)</value></data>
+  <data name="ToolbarFit" xml:space="preserve"><value>Fit</value></data>
+  <data name="ToolbarFitTip" xml:space="preserve"><value>Fit the image to the window (Ctrl+0)</value></data>
+  <data name="ToolbarActualSize" xml:space="preserve"><value>100%</value></data>
+  <data name="ToolbarActualSizeTip" xml:space="preserve"><value>Show the image at its actual size (Ctrl+1)</value></data>
+  <data name="ToolbarShowResults" xml:space="preserve"><value>Show Results</value></data>
+  <data name="ToolbarShowResultsTip" xml:space="preserve"><value>List the Results beside their Originals</value></data>
+  <data name="ToolbarBackground" xml:space="preserve"><value>Background:</value></data>
+  <data name="ToolbarBackgroundTip" xml:space="preserve"><value>What the viewer shows behind the image</value></data>
+  <data name="ToolbarCheckerboard" xml:space="preserve"><value>Checkerboard</value></data>
+  <data name="ToolbarWhite" xml:space="preserve"><value>White</value></data>
+  <data name="ToolbarDarkGrey" xml:space="preserve"><value>Dark grey</value></data>
 </root>

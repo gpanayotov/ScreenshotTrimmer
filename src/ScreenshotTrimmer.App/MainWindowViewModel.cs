@@ -44,6 +44,12 @@ public sealed class MainWindowViewModel : Observable, IDisposable
         RemoveSelectedCommand = new RelayCommand(RemoveSelected);
         RemoveEntryCommand = new RelayCommand<StripEntry>(Remove);
         DismissNoticesCommand = new RelayCommand(DismissNotices);
+        ToggleShowResultsCommand = new RelayCommand(() => ShowResults = !ShowResults);
+        ChooseBackgroundCommand = new RelayCommand<object>(choice =>
+        {
+            if (choice is ViewerBackground background)
+                Background = background;
+        });
     }
 
     public ObservableCollection<StripEntry> Entries { get; } = [];
@@ -100,35 +106,14 @@ public sealed class MainWindowViewModel : Observable, IDisposable
     }
 
     /// <summary>What the viewer draws behind the image. Session-only; starts as the checkerboard.</summary>
+    /// <remarks>
+    /// The menu's and toolbar's choices show it with <see cref="IsValueConverter"/>; the menu's set it with
+    /// <see cref="ChooseBackgroundCommand"/>, since a menu item does not check itself when clicked.
+    /// </remarks>
     public ViewerBackground Background
     {
         get => _background;
-        set
-        {
-            if (!Set(ref _background, value))
-                return;
-            Raise(nameof(IsCheckerboardBackground));
-            Raise(nameof(IsWhiteBackground));
-            Raise(nameof(IsDarkGreyBackground));
-        }
-    }
-
-    public bool IsCheckerboardBackground
-    {
-        get => Background == ViewerBackground.Checkerboard;
-        set => SetBackgroundIf(value, ViewerBackground.Checkerboard);
-    }
-
-    public bool IsWhiteBackground
-    {
-        get => Background == ViewerBackground.White;
-        set => SetBackgroundIf(value, ViewerBackground.White);
-    }
-
-    public bool IsDarkGreyBackground
-    {
-        get => Background == ViewerBackground.DarkGrey;
-        set => SetBackgroundIf(value, ViewerBackground.DarkGrey);
+        set => Set(ref _background, value);
     }
 
     /// <summary>The selected image's file name for the status bar.</summary>
@@ -172,6 +157,12 @@ public sealed class MainWindowViewModel : Observable, IDisposable
     public ICommand RemoveEntryCommand { get; }
 
     public ICommand DismissNoticesCommand { get; }
+
+    /// <summary>Turns <see cref="ShowResults"/> on or off.</summary>
+    public ICommand ToggleShowResultsCommand { get; }
+
+    /// <summary>Sets <see cref="Background"/> to the <see cref="ViewerBackground"/> given as the parameter.</summary>
+    public ICommand ChooseBackgroundCommand { get; }
 
     /// <summary>
     /// Opens <paramref name="paths"/> in the workspace, replacing the list, and reports any path that does not exist
@@ -393,12 +384,6 @@ public sealed class MainWindowViewModel : Observable, IDisposable
     {
         Raise(nameof(NoticeText));
         Raise(nameof(HasNotices));
-    }
-
-    private void SetBackgroundIf(bool chosen, ViewerBackground background)
-    {
-        if (chosen)
-            Background = background;
     }
 
     private void RaiseStatus()
