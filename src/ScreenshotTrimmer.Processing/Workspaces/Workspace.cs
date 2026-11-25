@@ -61,8 +61,9 @@ public sealed class Workspace : IDisposable
 
     /// <summary>
     /// Replaces the list with the images for <paramref name="paths"/>: one file lists its whole folder with that file
-    /// selected; a folder or several paths list their images with the first selected. Paths that exist neither as a
-    /// file nor as a folder are skipped and returned, so the caller can tell the user.
+    /// selected; a folder or several paths list their images with the first selected. Removed entries are listed
+    /// again. Paths that exist neither as a file nor as a folder are skipped and returned, so the caller can tell the
+    /// user.
     /// </summary>
     public IReadOnlyList<string> Open(IReadOnlyList<string> paths)
     {
@@ -84,6 +85,7 @@ public sealed class Workspace : IDisposable
                 .ToList();
             _unavailableFolders = new HashSet<string>();
             _lastRelistFailed = false;
+            _removed = new HashSet<string>(FileNames.Comparer);
             _renames.Clear();
             _relistTimer.Change(Timeout.InfiniteTimeSpan, Timeout.InfiniteTimeSpan);
             var listing = List();
@@ -255,8 +257,8 @@ public sealed class Workspace : IDisposable
 
     /// <summary>
     /// Replaces <see cref="Images"/> with the current listing of the opened paths under the current settings and
-    /// <see cref="ShowResults"/>; the one re-list path for <see cref="Open"/>, <see cref="ShowResults"/> and
-    /// <see cref="ApplySettings"/>.
+    /// <see cref="ShowResults"/>, less the removed entries; the one re-list path, so removed entries stay hidden
+    /// through every update.
     /// </summary>
     private Listing List()
     {
@@ -387,6 +389,7 @@ public sealed class Workspace : IDisposable
                 return;
             var renamed = TakeRenames();
             _openedPaths = _openedPaths.Select(renamed).ToList();
+            _removed = _removed.Select(renamed).ToHashSet(FileNames.Comparer);
             if (_openedOneFile && _openedPaths is [var file] && !File.Exists(file))
             {
                 // The file opened on its own is gone; the rest of its folder stays listed.
