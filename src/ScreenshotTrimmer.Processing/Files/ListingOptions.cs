@@ -11,4 +11,15 @@ public sealed record ListingOptions
 
     /// <summary>Whether Results are listed (marked <see cref="ListedImage.IsResult"/>) instead of hidden.</summary>
     public bool IncludeResults { get; init; }
+
+    /// <summary>The listing options that match <paramref name="save"/>: Results are recognised only in Suffix mode.</summary>
+    public static ListingOptions For(SaveOptions save, bool includeResults = false)
+    {
+        ArgumentNullException.ThrowIfNull(save);
+        return new ListingOptions
+        {
+            ResultSuffix = save.Mode == SaveMode.Suffix ? save.ResultSuffix : null,
+            IncludeResults = includeResults,
+        };
+    }
 }

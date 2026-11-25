@@ -141,6 +141,20 @@ public class ListingTests
     }
 
     [Fact]
+    public void Listing_options_follow_the_save_options()
+    {
+        using var folder = new TempFolder();
+        Touch(folder, "shot.png", "shot_done.png", "shot-original.png");
+
+        var suffixMode = ImageListing.List([folder.Path], ListingOptions.For(new SaveOptions { ResultSuffix = "_done" }));
+        var backupMode = ImageListing.List([folder.Path], ListingOptions.For(new SaveOptions { Mode = SaveMode.Backup, ResultSuffix = "_done" }));
+
+        Assert.Equal(["shot.png", "shot-original.png"], Names(suffixMode));
+        Assert.Equal(["shot.png", "shot-original.png", "shot_done.png"], Names(backupMode));
+        Assert.All(backupMode.Images, image => Assert.False(image.IsResult || image.HasResult));
+    }
+
+    [Fact]
     public void The_result_suffix_is_configurable()
     {
         using var folder = new TempFolder();
