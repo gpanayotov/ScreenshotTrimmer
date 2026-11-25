@@ -9,7 +9,7 @@ internal static class CornerRounding
     private const int DifferenceThreshold = 40;
 
     /// <summary>How far in, at most, the reference pixel lies; also the longest stretch walked.</summary>
-    private const int MaxLimit = 40;
+    private const int MaxReach = 40;
 
     /// <summary>Measured radii closer than this are taken to be the same radius.</summary>
     private const double Agreement = 3;
@@ -26,11 +26,12 @@ internal static class CornerRounding
         RgbaImage image, PixelRect window, RoundedCorners settings, Overhang overhang)
     {
         var measured = Measure(image, window);
-        var applied = Group(new CornerRadii(
-            overhang.Left || overhang.Top ? 0 : measured.TopLeft,
-            overhang.Right || overhang.Top ? 0 : measured.TopRight,
-            overhang.Right || overhang.Bottom ? 0 : measured.BottomRight,
-            overhang.Left || overhang.Bottom ? 0 : measured.BottomLeft));
+        var applied = Group(measured, [
+            overhang.Left || overhang.Top,
+            overhang.Right || overhang.Top,
+            overhang.Right || overhang.Bottom,
+            overhang.Left || overhang.Bottom,
+        ]);
         if (settings.ManualRadius is { } manual)
             applied = new CornerRadii(
                 applied.TopLeft > 0 ? manual : 0,
@@ -46,19 +47,34 @@ internal static class CornerRounding
 
     /// <summary>
     /// Rounds together the corners whose measured radii agree within <see cref="Agreement"/>, at least two
-    /// of them, at the largest of those radii. A corner that agrees with no other stays square.
+    /// of them, at the largest of those radii. Agreement chains: radii in order, each within
+    /// <see cref="Agreement"/> of the next, form one group, so every corner in a group gets the same radius.
+    /// A corner that agrees with no other stays square.
     /// </summary>
-    private static CornerRadii Group(CornerRadii measured)
+    /// <param name="square">
+    /// Per corner (top-left, top-right, bottom-right, bottom-left), whether it lies on a side with a Popup
+    /// overhang. Such a corner stays square but still counts towards its group, so the corner it agrees with is
+    /// rounded; its radius, which the popup may distort, does not set the group's radius.
+    /// </param>
+    private static CornerRadii Group(CornerRadii measured, bool[] square)
     {
         double[] radii = [measured.TopLeft, measured.TopRight, measured.BottomRight, measured.BottomLeft];
         var applied = new double[4];
-        for (var i = 0; i < 4; i++)
+        var order = Enumerable.Range(0, 4).Where(i => radii[i] > 0).OrderBy(i => radii[i]).ToList();
+        var start = 0;
+        for (var end = 1; end <= order.Count; end++)
         {
-            if (radii[i] <= 0)
+            if (end < order.Count && radii[order[end]] - radii[order[end - 1]] <= Agreement)
                 continue;
-            var agreeing = radii.Where(r => r > 0 && Math.Abs(r - radii[i]) <= Agreement).ToArray();
-            if (agreeing.Length >= 2)
-                applied[i] = agreeing.Max();
+            var group = order[start..end];
+            var rounded = group.Where(i => !square[i]).ToList();
+            if (group.Count >= 2 && rounded.Count > 0)
+            {
+                var radius = rounded.Max(i => radii[i]);
+                foreach (var i in rounded)
+                    applied[i] = radius;
+            }
+            start = end;
         }
         return new CornerRadii(applied[0], applied[1], applied[2], applied[3]);
     }
@@ -99,7 +115,7 @@ internal static class CornerRounding
 
     private static CornerRadii Measure(RgbaImage image, PixelRect window)
     {
-        var limit = Math.Min(MaxLimit, Math.Min(window.Width / 4, window.Height / 4));
+        var limit = Math.Min(MaxReach,Math.Min(window.Width / 4, window.Height / 4));
         if (limit < 1)
             return CornerRadii.Square;
 
