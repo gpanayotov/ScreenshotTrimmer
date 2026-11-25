@@ -23,6 +23,12 @@ public static class Renderer
             report = report with { FrameLinesRemoved = removed };
         }
 
+        if (steps.RoundedCorners is not null)
+        {
+            var (measured, applied) = CornerRounding.Apply(result, steps.RoundedCorners);
+            report = report with { MeasuredRadii = measured, AppliedRadii = applied };
+        }
+
         return new RenderOutput(result, report);
     }
 
