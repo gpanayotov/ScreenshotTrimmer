@@ -27,6 +27,7 @@ public sealed class Workspace : IDisposable
     private IReadOnlySet<string> _unavailableFolders = new HashSet<string>();
     private bool _lastRelistFailed;
     private bool _showResults;
+    private HashSet<string> _removed = new(FileNames.Comparer);
 
     public Workspace(UserSettings settings)
         : this(settings, DefaultWatchDelay)
@@ -60,8 +61,9 @@ public sealed class Workspace : IDisposable
 
     /// <summary>
     /// Replaces the list with the images for <paramref name="paths"/>: one file lists its whole folder with that file
-    /// selected; a folder or several paths list their images with the first selected. Paths that exist neither as a
-    /// file nor as a folder are skipped and returned, so the caller can tell the user.
+    /// selected; a folder or several paths list their images with the first selected. Removed entries are listed
+    /// again. Paths that exist neither as a file nor as a folder are skipped and returned, so the caller can tell the
+    /// user.
     /// </summary>
     public IReadOnlyList<string> Open(IReadOnlyList<string> paths)
     {
@@ -83,6 +85,7 @@ public sealed class Workspace : IDisposable
                 .ToList();
             _unavailableFolders = new HashSet<string>();
             _lastRelistFailed = false;
+            _removed = new HashSet<string>(FileNames.Comparer);
             _renames.Clear();
             _relistTimer.Change(Timeout.InfiniteTimeSpan, Timeout.InfiniteTimeSpan);
             var listing = List();
@@ -137,6 +140,26 @@ public sealed class Workspace : IDisposable
             List();
             Selected = Images.FirstOrDefault(image => image.Path == selectedPath)
                 ?? (Images.Count == 0 ? null : Images[Math.Clamp(selectedIndex, 0, Images.Count - 1)]);
+            RaiseChanged();
+        }
+    }
+
+    /// <summary>
+    /// Hides <paramref name="image"/>, which must be one of <see cref="Images"/>, for as long as this list is open; its
+    /// file is not touched.
+    /// </summary>
+    public void Remove(WorkspaceImage image)
+    {
+        ArgumentNullException.ThrowIfNull(image);
+        lock (_lock)
+        {
+            if (IndexOf(image) < 0)
+                throw new ArgumentException("The image is not listed in this workspace.", nameof(image));
+            var before = Images.Select(listed => listed.Path).ToList();
+            var selectedIndex = SelectedIndex;
+            _removed.Add(image.Path);
+            List();
+            Selected = SurvivorNear(before, selectedIndex);
             RaiseChanged();
         }
     }
@@ -234,13 +257,14 @@ public sealed class Workspace : IDisposable
 
     /// <summary>
     /// Replaces <see cref="Images"/> with the current listing of the opened paths under the current settings and
-    /// <see cref="ShowResults"/>; the one re-list path for <see cref="Open"/>, <see cref="ShowResults"/> and
-    /// <see cref="ApplySettings"/>.
+    /// <see cref="ShowResults"/>, less the removed entries; the one re-list path, so removed entries stay hidden
+    /// through every update.
     /// </summary>
     private Listing List()
     {
         var listing = ImageListing.List(_openedPaths, ListingOptionsFor(_settings, _showResults));
         Images = listing.Images
+            .Where(image => !_removed.Contains(image.Path))
             .Select(image => new WorkspaceImage
             {
                 Path = image.Path, IsResult = image.IsResult, HasResult = image.HasResult,
@@ -365,6 +389,7 @@ public sealed class Workspace : IDisposable
                 return;
             var renamed = TakeRenames();
             _openedPaths = _openedPaths.Select(renamed).ToList();
+            _removed = _removed.Select(renamed).ToHashSet(FileNames.Comparer);
             if (_openedOneFile && _openedPaths is [var file] && !File.Exists(file))
             {
                 // The file opened on its own is gone; the rest of its folder stays listed.

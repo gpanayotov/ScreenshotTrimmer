@@ -13,6 +13,7 @@
   <data name="ImageMenu" xml:space="preserve"><value>_Изображение</value></data>
   <data name="NextImage" xml:space="preserve"><value>_Следващо изображение</value></data>
   <data name="PreviousImage" xml:space="preserve"><value>_Предишно изображение</value></data>
+  <data name="RemoveFromList" xml:space="preserve"><value>Пре_махване от списъка</value></data>
   <data name="OpenFilesTitle" xml:space="preserve"><value>Отваряне на файлове</value></data>
   <data name="OpenFolderTitle" xml:space="preserve"><value>Отваряне на папка</value></data>
   <data name="ImagesFilter" xml:space="preserve"><value>Изображения</value></data>
