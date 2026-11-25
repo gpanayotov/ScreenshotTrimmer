@@ -35,14 +35,14 @@ public static class ImageListing
 
         var paths = candidates.Where(IsImagePath).Distinct().ToList();
         var suffix = string.IsNullOrEmpty(options.ResultSuffix) ? null : options.ResultSuffix;
-        var listedStems = paths.Select(StemOf).ToHashSet(StringComparer.OrdinalIgnoreCase);
+        var listedStems = paths.Select(StemOf).ToHashSet(FileNames.Comparer);
         var stemsOnDisk = suffix is null ? [] : ImageStemsInFoldersOf(paths);
 
         // A Result's Original must be listed too; otherwise the suffixed file is a normal image.
         bool IsResult(string path) =>
             suffix is not null
             && StemOf(path) is var stem
-            && stem.EndsWith(suffix, StringComparison.OrdinalIgnoreCase)
+            && stem.EndsWith(suffix, FileNames.Comparison)
             && listedStems.Contains(stem[..^suffix.Length]);
 
         // The badge reflects the disk, so an Original opened without its Result is still marked.
@@ -72,7 +72,7 @@ public static class ImageListing
             .SelectMany(Directory.EnumerateFiles)
             .Where(IsImagePath)
             .Select(StemOf)
-            .ToHashSet(StringComparer.OrdinalIgnoreCase);
+            .ToHashSet(FileNames.Comparer);
 
     /// <summary>The folder and base name of <paramref name="path"/>, without its extension.</summary>
     private static string StemOf(string path) =>
