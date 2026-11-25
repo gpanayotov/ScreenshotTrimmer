@@ -72,6 +72,21 @@ public sealed record Viewport
     }
 
     /// <summary>
+    /// Multiplies the zoom by <paramref name="factor"/> around the anchor, as <see cref="ZoomAt"/> does, but stops
+    /// at 100% when the step would cross it, so stepping always passes through the true pixels.
+    /// </summary>
+    public Viewport ZoomBy(double factor, double anchorX, double anchorY)
+    {
+        var zoom = Zoom * factor;
+        var crosses = (Zoom < 1 && zoom > 1) || (Zoom > 1 && zoom < 1);
+        return ZoomAt(crosses ? 1 : zoom, anchorX, anchorY);
+    }
+
+    /// <summary>Moves the image by (<paramref name="dx"/>, <paramref name="dy"/>) screen pixels, within its edges.</summary>
+    public Viewport PanBy(double dx, double dy) =>
+        (this with { OriginX = OriginX - dx / Zoom, OriginY = OriginY - dy / Zoom }).Clamped();
+
+    /// <summary>
     /// Centres the image on an axis where it is smaller than the view; elsewhere keeps the view covered by the image.
     /// </summary>
     private Viewport Clamped()

@@ -48,4 +48,49 @@ public class ViewportTests
 
         Assert.Equal(expected, viewport.ZoomAt(requested, 400, 300).Zoom, 9);
     }
+
+    [Fact]
+    public void Zooming_by_a_factor_stops_at_100_percent_when_it_would_cross_it()
+    {
+        var viewport = Viewport.Fitted(2000, 1000, viewWidth: 800, viewHeight: 600).ZoomAt(0.9, 400, 300);
+
+        var zoomedIn = viewport.ZoomBy(1.25, 400, 300);
+        var zoomedInAgain = zoomedIn.ZoomBy(1.25, 400, 300);
+
+        Assert.Equal(1, zoomedIn.Zoom, 9);
+        Assert.Equal(1.25, zoomedInAgain.Zoom, 9);
+        Assert.Equal(1, zoomedInAgain.ZoomBy(0.5, 400, 300).Zoom, 9);
+    }
+
+    [Fact]
+    public void Panning_moves_the_image_with_the_pointer()
+    {
+        var viewport = Viewport.Fitted(2000, 1000, viewWidth: 800, viewHeight: 600).ZoomAt(1, 400, 300);
+
+        var panned = viewport.PanBy(30, -20);
+
+        Assert.Equal(viewport.ImageLeft + 30, panned.ImageLeft, 9);
+        Assert.Equal(viewport.ImageTop - 20, panned.ImageTop, 9);
+    }
+
+    [Fact]
+    public void Panning_stops_at_the_image_edges()
+    {
+        var viewport = Viewport.Fitted(2000, 1000, viewWidth: 800, viewHeight: 600).ZoomAt(1, 400, 300);
+
+        var pannedFar = viewport.PanBy(5000, -5000);
+
+        Assert.Equal(0, pannedFar.ImageLeft, 9);
+        Assert.Equal(600 - 1000, pannedFar.ImageTop, 9);
+    }
+
+    [Fact]
+    public void An_axis_where_the_image_is_smaller_than_the_view_stays_centred_when_panning()
+    {
+        var viewport = Viewport.Fitted(2000, 100, viewWidth: 800, viewHeight: 600).ZoomAt(1, 400, 300);
+
+        var panned = viewport.PanBy(0, 200);
+
+        Assert.Equal(250, panned.ImageTop, 9);
+    }
 }
