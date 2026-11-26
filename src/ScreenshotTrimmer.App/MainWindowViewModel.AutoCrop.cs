@@ -15,7 +15,7 @@ public sealed partial class MainWindowViewModel
 
     private CancellationTokenSource? _detection;
     private RelayCommand? _autoCropCommand;
-    private RelayCommand<object>? _chooseCropToolCommand;
+    private RelayCommand<CropTool>? _chooseCropToolCommand;
     private bool _isDetecting;
     private CropTool _cropTool;
 
@@ -31,21 +31,53 @@ public sealed partial class MainWindowViewModel
     /// Session-only; starts as Classic crop and is kept while moving between images.
     /// </summary>
     /// <remarks>
-    /// The menu's and toolbar's choices show it with <see cref="Mvvm.IsValueConverter"/>; the menu's set it with
-    /// <see cref="ChooseCropToolCommand"/>, since a menu item does not check itself when clicked.
+    /// The menu's and toolbar's choices show it with <see cref="IsClassicCropTool"/> and
+    /// <see cref="IsAutoCropInRegionTool"/>; the menu's set it with <see cref="ChooseCropToolCommand"/>, since a menu
+    /// item does not check itself when clicked.
     /// </remarks>
     public CropTool CropTool
     {
         get => _cropTool;
-        set => Set(ref _cropTool, value);
+        set
+        {
+            if (!Set(ref _cropTool, value))
+                return;
+            Raise(nameof(IsClassicCropTool));
+            Raise(nameof(IsAutoCropInRegionTool));
+        }
+    }
+
+    /// <summary>
+    /// Whether <see cref="CropTool"/> is Classic crop. Setting it to <c>true</c> chooses Classic crop; setting it to
+    /// <c>false</c> changes nothing, since a radio choice is unchecked only by checking another.
+    /// </summary>
+    public bool IsClassicCropTool
+    {
+        get => CropTool == CropTool.Classic;
+        set
+        {
+            if (value)
+                CropTool = CropTool.Classic;
+        }
+    }
+
+    /// <summary>
+    /// Whether <see cref="CropTool"/> is Auto crop in region, so the viewer draws a region rather than a crop. Setting it
+    /// to <c>true</c> chooses Auto crop in region; setting it to <c>false</c> changes nothing.
+    /// </summary>
+    public bool IsAutoCropInRegionTool
+    {
+        get => CropTool == CropTool.AutoCropInRegion;
+        set
+        {
+            if (value)
+                CropTool = CropTool.AutoCropInRegion;
+        }
     }
 
     /// <summary>Sets <see cref="CropTool"/> to the <see cref="App.CropTool"/> given as the parameter.</summary>
-    public ICommand ChooseCropToolCommand => _chooseCropToolCommand ??= new RelayCommand<object>(choice =>
-    {
-        if (choice is CropTool tool)
-            CropTool = tool;
-    });
+    public RelayCommand<CropTool> ChooseCropToolCommand =>
+        _chooseCropToolCommand ??= new RelayCommand<CropTool>(tool => CropTool = tool);
 
     /// <summary>Whether Auto crop has been running for more than a moment, so the window shows that it is working.</summary>
     public bool IsDetecting

@@ -19,6 +19,10 @@ public readonly record struct PixelRect(int X, int Y, int Width, int Height)
         return new PixelRect(left, top, Math.Max(0, right - left), Math.Max(0, bottom - top));
     }
 
+    /// <summary>Whether <paramref name="inner"/> lies wholly inside this rectangle; its sides may lie on this one's.</summary>
+    public bool Contains(PixelRect inner) =>
+        inner.X >= X && inner.Y >= Y && inner.Right <= Right && inner.Bottom <= Bottom;
+
     /// <summary>The smallest rectangle that contains both this rectangle and <paramref name="other"/>.</summary>
     public PixelRect Union(PixelRect other)
     {

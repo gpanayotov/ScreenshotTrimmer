@@ -95,7 +95,7 @@ public class RegionSubjectTests
     [Theory]
     [InlineData(300, 200, 200, 120)]
     [InlineData(560, 100, 200, 300)]
-    public void Nothing_is_found_in_a_region_with_no_element_inside(int x, int y, int width, int height)
+    public void Nothing_is_found_in_a_region_with_no_subject_inside(int x, int y, int width, int height)
     {
         var image = Synthetic.LightApplication(800, 520);
 

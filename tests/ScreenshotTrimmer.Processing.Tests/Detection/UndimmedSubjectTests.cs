@@ -60,6 +60,25 @@ public class UndimmedSubjectTests
         Assert.Equal(window, subject?.Window);
     }
 
+    [Theory]
+    [InlineData(8)]
+    [InlineData(0)]
+    public void Of_undimmed_stacked_dialogs_the_topmost_is_found(float radius)
+    {
+        // A smaller dialog opened from a larger one, lying wholly on top of it, both casting a soft shadow on a flat page.
+        var image = Synthetic.Plain(900, 600, Synthetic.LightPage);
+        var behind = new PixelRect(110, 70, 680, 460);
+        Synthetic.DrawShadow(image, behind, 5, 110, radius);
+        Synthetic.DrawDialog(image, behind, radius);
+        var topmost = new PixelRect(297, 181, 307, 223);
+        Synthetic.DrawShadow(image, topmost, 5, 110, radius);
+        Synthetic.DrawDialog(image, topmost, radius);
+
+        var subject = SubjectDetection.Find(image);
+
+        Assert.Equal(topmost, subject?.Window);
+    }
+
     [Fact]
     public void Nothing_is_found_in_a_page_of_cards_with_short_shadows()
     {

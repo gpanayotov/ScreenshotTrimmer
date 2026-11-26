@@ -203,15 +203,12 @@ internal static class BrightnessMethod
             .Select(entry => entry.Cells);
         var kept = new List<PixelRect>();
         foreach (var cells in large)
-            if (!kept.Any(other => Contains(other, cells)))
+            if (!kept.Any(other => other.Contains(cells)))
                 kept.Add(cells);
         return kept;
     }
 
     private static int Area(PixelRect cells) => cells.Width * cells.Height;
-
-    private static bool Contains(PixelRect outer, PixelRect inner) =>
-        inner.X >= outer.X && inner.Y >= outer.Y && inner.Right <= outer.Right && inner.Bottom <= outer.Bottom;
 
     /// <summary>
     /// The window's pixel rectangle from its rectangle of samples: each edge moves to the outermost column or row of
