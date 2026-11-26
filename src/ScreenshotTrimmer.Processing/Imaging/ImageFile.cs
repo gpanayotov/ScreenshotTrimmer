@@ -13,14 +13,32 @@ public static class ImageFile
     public static RgbaImage Load(string path)
     {
         using var stream = File.OpenRead(path);
+        return Decode(stream, $"'{path}'");
+    }
+
+    /// <summary>
+    /// Decodes an encoded PNG, JPEG, WebP or BMP image held in memory, such as one read from the clipboard, as
+    /// <see cref="Load"/> does.
+    /// </summary>
+    /// <exception cref="InvalidDataException">The bytes are not an image SkiaSharp can decode.</exception>
+    public static RgbaImage Decode(byte[] encoded)
+    {
+        ArgumentNullException.ThrowIfNull(encoded);
+        using var stream = new MemoryStream(encoded, writable: false);
+        return Decode(stream, "The data");
+    }
+
+    /// <param name="described">What is being decoded, for the exception messages.</param>
+    private static RgbaImage Decode(Stream stream, string described)
+    {
         using var codec = SKCodec.Create(stream)
-            ?? throw new InvalidDataException($"'{path}' is not a supported image.");
+            ?? throw new InvalidDataException($"{described} is not a supported image.");
 
         var info = new SKImageInfo(codec.Info.Width, codec.Info.Height, SKColorType.Rgba8888, SKAlphaType.Unpremul);
         var stored = new RgbaImage(info.Width, info.Height);
         var decoded = codec.GetPixels(info, out var pixels);
         if (decoded is not (SKCodecResult.Success or SKCodecResult.IncompleteInput))
-            throw new InvalidDataException($"'{path}' could not be decoded: {decoded}.");
+            throw new InvalidDataException($"{described} could not be decoded: {decoded}.");
         pixels.CopyTo(stored.Bytes);
 
         return ApplyOrigin(stored, codec.EncodedOrigin);

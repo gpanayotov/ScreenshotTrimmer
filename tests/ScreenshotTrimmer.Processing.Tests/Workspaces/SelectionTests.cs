@@ -92,6 +92,6 @@ public class SelectionTests
         using var folder = new TempFolder();
         using var workspace = OpenFolderOf(folder, "a.png");
 
-        Assert.Throws<ArgumentException>(() => workspace.Select(new WorkspaceImage { Path = folder.File("x.png") }));
+        Assert.Throws<ArgumentException>(() => workspace.Select(new WorkspaceImage { Key = ImageKey.OfFile(folder.File("x.png")) }));
     }
 }

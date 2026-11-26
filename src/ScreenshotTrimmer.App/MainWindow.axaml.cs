@@ -6,6 +6,7 @@ using Avalonia.Input;
 using Avalonia.Interactivity;
 using Avalonia.Platform.Storage;
 using ScreenshotTrimmer.App.Controls;
+using ScreenshotTrimmer.App.Imaging;
 using ScreenshotTrimmer.App.Localization;
 using ScreenshotTrimmer.App.Mvvm;
 using ScreenshotTrimmer.Processing.Settings;
@@ -13,10 +14,11 @@ using ScreenshotTrimmer.Processing.Workspaces;
 
 namespace ScreenshotTrimmer.App;
 
-public partial class MainWindow : Window, IPathPicker
+public partial class MainWindow : Window, IPathPicker, IQuestions
 {
     private MainWindowViewModel? _viewModel;
     private readonly Dictionary<Control, StripEntry> _shownEntries = [];
+    private bool _mayClose;
 
     public MainWindow()
     {
@@ -35,8 +37,30 @@ public partial class MainWindow : Window, IPathPicker
         Deactivated += (_, _) => Viewer.IsSpaceHeld = false;
         Viewer.PropertyChanged += OnViewerPropertyChanged;
         AddViewerShortcuts();
+        Viewer.AddHandler(PointerPressedEvent, OnViewerPointerPressed, RoutingStrategies.Tunnel);
+        Viewer.KeyDown += OnViewerKeyDown;
+        ManualRadiusBox.AddHandler(KeyDownEvent, OnManualRadiusKeyDown, RoutingStrategies.Tunnel);
+        ManualRadiusBox.LostFocus += (_, _) => _viewModel?.ApplyManualRadiusCommand.Execute(null);
+        WatchShadowDrags(ShadowSizeSlider);
+        WatchShadowDrags(ShadowOpacitySlider);
         Strip.ContainerPrepared += OnStripContainerPrepared;
         Strip.ContainerClearing += OnStripContainerClearing;
+    }
+
+    /// <summary>
+    /// Tells the view model when a pointer drag on a Shadow slider starts and ends, whether it grabs the thumb or the
+    /// track, so the whole drag becomes one Step. Tunnel and handled events too, as the slider handles the pointer itself.
+    /// </summary>
+    private void WatchShadowDrags(Slider slider)
+    {
+        slider.AddHandler(PointerPressedEvent, (_, e) =>
+        {
+            if (e.GetCurrentPoint(slider).Properties.IsLeftButtonPressed)
+                _viewModel?.BeginShadowDrag();
+        }, RoutingStrategies.Tunnel, handledEventsToo: true);
+        slider.AddHandler(PointerReleasedEvent, (_, _) => _viewModel?.EndShadowDrag(),
+            RoutingStrategies.Tunnel, handledEventsToo: true);
+        slider.AddHandler(PointerCaptureLostEvent, (_, _) => _viewModel?.EndShadowDrag(), handledEventsToo: true);
     }
 
     /// <summary>The zoom shortcuts, with the numeric keypad's keys and Ctrl+Shift+= for Ctrl+Plus too.</summary>
@@ -60,11 +84,62 @@ public partial class MainWindow : Window, IPathPicker
     /// </summary>
     public void Attach(Workspace workspace, SettingsSession settings)
     {
-        _viewModel = new MainWindowViewModel(workspace, this, settings);
+        _viewModel = new MainWindowViewModel(workspace, this, this, new ImageClipboard(() => Clipboard), settings);
         _viewModel.PropertyChanged += OnViewModelPropertyChanged;
         DataContext = _viewModel;
+        Closing += OnClosing;
         Closed += (_, _) => _viewModel.Dispose();
     }
+
+    /// <summary>
+    /// Keeps the window open while it asks about unsaved work, then closes it once the user has discarded the work or
+    /// saved all of it.
+    /// </summary>
+    private async void OnClosing(object? sender, WindowClosingEventArgs e)
+    {
+        if (_mayClose || _viewModel is null || !_viewModel.HasUnsavedWork)
+            return;
+        e.Cancel = true;
+        try
+        {
+            if (!await _viewModel.ConfirmLeavingAsync())
+                return;
+            _mayClose = true;
+            Close();
+        }
+        catch (Exception failure)
+        {
+            _viewModel.ReportFailure(failure);
+        }
+    }
+
+    public Task<LeaveAnswer> AskToLeaveAsync() =>
+        new QuestionWindow<LeaveAnswer>(
+            Localizer.Instance["LeaveTitle"],
+            Localizer.Instance["LeaveQuestion"],
+            [
+                (Localizer.Instance["SaveAllAnswer"], LeaveAnswer.SaveAll),
+                (Localizer.Instance["DiscardAnswer"], LeaveAnswer.Discard),
+                (Localizer.Instance["Cancel"], LeaveAnswer.Cancel),
+            ]).AskAsync(this);
+
+    public Task<bool> AskToDiscardAsync(string name) =>
+        new QuestionWindow<bool>(
+            Localizer.Instance["LeaveTitle"],
+            Localizer.Instance.Format("DiscardQuestion", name),
+            [
+                (Localizer.Instance["DiscardAnswer"], true),
+                (Localizer.Instance["Cancel"], false),
+            ]).AskAsync(this);
+
+    public Task<bool> AskToOverwriteAsync(string path) =>
+        new QuestionWindow<bool>(
+            Localizer.Instance["OverwriteTitle"],
+            Localizer.Instance.Format("OverwriteQuestion", path),
+            [
+                (Localizer.Instance["ReplaceAnswer"], true),
+                (Localizer.Instance["Cancel"], false),
+            ]).AskAsync(this);
 
     /// <summary>Opens the paths given on the command line, relative to the current folder, like any other open.</summary>
     public void OpenCommandLine(IReadOnlyList<string> args)
@@ -120,6 +195,23 @@ public partial class MainWindow : Window, IPathPicker
         return LocalPaths(folders);
     }
 
+    public async Task<string?> PickSaveFileAsync(string? startFolder, string suggestedName, string name)
+    {
+        var file = await StorageProvider.SaveFilePickerAsync(new FilePickerSaveOptions
+        {
+            Title = Localizer.Instance.Format("SavePastedTitle", name),
+            SuggestedStartLocation = await FolderAsync(startFolder),
+            SuggestedFileName = suggestedName,
+            DefaultExtension = "png",
+            ShowOverwritePrompt = false,
+            FileTypeChoices =
+            [
+                new FilePickerFileType(Localizer.Instance["PngFilter"]) { Patterns = ["*.png"], MimeTypes = ["image/png"] },
+            ],
+        });
+        return file?.TryGetLocalPath();
+    }
+
     private async Task<IStorageFolder?> FolderAsync(string? path) =>
         path is null ? null : await StorageProvider.TryGetFolderFromPathAsync(path);
 
@@ -137,7 +229,7 @@ public partial class MainWindow : Window, IPathPicker
         // Dropped folders come through as storage items too.
         var paths = LocalPaths(e.DataTransfer.TryGetFiles() ?? []);
         if (paths.Count > 0)
-            _viewModel?.Open(paths);
+            _viewModel?.OpenAfterAsking(paths);
         e.Handled = true;
     }
 
@@ -161,6 +253,35 @@ public partial class MainWindow : Window, IPathPicker
         e.Handled = true;
     }
 
+    /// <summary>
+    /// A press of any button on the viewer gives it focus, so Tab toggles the view and the arrow keys nudge the crop;
+    /// a left-button press on the Result starts editing the crop, so it switches to the Original first.
+    /// </summary>
+    private void OnViewerPointerPressed(object? sender, PointerPressedEventArgs e)
+    {
+        Viewer.Focus();
+        if (_viewModel is { ShowsResult: true } && e.GetCurrentPoint(Viewer).Properties.IsLeftButtonPressed
+            && !Viewer.IsSpaceHeld)
+            _viewModel.ShowsResult = false;
+    }
+
+    /// <summary>Tab, while the viewer has focus, switches between the Original and the Result.</summary>
+    private void OnViewerKeyDown(object? sender, KeyEventArgs e)
+    {
+        if (e.Key != Key.Tab || e.KeyModifiers != KeyModifiers.None || _viewModel is null)
+            return;
+        _viewModel.ToggleResultViewCommand.Execute(null);
+        e.Handled = true;
+    }
+
+    private void OnManualRadiusKeyDown(object? sender, KeyEventArgs e)
+    {
+        if (e.Key != Key.Enter || _viewModel is null)
+            return;
+        _viewModel.ApplyManualRadiusCommand.Execute(null);
+        e.Handled = true;
+    }
+
     private void OnPreviewKeyUp(object? sender, KeyEventArgs e)
     {
         if (e.Key == Key.Space)
@@ -169,8 +290,14 @@ public partial class MainWindow : Window, IPathPicker
 
     private void OnViewerPropertyChanged(object? sender, AvaloniaPropertyChangedEventArgs e)
     {
-        if (e.Property == ImageViewer.ZoomProperty && _viewModel is not null)
+        if (_viewModel is null)
+            return;
+        if (e.Property == ImageViewer.ZoomProperty)
             _viewModel.Zoom = Viewer.Zoom;
+        else if (e.Property == ImageViewer.ShownCropProperty)
+            _viewModel.ShownCrop = Viewer.ShownCrop;
+        else if (e.Property == ImageViewer.NudgedHandleProperty)
+            _viewModel.NudgedHandle = Viewer.NudgedHandle;
     }
 
     // The strip recycles its containers as it scrolls; remembering which entry each one shows tells an entry when it

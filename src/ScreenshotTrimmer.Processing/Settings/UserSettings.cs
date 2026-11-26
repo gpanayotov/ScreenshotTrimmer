@@ -1,3 +1,4 @@
+using System.Text.Json.Serialization;
 using ScreenshotTrimmer.Processing.Files;
 using ScreenshotTrimmer.Processing.Rendering;
 
@@ -33,6 +34,13 @@ public sealed record UserSettings
 
     /// <summary>Whether Clean edges makes the pixels outside rounded corners transparent.</summary>
     public bool RoundedCorners { get; init; } = true;
+
+    /// <summary>
+    /// Whether a Shadow is added; <see cref="ShadowSize"/> and <see cref="ShadowOpacity"/> say what it looks like.
+    /// Saved as <c>shadow</c>, the name earlier settings files use.
+    /// </summary>
+    [JsonPropertyName("shadow")]
+    public bool ShadowOn { get; init; } = true;
 
     public Language Language { get; init; } = Language.System;
 }

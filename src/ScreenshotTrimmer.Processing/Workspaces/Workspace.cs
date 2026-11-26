@@ -7,7 +7,7 @@ namespace ScreenshotTrimmer.Processing.Workspaces;
 /// The images the user opened, in strip order, and which one is selected. Has no interface dependency, so the app's
 /// strip and a command-line tool can share it.
 /// </summary>
-public sealed class Workspace : IDisposable
+public sealed partial class Workspace : IDisposable
 {
     /// <summary>How long the disk must stay quiet after a change before the list is updated.</summary>
     public static readonly TimeSpan DefaultWatchDelay = TimeSpan.FromMilliseconds(300);
@@ -65,7 +65,7 @@ public sealed class Workspace : IDisposable
     /// <summary>
     /// Replaces the list with the images for <paramref name="paths"/>: one file lists its whole folder with that file
     /// selected; a folder or several paths list their images with the first selected. Removed entries are listed
-    /// again. Paths that exist neither as a file nor as a folder are skipped and returned, so the caller can tell the
+    /// again, Pasted images leave the list, and every image starts with no Steps. Paths that exist neither as a file nor as a folder are skipped and returned, so the caller can tell the
     /// user.
     /// </summary>
     public IReadOnlyList<string> Open(IReadOnlyList<string> paths)
@@ -88,6 +88,9 @@ public sealed class Workspace : IDisposable
             _unavailableFolders = new HashSet<string>();
             _lastRelistFailed = false;
             _removed = new HashSet<string>(FileNames.Comparer);
+            _steps.Clear();
+            _backupSaves.Clear();
+            ForgetPasted();
             _folderWatch.Reset();
             Relist(listing => listing.Selected is { } opened ? Find(opened.Path) : Images.FirstOrDefault());
         });
@@ -96,7 +99,8 @@ public sealed class Workspace : IDisposable
 
     /// <summary>
     /// Whether Suffix-mode Results are listed in their sorted place instead of hidden. Session-only and off by default;
-    /// changing it keeps the selection, except that a selected Result being hidden gives way to its Original.
+    /// changing it keeps the selection, except that a selected Result being hidden gives way to its Original. A Result
+    /// with unsaved Steps is never hidden, so no unsaved work is out of sight.
     /// </summary>
     public bool ShowResults
     {
@@ -107,7 +111,7 @@ public sealed class Workspace : IDisposable
                 return;
             _showResults = value;
             var selected = Selected;
-            Relist(_ => (selected is null ? null : Find(selected.Path))
+            Relist(_ => (selected is null ? null : Find(selected.Key))
                 ?? (selected is { IsResult: true } ? OriginalOf(selected) : null)
                 ?? Images.FirstOrDefault());
         });
@@ -128,14 +132,14 @@ public sealed class Workspace : IDisposable
                 return;
             var selectedIndex = SelectedIndex;
             var selected = Selected;
-            Relist(_ => (selected is null ? null : Find(selected.Path))
+            Relist(_ => (selected is null ? null : Find(selected.Key))
                 ?? (Images.Count == 0 ? null : Images[Math.Clamp(selectedIndex, 0, Images.Count - 1)]));
         });
     }
 
     /// <summary>
     /// Hides <paramref name="image"/>, which must be one of <see cref="Images"/>, for as long as this list is open; its
-    /// file is not touched.
+    /// file is not touched. A Pasted image that has not been saved is dropped with its pixels.
     /// </summary>
     public void Remove(WorkspaceImage image)
     {
@@ -143,9 +147,12 @@ public sealed class Workspace : IDisposable
         Update(() =>
         {
             RequireListed(image);
-            var before = Images.Select(listed => listed.Path).ToList();
+            var before = Images.Select(image => image.Key).ToList();
             var selectedIndex = SelectedIndex;
-            _removed.Add(image.Path);
+            if (image.Path is { } path)
+                _removed.Add(path);
+            else
+                DropPasted(image);
             Relist(_ => SurvivorNear(before, selectedIndex));
         });
     }
@@ -202,21 +209,37 @@ public sealed class Workspace : IDisposable
 
     /// <summary>
     /// Replaces <see cref="Images"/> with the current listing of the opened paths under the current settings and
-    /// <see cref="ShowResults"/>, less the removed entries; the one re-list path, so removed entries stay hidden
-    /// through every update. A listing equal to the current one keeps the current list instance.
+    /// <see cref="ShowResults"/>, then the saved Pasted images not listed among them, less the removed entries, then
+    /// the Pasted images not saved yet; the one re-list path, so removed entries stay hidden and Pasted images stay
+    /// listed through every update. A listing equal to the current one keeps the current list instance.
     /// </summary>
     private Listing List()
     {
-        var listing = ImageListing.List(_openedPaths, ListingOptionsFor(_settings, _showResults));
-        var images = listing.Images
-            .Where(image => !_removed.Contains(image.Path))
-            .Select(image => new WorkspaceImage
+        var listing = ImageListing.List(_openedPaths, ListingOptionsFor(_settings, _showResults) with
+        {
+            KeptResults = _steps.Keys.Where(HasUnsavedSteps).Select(key => key.Path).OfType<string>()
+                .ToHashSet(FileNames.Comparer),
+        });
+        var files = listing.Images
+            .Select(image => (image.Path, image.IsResult, image.HasResult))
+            .Concat(SavedPastedPaths().Select(path => (Path: path, IsResult: false, HasResult: false)))
+            .Where(file => !_removed.Contains(file.Path))
+            .DistinctBy(file => file.Path, FileNames.Comparer);
+        var images = files
+            .Select(file =>
             {
-                Path = image.Path, IsResult = image.IsResult, HasResult = image.HasResult,
-                ContentVersion = ContentVersion.Of(image.Path),
+                var key = ImageKey.OfFile(file.Path);
+                return new WorkspaceImage
+                {
+                    Key = key, IsResult = file.IsResult, HasResult = file.HasResult,
+                    ContentVersion = ContentVersion.Of(file.Path),
+                    HasUnsavedSteps = HasUnsavedSteps(key),
+                };
             })
+            .Concat(PastedEntries())
             .ToList();
-        if (!images.SequenceEqual(Images))
+        // Keys compare paths as the file system does; a rename that only changes case is still a new listing.
+        if (!images.SequenceEqual(Images) || !images.Select(image => image.Path).SequenceEqual(Images.Select(image => image.Path)))
             Images = images;
         Watch();
         return listing;
@@ -224,7 +247,8 @@ public sealed class Workspace : IDisposable
 
     /// <summary>Watches the home folders and every folder holding a listed image.</summary>
     private void Watch() =>
-        _folderWatch.Watch(Images.Select(image => Path.GetDirectoryName(image.Path)!), _homeFolders);
+        _folderWatch.Watch(Images.Select(image => image.Path).OfType<string>()
+            .Select(path => Path.GetDirectoryName(path)!), _homeFolders);
 
     private void OnDiskQuiet()
     {
@@ -245,6 +269,9 @@ public sealed class Workspace : IDisposable
         var renamed = _folderWatch.TakeRenames();
         _openedPaths = _openedPaths.Select(renamed).ToList();
         _removed = _removed.Select(renamed).ToHashSet(FileNames.Comparer);
+        FollowRenamesOfSavedPasted(renamed);
+        FollowRenamesWithSteps(renamed);
+        FollowRenamesOfBackupSaves(renamed);
         if (_openedOneFile && _openedPaths is [var file] && !File.Exists(file))
         {
             // The file opened on its own is gone; the rest of its folder stays listed.
@@ -276,34 +303,38 @@ public sealed class Workspace : IDisposable
         }
         Selected = selectedIndex < 0
             ? Images.FirstOrDefault()
-            : SurvivorNear(old.Select(image => renamed(image.Path)).ToList(), selectedIndex);
+            : SurvivorNear(old.Select(image => image.Key.Renamed(renamed)).ToList(), selectedIndex);
         var newlyUnavailable = _homeFolders
             .Where(folder => unavailable.Contains(folder) && !_unavailableFolders.Contains(folder))
             .ToList();
         _unavailableFolders = unavailable;
+        var dropped = DiscardStepsOfDropped(old.Select(image => image.Path).OfType<string>().Select(renamed));
+        ForgetSavedPastedNotListed();
 
         // Events for files that are not listed, or writes that left a file as it was, change nothing to show.
         if (ReferenceEquals(Images, old) && Selected == oldSelected && newlyUnavailable.Count == 0)
             return;
-        QueueChange(newlyUnavailable);
+        QueueChange(newlyUnavailable, dropped);
     }
 
     /// <summary>The listed Original of the Result <paramref name="result"/>, if any.</summary>
     private WorkspaceImage? OriginalOf(WorkspaceImage result)
     {
-        var stem = StemOf(result.Path);
+        if (result.Path is not { } path)
+            return null;
+        var stem = StemOf(path);
         var suffix = _settings.ResultSuffix;
         if (!stem.EndsWith(suffix, FileNames.Comparison))
             return null;
         var originalStem = stem[..^suffix.Length];
-        return Images.FirstOrDefault(image => FileNames.Same(StemOf(image.Path), originalStem));
+        return Images.FirstOrDefault(image => image.Path is { } candidate && FileNames.Same(StemOf(candidate), originalStem));
     }
 
     /// <summary>
-    /// The listed entry at the path <paramref name="before"/>[<paramref name="index"/>] if it is still listed; otherwise the
+    /// The listed entry with the key <paramref name="before"/>[<paramref name="index"/>] if it is still listed; otherwise the
     /// nearest still-listed entry after it, or before it when none follows. <c>null</c> when nothing is listed.
     /// </summary>
-    private WorkspaceImage? SurvivorNear(IReadOnlyList<string> before, int index)
+    private WorkspaceImage? SurvivorNear(IReadOnlyList<ImageKey> before, int index)
     {
         var candidates = before.Skip(index).Concat(before.Take(index).Reverse());
         return candidates.Select(Find).FirstOrDefault(image => image is not null) ?? Images.FirstOrDefault();
@@ -312,8 +343,11 @@ public sealed class Workspace : IDisposable
     private static string StemOf(string path) =>
         Path.Combine(Path.GetDirectoryName(path)!, Path.GetFileNameWithoutExtension(path));
 
-    /// <summary>The listed entry for <paramref name="path"/>, or <c>null</c>.</summary>
-    private WorkspaceImage? Find(string path) => Images.FirstOrDefault(image => FileNames.Same(image.Path, path));
+    /// <summary>The listed entry whose <see cref="WorkspaceImage.Key">key</see> is <paramref name="key"/>, or <c>null</c>.</summary>
+    private WorkspaceImage? Find(ImageKey key) => Images.FirstOrDefault(image => image.Key == key);
+
+    /// <summary>The listed entry of the file at <paramref name="path"/>, or <c>null</c>.</summary>
+    private WorkspaceImage? Find(string path) => Find(ImageKey.OfFile(path));
 
     private int SelectedIndex => Selected is null ? -1 : IndexOf(Selected);
 
@@ -321,7 +355,7 @@ public sealed class Workspace : IDisposable
     {
         for (var i = 0; i < Images.Count; i++)
         {
-            if (FileNames.Same(Images[i].Path, image.Path))
+            if (Images[i].Key == image.Key)
                 return i;
         }
         return -1;
@@ -347,10 +381,12 @@ public sealed class Workspace : IDisposable
     }
 
     /// <summary>Queues the current list and selection to be announced; call under the lock, then <see cref="Announce"/>.</summary>
-    private void QueueChange(IReadOnlyList<string>? unavailableFolders = null) =>
+    private void QueueChange(
+        IReadOnlyList<string>? unavailableFolders = null, IReadOnlyList<string>? droppedWithUnsavedSteps = null) =>
         _pendingChanges.Enqueue(new WorkspaceChange
         {
             Images = Images, Selected = Selected, UnavailableFolders = unavailableFolders ?? [],
+            DroppedWithUnsavedSteps = droppedWithUnsavedSteps ?? [],
         });
 
     /// <summary>
@@ -383,12 +419,5 @@ public sealed class Workspace : IDisposable
     }
 
     private static ListingOptions ListingOptionsFor(UserSettings settings, bool includeResults) =>
-        ListingOptions.For(
-            new SaveOptions
-            {
-                Mode = settings.SaveMode,
-                ResultSuffix = settings.ResultSuffix,
-                BackupSuffix = settings.BackupSuffix,
-            },
-            includeResults);
+        ListingOptions.For(SaveOptionsFor(settings), includeResults);
 }

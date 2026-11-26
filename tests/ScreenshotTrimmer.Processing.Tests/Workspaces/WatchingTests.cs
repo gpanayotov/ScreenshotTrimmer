@@ -19,7 +19,7 @@ public class WatchingTests
     }
 
     private static string[] Names(IEnumerable<WorkspaceImage> images) =>
-        images.Select(i => Path.GetFileName(i.Path)).ToArray();
+        images.Select(i => Path.GetFileName(i.Path!)).ToArray();
 
     private static string? SelectedName(WorkspaceChange change) =>
         change.Selected is { } selected ? Path.GetFileName(selected.Path) : null;

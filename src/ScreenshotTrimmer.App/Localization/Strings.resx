@@ -35,6 +35,34 @@
   <data name="BackgroundDarkGrey" xml:space="preserve"><value>_Dark grey</value></data>
   <data name="ImageSize" xml:space="preserve"><value>{0:N0} × {1:N0} px</value></data>
   <data name="ZoomPercent" xml:space="preserve"><value>{0:0.#}%</value></data>
+  <data name="ResultView" xml:space="preserve"><value>_Result view</value></data>
+  <data name="ToolbarResultView" xml:space="preserve"><value>Result</value></data>
+  <data name="ToolbarResultViewTip" xml:space="preserve"><value>Switch between the Original with the crop and the Result (Tab while the image has focus)</value></data>
+  <data name="ResultSize" xml:space="preserve"><value>Result: {0:N0} × {1:N0} px</value></data>
+  <data name="CleanEdges" xml:space="preserve"><value>Clean edges</value></data>
+  <data name="FrameLines" xml:space="preserve"><value>Frame lines</value></data>
+  <data name="FrameLinesRemoved" xml:space="preserve"><value>Removed: left {0}, top {1}, right {2}, bottom {3}</value></data>
+  <data name="RoundedCorners" xml:space="preserve"><value>Rounded corners</value></data>
+  <data name="MeasuredRadii" xml:space="preserve"><value>Measured radius: top left {0:0.#}, top right {1:0.#}, bottom right {2:0.#}, bottom left {3:0.#}</value></data>
+  <data name="ManualRadius" xml:space="preserve"><value>Radius</value></data>
+  <data name="ManualRadiusAutomatic" xml:space="preserve"><value>automatic</value></data>
+  <data name="ManualRadiusTip" xml:space="preserve"><value>A corner radius in pixels for this image only; leave it empty to use the measured radius</value></data>
+  <data name="PixelsUnit" xml:space="preserve"><value>px</value></data>
+  <data name="ManualRadiusInvalid" xml:space="preserve"><value>The corner radius must be a number of pixels from 0 to {0}, or empty for the measured radius.</value></data>
+  <data name="Shadow" xml:space="preserve"><value>Shadow</value></data>
+  <data name="ShadowOn" xml:space="preserve"><value>Add a Shadow</value></data>
+  <data name="ShadowSize" xml:space="preserve"><value>Size</value></data>
+  <data name="ShadowOpacity" xml:space="preserve"><value>Opacity</value></data>
+  <data name="ShadowPaddingWarning" xml:space="preserve"><value>The Original already seems to have shadow padding, so Shadow is left off for it. You can still turn it on.</value></data>
+  <data name="CropSize" xml:space="preserve"><value>Crop: {0:N0} × {1:N0} px at {2:N0}, {3:N0}</value></data>
+  <data name="ClearCrop" xml:space="preserve"><value>_Clear crop</value></data>
+  <data name="ClassicCrop" xml:space="preserve"><value>Classic crop</value></data>
+  <data name="NoCrop" xml:space="preserve"><value>No crop: the whole image</value></data>
+  <data name="EditMenu" xml:space="preserve"><value>_Edit</value></data>
+  <data name="Undo" xml:space="preserve"><value>_Undo</value></data>
+  <data name="Redo" xml:space="preserve"><value>_Redo</value></data>
+  <data name="ResetSteps" xml:space="preserve"><value>Re_set</value></data>
+  <data name="LoupePosition" xml:space="preserve"><value>x {0:N0}   y {1:N0}</value></data>
   <data name="ThumbnailUnreadable" xml:space="preserve"><value>Cannot be read</value></data>
   <data name="ShowResults" xml:space="preserve"><value>Show _Results</value></data>
   <data name="HasResultBadge" xml:space="preserve"><value>Result</value></data>
@@ -74,4 +102,31 @@
   <data name="ToolbarCheckerboard" xml:space="preserve"><value>Checkerboard</value></data>
   <data name="ToolbarWhite" xml:space="preserve"><value>White</value></data>
   <data name="ToolbarDarkGrey" xml:space="preserve"><value>Dark grey</value></data>
+  <data name="SaveMenu" xml:space="preserve"><value>_Save</value></data>
+  <data name="UnsavedTip" xml:space="preserve"><value>This image has unsaved changes</value></data>
+  <data name="Saved" xml:space="preserve"><value>Saved {0}</value></data>
+  <data name="SaveFailed" xml:space="preserve"><value>Could not save the Result of {0}: {1}</value></data>
+  <data name="SaveFailureTargetIsFolder" xml:space="preserve"><value>a folder named {0} is in the way.</value></data>
+  <data name="SaveFailureTargetExists" xml:space="preserve"><value>a file named {0} already exists.</value></data>
+  <data name="SaveFailureFolderNotFound" xml:space="preserve"><value>the folder of {0} does not exist.</value></data>
+  <data name="SaveFailureAccessDenied" xml:space="preserve"><value>there is no permission to write {0}.</value></data>
+  <data name="SaveAllMenu" xml:space="preserve"><value>Save _all</value></data>
+  <data name="SavedAll" xml:space="preserve"><value>Saved {0} of {1} Results.</value></data>
+  <data name="UnsavedTitle" xml:space="preserve"><value>• {0}</value></data>
+  <data name="LeaveTitle" xml:space="preserve"><value>Unsaved changes</value></data>
+  <data name="LeaveQuestion" xml:space="preserve"><value>Some images have unsaved changes. Save them before continuing?</value></data>
+  <data name="SaveAllAnswer" xml:space="preserve"><value>Save all</value></data>
+  <data name="DiscardAnswer" xml:space="preserve"><value>Discard</value></data>
+  <data name="DiscardQuestion" xml:space="preserve"><value>{0} has unsaved changes. Remove it from the list and discard them?</value></data>
+  <data name="UnsavedDropped" xml:space="preserve"><value>These images were deleted or moved away on disk, and their unsaved changes were discarded: {0}</value></data>
+  <data name="PasteImage" xml:space="preserve"><value>_Paste image</value></data>
+  <data name="CopyResult" xml:space="preserve"><value>_Copy Result</value></data>
+  <data name="PastedImageName" xml:space="preserve"><value>Pasted image {0}</value></data>
+  <data name="ClipboardHasNoImage" xml:space="preserve"><value>The clipboard holds no image.</value></data>
+  <data name="ResultCopied" xml:space="preserve"><value>Copied the Result of {0}.</value></data>
+  <data name="SavePastedTitle" xml:space="preserve"><value>Save the Result of {0}</value></data>
+  <data name="PngFilter" xml:space="preserve"><value>PNG images</value></data>
+  <data name="OverwriteTitle" xml:space="preserve"><value>Replace file</value></data>
+  <data name="OverwriteQuestion" xml:space="preserve"><value>{0} already exists. Replace it?</value></data>
+  <data name="ReplaceAnswer" xml:space="preserve"><value>Replace</value></data>
 </root>

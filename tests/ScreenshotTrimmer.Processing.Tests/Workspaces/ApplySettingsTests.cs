@@ -13,10 +13,10 @@ public class ApplySettingsTests
     }
 
     private static string[] Names(Workspace workspace) =>
-        workspace.Images.Select(i => Path.GetFileName(i.Path)).ToArray();
+        workspace.Images.Select(i => Path.GetFileName(i.Path!)).ToArray();
 
     private static string[] NamesWithResult(Workspace workspace) =>
-        workspace.Images.Where(i => i.HasResult).Select(i => Path.GetFileName(i.Path)).ToArray();
+        workspace.Images.Where(i => i.HasResult).Select(i => Path.GetFileName(i.Path!)).ToArray();
 
     private static string? SelectedName(Workspace workspace) =>
         workspace.Selected is { } selected ? Path.GetFileName(selected.Path) : null;

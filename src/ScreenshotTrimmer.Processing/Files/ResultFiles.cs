@@ -69,6 +69,14 @@ public static class ResultFiles
         });
     }
 
+    /// <summary>
+    /// Writes <paramref name="result"/> as a PNG over the earlier Result at <paramref name="resultPath"/>, creating it if
+    /// it is gone, and touches nothing else: a re-save after a Backup-mode save, whose backup is already settled.
+    /// </summary>
+    /// <exception cref="SaveFailedException">The target could not be written. Nothing is left behind.</exception>
+    public static SaveReport Replace(RgbaImage result, string resultPath) =>
+        SavePasted(result, resultPath, overwrite: true);
+
     private static SaveReport SaveWithBackup(RgbaImage result, string originalPath, string backupPath, string targetPath)
     {
         using var pending = AtomicFile.Prepare(targetPath, stream => PngEncoder.Write(result, stream));

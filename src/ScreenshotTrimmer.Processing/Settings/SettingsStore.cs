@@ -69,6 +69,7 @@ public sealed class SettingsStore
             ShadowOpacity = Number(root, "shadowOpacity", defaults.ShadowOpacity, Shadow.IsAllowedOpacity),
             FrameLines = Bool(root, "frameLines", defaults.FrameLines),
             RoundedCorners = Bool(root, "roundedCorners", defaults.RoundedCorners),
+            ShadowOn = Bool(root, "shadow", defaults.ShadowOn),
             Language = Enum(root, "language", defaults.Language),
         };
     }

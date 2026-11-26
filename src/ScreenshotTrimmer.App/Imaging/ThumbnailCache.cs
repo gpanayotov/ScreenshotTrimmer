@@ -33,10 +33,20 @@ public sealed class ThumbnailCache(int capacity = 400)
     /// <exception cref="UnauthorizedAccessException">The file cannot be read.</exception>
     /// <exception cref="InvalidDataException">The file is not an image that can be decoded.</exception>
     /// <exception cref="OperationCanceledException"><paramref name="cancellation"/> was cancelled first.</exception>
-    public async Task<Lease> RentAsync(string path, ContentVersion version, CancellationToken cancellation)
+    public Task<Lease> RentAsync(string path, ContentVersion version, CancellationToken cancellation) =>
+        RentAsync(ImageKey.OfFile(path), version, () => ThumbnailDecoding.Decode(path, (int)Width, (int)Height),
+            cancellation);
+
+    /// <summary>
+    /// A lease on the thumbnail kept under <paramref name="key"/> at <paramref name="version"/>, from the cache or made
+    /// by <paramref name="decode"/> off the interface thread, as <see cref="RentAsync(string, ContentVersion, CancellationToken)"/>
+    /// does for a file.
+    /// </summary>
+    public async Task<Lease> RentAsync(ImageKey key, ContentVersion version, Func<Bitmap> decode,
+                                       CancellationToken cancellation)
     {
-        var key = new Key(path, version);
-        if (TryRent(key) is { } cached)
+        var cacheKey = new Key(key, version);
+        if (TryRent(cacheKey) is { } cached)
             return cached;
 
         var bitmap = await Task.Run(async () =>
@@ -46,7 +56,7 @@ public sealed class ThumbnailCache(int capacity = 400)
             {
                 // The entry may have scrolled out of view while it waited for a slot.
                 cancellation.ThrowIfCancellationRequested();
-                return ThumbnailDecoding.Decode(path, (int)Width, (int)Height);
+                return decode();
             }
             finally
             {
@@ -54,11 +64,11 @@ public sealed class ThumbnailCache(int capacity = 400)
             }
         }, cancellation);
 
-        return Add(key, bitmap);
+        return Add(cacheKey, bitmap);
     }
 
-    /// <summary>A lease on the cached thumbnail for <paramref name="path"/> at <paramref name="version"/>, or <c>null</c>.</summary>
-    public Lease? TryRent(string path, ContentVersion version) => TryRent(new Key(path, version));
+    /// <summary>A lease on the cached thumbnail kept under <paramref name="key"/> at <paramref name="version"/>, or <c>null</c>.</summary>
+    public Lease? TryRent(ImageKey key, ContentVersion version) => TryRent(new Key(key, version));
 
     private Lease? TryRent(Key key)
     {
@@ -146,5 +156,5 @@ public sealed class ThumbnailCache(int capacity = 400)
         public bool Evicted { get; set; }
     }
 
-    internal readonly record struct Key(string Path, ContentVersion Version);
+    internal readonly record struct Key(ImageKey Image, ContentVersion Version);
 }
