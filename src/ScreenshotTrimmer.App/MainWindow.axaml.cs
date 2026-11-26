@@ -35,6 +35,10 @@ public partial class MainWindow : Window, IPathPicker
         Deactivated += (_, _) => Viewer.IsSpaceHeld = false;
         Viewer.PropertyChanged += OnViewerPropertyChanged;
         AddViewerShortcuts();
+        Viewer.AddHandler(PointerPressedEvent, OnViewerPointerPressed, RoutingStrategies.Tunnel);
+        Viewer.KeyDown += OnViewerKeyDown;
+        ManualRadiusBox.AddHandler(KeyDownEvent, OnManualRadiusKeyDown, RoutingStrategies.Tunnel);
+        ManualRadiusBox.LostFocus += (_, _) => _viewModel?.ApplyManualRadiusCommand.Execute(null);
         Strip.ContainerPrepared += OnStripContainerPrepared;
         Strip.ContainerClearing += OnStripContainerClearing;
     }
@@ -158,6 +162,35 @@ public partial class MainWindow : Window, IPathPicker
             _viewModel.PreviousCommand.Execute(null);
         else
             return;
+        e.Handled = true;
+    }
+
+    /// <summary>
+    /// A click on the viewer gives it focus, so Tab toggles the view; a left-button press on the Result starts editing
+    /// the crop, so it switches to the Original first.
+    /// </summary>
+    private void OnViewerPointerPressed(object? sender, PointerPressedEventArgs e)
+    {
+        Viewer.Focus();
+        if (_viewModel is { ShowsResult: true } && e.GetCurrentPoint(Viewer).Properties.IsLeftButtonPressed
+            && !Viewer.IsSpaceHeld)
+            _viewModel.ShowsResult = false;
+    }
+
+    /// <summary>Tab, while the viewer has focus, switches between the Original and the Result.</summary>
+    private void OnViewerKeyDown(object? sender, KeyEventArgs e)
+    {
+        if (e.Key != Key.Tab || e.KeyModifiers != KeyModifiers.None || _viewModel is null)
+            return;
+        _viewModel.ToggleResultViewCommand.Execute(null);
+        e.Handled = true;
+    }
+
+    private void OnManualRadiusKeyDown(object? sender, KeyEventArgs e)
+    {
+        if (e.Key != Key.Enter || _viewModel is null)
+            return;
+        _viewModel.ApplyManualRadiusCommand.Execute(null);
         e.Handled = true;
     }
 

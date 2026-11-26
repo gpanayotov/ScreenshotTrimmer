@@ -36,6 +36,10 @@
         <MenuItem Header="{loc:Tr ShowResults}" ToggleType="CheckBox"
                   Command="{Binding ToggleShowResultsCommand}" IsChecked="{Binding ShowResults, Mode=OneWay}" />
         <Separator />
+        <!-- Tab toggles it while the viewer has focus; see MainWindow.OnViewerKeyDown. -->
+        <MenuItem Header="{loc:Tr ResultView}" ToggleType="CheckBox" InputGesture="Tab"
+                  Command="{Binding ToggleResultViewCommand}" IsChecked="{Binding ShowsResult, Mode=OneWay}" />
+        <Separator />
         <MenuItem Header="{loc:Tr FitToWindow}" InputGesture="Ctrl+D0" Command="{Binding #Viewer.FitCommand}" />
         <MenuItem Header="{loc:Tr ActualSize}" InputGesture="Ctrl+D1" Command="{Binding #Viewer.ActualSizeCommand}" />
         <MenuItem Header="{loc:Tr ZoomIn}" InputGesture="Ctrl+OemPlus" Command="{Binding #Viewer.ZoomInCommand}" />
@@ -77,6 +81,8 @@
         <Separator Width="1" Height="20" Margin="6,0" Background="{DynamicResource SystemControlForegroundBaseLowBrush}" />
         <ToggleButton Content="{loc:Tr ToolbarShowResults}" ToolTip.Tip="{loc:Tr ToolbarShowResultsTip}"
                       IsChecked="{Binding ShowResults, Mode=TwoWay}" />
+        <ToggleButton Content="{loc:Tr ToolbarResultView}" ToolTip.Tip="{loc:Tr ToolbarResultViewTip}"
+                      IsChecked="{Binding ShowsResult, Mode=TwoWay}" />
         <Separator Width="1" Height="20" Margin="6,0" Background="{DynamicResource SystemControlForegroundBaseLowBrush}" />
         <TextBlock Text="{loc:Tr ToolbarBackground}" VerticalAlignment="Center" Margin="0,0,4,0"
                    ToolTip.Tip="{loc:Tr ToolbarBackgroundTip}" />
@@ -118,6 +124,8 @@
         <ColumnDefinition Width="240" MinWidth="120" MaxWidth="800" />
         <ColumnDefinition Width="4" />
         <ColumnDefinition Width="*" />
+        <!-- The finishing panel. -->
+        <ColumnDefinition Width="Auto" />
       </Grid.ColumnDefinitions>
       <ListBox x:Name="Strip" ItemsSource="{Binding Entries}" SelectedItem="{Binding SelectedEntry}">
         <ListBox.ItemTemplate>
@@ -170,8 +178,9 @@
 
       <Panel Grid.Column="2">
         <Grid ColumnDefinitions="*,Auto" RowDefinitions="*,Auto">
-          <controls:ImageViewer x:Name="Viewer" Source="{Binding Image}" BackgroundKind="{Binding Background}"
-                                Crop="{Binding Crop, Mode=TwoWay}" />
+          <controls:ImageViewer x:Name="Viewer" Source="{Binding ViewerImage}" BackgroundKind="{Binding Background}"
+                                Crop="{Binding Crop, Mode=TwoWay}" IsCropShown="{Binding !ShowsResult}"
+                                Focusable="True" />
           <ScrollBar Grid.Column="1" Orientation="Vertical" Visibility="Auto" AllowAutoHide="False"
                      Maximum="{Binding #Viewer.VerticalScrollMax}" ViewportSize="{Binding #Viewer.ViewHeight}"
                      LargeChange="{Binding #Viewer.ViewHeight}" SmallChange="48"
@@ -187,6 +196,33 @@
                    HorizontalAlignment="Center" VerticalAlignment="Center" TextAlignment="Center" TextWrapping="Wrap"
                    Foreground="{DynamicResource SystemControlForegroundBaseMediumBrush}" />
       </Panel>
+
+      <!-- The finishing panel: the selected image's Steps, or the remembered settings while it has none. -->
+      <Border Grid.Column="3" IsVisible="{Binding ShowsFinishing}" Width="250" Padding="12,8" BorderThickness="1,0,0,0"
+              BorderBrush="{DynamicResource SystemControlForegroundBaseLowBrush}">
+        <ScrollViewer HorizontalScrollBarVisibility="Disabled">
+          <StackPanel Spacing="6">
+            <TextBlock Text="{Binding ResultSizeText}" TextWrapping="Wrap" />
+
+            <TextBlock Text="{loc:Tr CleanEdges}" FontWeight="SemiBold" Margin="0,10,0,0" />
+            <CheckBox Content="{loc:Tr FrameLines}" IsChecked="{Binding FrameLines, Mode=TwoWay}" />
+            <TextBlock Text="{Binding FrameLinesRemovedText}" TextWrapping="Wrap" FontSize="12" Margin="28,0,0,0"
+                       IsVisible="{Binding FrameLinesRemovedText, Converter={x:Static StringConverters.IsNotNullOrEmpty}}"
+                       Foreground="{DynamicResource SystemControlForegroundBaseMediumBrush}" />
+            <CheckBox Content="{loc:Tr RoundedCorners}" IsChecked="{Binding RoundedCorners, Mode=TwoWay}" />
+            <TextBlock Text="{Binding MeasuredRadiiText}" TextWrapping="Wrap" FontSize="12" Margin="28,0,0,0"
+                       IsVisible="{Binding MeasuredRadiiText, Converter={x:Static StringConverters.IsNotNullOrEmpty}}"
+                       Foreground="{DynamicResource SystemControlForegroundBaseMediumBrush}" />
+            <DockPanel Margin="28,0,0,0" IsEnabled="{Binding RoundedCorners}">
+              <TextBlock DockPanel.Dock="Right" Text="{loc:Tr PixelsUnit}" VerticalAlignment="Center" Margin="6,0,0,0" />
+              <TextBlock DockPanel.Dock="Left" Text="{loc:Tr ManualRadius}" VerticalAlignment="Center" Margin="0,0,6,0" />
+              <!-- Applied on Enter and when it loses focus; see MainWindow. Empty means automatic. -->
+              <TextBox x:Name="ManualRadiusBox" Text="{Binding ManualRadiusText}" Watermark="{loc:Tr ManualRadiusAutomatic}"
+                       ToolTip.Tip="{loc:Tr ManualRadiusTip}" />
+            </DockPanel>
+          </StackPanel>
+        </ScrollViewer>
+      </Border>
     </Grid>
   </DockPanel>
 </Window>

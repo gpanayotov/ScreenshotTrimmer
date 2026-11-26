@@ -22,7 +22,8 @@ public enum ViewerBackground
 
 /// <summary>
 /// Draws one image with zoom and pan. A zoom of 1 (100%) is one image pixel per physical screen pixel, whatever the
-/// display scaling. Pixels are sharp squares from 100% up and smoothly sampled below it. Each new image starts fitted.
+/// display scaling. Pixels are sharp squares from 100% up and smoothly sampled below it. Each new image starts fitted;
+/// a source replaced by one of the same size keeps the view.
 /// </summary>
 /// <remarks>
 /// Panning uses the middle button, the left button while <see cref="IsSpaceHeld"/>, Shift with the wheel and the
@@ -41,6 +42,9 @@ public sealed class ImageViewer : Control
 
     public static readonly StyledProperty<Bitmap?> SourceProperty =
         AvaloniaProperty.Register<ImageViewer, Bitmap?>(nameof(Source));
+
+    public static readonly StyledProperty<bool> IsCropShownProperty =
+        AvaloniaProperty.Register<ImageViewer, bool>(nameof(IsCropShown), defaultValue: true);
 
     public static readonly StyledProperty<ViewerBackground> BackgroundKindProperty =
         AvaloniaProperty.Register<ImageViewer, ViewerBackground>(nameof(BackgroundKind));
@@ -90,7 +94,7 @@ public sealed class ImageViewer : Control
 
     static ImageViewer()
     {
-        AffectsRender<ImageViewer>(BackgroundKindProperty, CropProperty);
+        AffectsRender<ImageViewer>(BackgroundKindProperty, CropProperty, IsCropShownProperty);
         ClipToBoundsProperty.OverrideDefaultValue<ImageViewer>(true);
     }
 
@@ -122,6 +126,15 @@ public sealed class ImageViewer : Control
     {
         get => GetValue(CropProperty);
         set => SetValue(CropProperty, value);
+    }
+
+    /// <summary>
+    /// Whether the crop is shown and can be drawn; off while the viewer shows a Result, which is already cropped.
+    /// </summary>
+    public bool IsCropShown
+    {
+        get => GetValue(IsCropShownProperty);
+        set => SetValue(IsCropShownProperty, value);
     }
 
     /// <summary>Physical screen pixels per image pixel; 0 when there is no image.</summary>
@@ -226,9 +239,19 @@ public sealed class ImageViewer : Control
         if (change.Property == SourceProperty)
         {
             EndDraw();
-            Show(Source is { } bitmap
-                ? Viewport.Fitted(bitmap.PixelSize.Width, bitmap.PixelSize.Height, Bounds.Width * Scaling, Bounds.Height * Scaling)
-                : null);
+            // A new image starts fitted; a bitmap of the same size replacing the shown one, such as the Result
+            // rendered again or the Original and Result of an uncropped image, keeps the zoom and position.
+            if (Source is not { } bitmap)
+                Show(null);
+            else if (_viewport is not { } viewport
+                     || viewport.ImageWidth != bitmap.PixelSize.Width || viewport.ImageHeight != bitmap.PixelSize.Height)
+                Show(Viewport.Fitted(bitmap.PixelSize.Width, bitmap.PixelSize.Height, Bounds.Width * Scaling, Bounds.Height * Scaling));
+            else
+                InvalidateVisual();
+        }
+        else if (change.Property == IsCropShownProperty)
+        {
+            EndDraw();
         }
         else if (change.Property == BoundsProperty)
         {
@@ -264,7 +287,7 @@ public sealed class ImageViewer : Control
     {
         base.OnPointerPressed(e);
         var point = e.GetCurrentPoint(this).Properties;
-        if (point.IsLeftButtonPressed && !IsSpaceHeld && _panFrom is null && _drawFrom is null
+        if (point.IsLeftButtonPressed && !IsSpaceHeld && IsCropShown && _panFrom is null && _drawFrom is null
             && Source is { } bitmap && _viewport is not null)
         {
             var position = e.GetPosition(this);
@@ -357,7 +380,7 @@ public sealed class ImageViewer : Control
             context.DrawImage(bitmap, new Rect(0, 0, bitmap.PixelSize.Width, bitmap.PixelSize.Height), destination);
 
         var crop = _drawFrom is not null ? _drawing?.Rectangle : Crop;
-        if (crop is { } rectangle)
+        if (IsCropShown && crop is { } rectangle)
             DrawCrop(context, viewport, destination, rectangle);
     }
 
