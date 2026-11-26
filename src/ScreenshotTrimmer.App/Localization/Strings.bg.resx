@@ -35,6 +35,8 @@
   <data name="BackgroundDarkGrey" xml:space="preserve"><value>_Тъмносив</value></data>
   <data name="ImageSize" xml:space="preserve"><value>{0:N0} × {1:N0} пиксела</value></data>
   <data name="ZoomPercent" xml:space="preserve"><value>{0:0.#}%</value></data>
+  <data name="CropSize" xml:space="preserve"><value>Изрязване: {0:N0} × {1:N0} пиксела в позиция {2:N0}, {3:N0}</value></data>
+  <data name="ClearCrop" xml:space="preserve"><value>_Изчистване на изрязването</value></data>
   <data name="ThumbnailUnreadable" xml:space="preserve"><value>Не може да бъде прочетено</value></data>
   <data name="ShowResults" xml:space="preserve"><value>Показване на _Резултатите</value></data>
   <data name="HasResultBadge" xml:space="preserve"><value>Резултат</value></data>

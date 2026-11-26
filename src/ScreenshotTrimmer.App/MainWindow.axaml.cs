@@ -169,8 +169,12 @@ public partial class MainWindow : Window, IPathPicker
 
     private void OnViewerPropertyChanged(object? sender, AvaloniaPropertyChangedEventArgs e)
     {
-        if (e.Property == ImageViewer.ZoomProperty && _viewModel is not null)
+        if (_viewModel is null)
+            return;
+        if (e.Property == ImageViewer.ZoomProperty)
             _viewModel.Zoom = Viewer.Zoom;
+        else if (e.Property == ImageViewer.ShownCropProperty)
+            _viewModel.ShownCrop = Viewer.ShownCrop;
     }
 
     // The strip recycles its containers as it scrolls; remembering which entry each one shows tells an entry when it

@@ -58,6 +58,8 @@
         <MenuItem Header="{loc:Tr PreviousImage}" InputGesture="PageUp" Command="{Binding PreviousCommand}" />
         <Separator />
         <MenuItem Header="{loc:Tr RemoveFromList}" InputGesture="Delete" Command="{Binding RemoveSelectedCommand}" />
+        <Separator />
+        <MenuItem Header="{loc:Tr ClearCrop}" Command="{Binding ClearCropCommand}" />
       </MenuItem>
     </Menu>
 
@@ -102,13 +104,14 @@
       </DockPanel>
     </Border>
 
-    <!-- Status bar: file name, size in pixels and zoom. -->
+    <!-- Status bar: file name, size in pixels, zoom and the crop rectangle. -->
     <Border DockPanel.Dock="Bottom" Padding="8,3" BorderThickness="0,1,0,0"
             BorderBrush="{DynamicResource SystemControlForegroundBaseLowBrush}">
       <StackPanel Orientation="Horizontal" Spacing="24">
         <TextBlock Text="{Binding StatusFileName}" TextTrimming="CharacterEllipsis" MaxWidth="480" />
         <TextBlock Text="{Binding StatusImageSize}" />
         <TextBlock Text="{Binding StatusZoom}" />
+        <TextBlock Text="{Binding StatusCrop}" />
       </StackPanel>
     </Border>
 

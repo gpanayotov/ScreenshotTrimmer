@@ -35,6 +35,8 @@
   <data name="BackgroundDarkGrey" xml:space="preserve"><value>_Dark grey</value></data>
   <data name="ImageSize" xml:space="preserve"><value>{0:N0} × {1:N0} px</value></data>
   <data name="ZoomPercent" xml:space="preserve"><value>{0:0.#}%</value></data>
+  <data name="CropSize" xml:space="preserve"><value>Crop: {0:N0} × {1:N0} px at {2:N0}, {3:N0}</value></data>
+  <data name="ClearCrop" xml:space="preserve"><value>_Clear crop</value></data>
   <data name="ThumbnailUnreadable" xml:space="preserve"><value>Cannot be read</value></data>
   <data name="ShowResults" xml:space="preserve"><value>Show _Results</value></data>
   <data name="HasResultBadge" xml:space="preserve"><value>Result</value></data>
