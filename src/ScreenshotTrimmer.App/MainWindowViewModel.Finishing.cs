@@ -21,7 +21,7 @@ public sealed partial class MainWindowViewModel
     private (RenderReport Report, Steps Steps)? _report;
     private bool _showsResult;
     private CleanEdges _cleanEdges = CleanEdges.Shown(Steps.None, new UserSettings());
-    private string? _finishingKey;
+    private ImageKey? _finishingKey;
     private string _manualRadiusText = "";
     private ShadowControls _shadow = ShadowControls.Shown(Steps.None, new UserSettings(), false);
 
@@ -215,7 +215,7 @@ public sealed partial class MainWindowViewModel
         var steps = ListedSteps(image);
         var shown = CleanEdges.Shown(steps, Settings);
         var shadow = ShadowControls.Shown(steps, Settings, _shownHasShadowPadding);
-        var sameImage = SamePath(image?.Key, _finishingKey);
+        var sameImage = image?.Key == _finishingKey;
         _finishingKey = image?.Key;
         if (!sameImage)
             _draggedShadow = null;
@@ -227,7 +227,7 @@ public sealed partial class MainWindowViewModel
             RaiseFinishing();
         }
 
-        if (image is not null && _original is { } original && SamePath(image.Key, _shown?.Key))
+        if (image is not null && _original is { } original && image.Key == _shown?.Key)
             Render(new RenderRequest(original, steps));
     }
 

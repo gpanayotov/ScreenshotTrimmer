@@ -34,14 +34,15 @@ public sealed class ThumbnailCache(int capacity = 400)
     /// <exception cref="InvalidDataException">The file is not an image that can be decoded.</exception>
     /// <exception cref="OperationCanceledException"><paramref name="cancellation"/> was cancelled first.</exception>
     public Task<Lease> RentAsync(string path, ContentVersion version, CancellationToken cancellation) =>
-        RentAsync(path, version, () => ThumbnailDecoding.Decode(path, (int)Width, (int)Height), cancellation);
+        RentAsync(ImageKey.OfFile(path), version, () => ThumbnailDecoding.Decode(path, (int)Width, (int)Height),
+            cancellation);
 
     /// <summary>
     /// A lease on the thumbnail kept under <paramref name="key"/> at <paramref name="version"/>, from the cache or made
     /// by <paramref name="decode"/> off the interface thread, as <see cref="RentAsync(string, ContentVersion, CancellationToken)"/>
-    /// does for a file. <paramref name="key"/> is a path or a <see cref="WorkspaceImage.Key"/>.
+    /// does for a file.
     /// </summary>
-    public async Task<Lease> RentAsync(string key, ContentVersion version, Func<Bitmap> decode,
+    public async Task<Lease> RentAsync(ImageKey key, ContentVersion version, Func<Bitmap> decode,
                                        CancellationToken cancellation)
     {
         var cacheKey = new Key(key, version);
@@ -66,8 +67,8 @@ public sealed class ThumbnailCache(int capacity = 400)
         return Add(cacheKey, bitmap);
     }
 
-    /// <summary>A lease on the cached thumbnail for <paramref name="path"/> at <paramref name="version"/>, or <c>null</c>.</summary>
-    public Lease? TryRent(string path, ContentVersion version) => TryRent(new Key(path, version));
+    /// <summary>A lease on the cached thumbnail kept under <paramref name="key"/> at <paramref name="version"/>, or <c>null</c>.</summary>
+    public Lease? TryRent(ImageKey key, ContentVersion version) => TryRent(new Key(key, version));
 
     private Lease? TryRent(Key key)
     {
@@ -155,5 +156,5 @@ public sealed class ThumbnailCache(int capacity = 400)
         public bool Evicted { get; set; }
     }
 
-    internal readonly record struct Key(string Path, ContentVersion Version);
+    internal readonly record struct Key(ImageKey Image, ContentVersion Version);
 }

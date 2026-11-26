@@ -81,7 +81,7 @@ public sealed partial class MainWindowViewModel : Observable, IDisposable
         get => _selectedEntry;
         set
         {
-            if (value is not null && !SamePath(value.Image.Key, _workspace.Selected?.Key))
+            if (value is not null && value.Image.Key != _workspace.Selected?.Key)
                 IfStillListed(value.Image, _workspace.Select);
             else
                 Set(ref _selectedEntry, value);
@@ -316,9 +316,6 @@ public sealed partial class MainWindowViewModel : Observable, IDisposable
             ? Path.TrimEndingDirectorySeparator(folder)
             : null;
 
-    private static bool SamePath(string? a, string? b) =>
-        a is null || b is null ? a == b : FileNames.Same(a, b);
-
     /// <summary>The folder's own name; a root folder such as <c>C:\</c> or <c>/</c>, which has none, shows in full.</summary>
     private static string FolderName(string folder) =>
         Path.GetFileName(folder) is { Length: > 0 } name ? name : folder;
@@ -356,7 +353,7 @@ public sealed partial class MainWindowViewModel : Observable, IDisposable
     /// </summary>
     private bool ShowsSelected([NotNullWhen(true)] out WorkspaceImage? image, [NotNullWhen(true)] out RgbaImage? original)
     {
-        if (_workspace.Selected is { } selected && _original is { } loaded && SamePath(selected.Key, _shown?.Key))
+        if (_workspace.Selected is { } selected && _original is { } loaded && selected.Key == _shown?.Key)
         {
             (image, original) = (selected, loaded);
             return true;
@@ -436,8 +433,8 @@ public sealed partial class MainWindowViewModel : Observable, IDisposable
             Raise(nameof(ShowsHint));
         }
 
-        var selected = Entries.FirstOrDefault(entry => SamePath(entry.Image.Key, change.Selected?.Key));
-        if (!SamePath(change.Selected?.Key, _shown?.Key))
+        var selected = Entries.FirstOrDefault(entry => entry.Image.Key == change.Selected?.Key);
+        if (change.Selected?.Key != _shown?.Key)
             LoadImage(change.Selected);
         Set(ref _selectedEntry, selected, nameof(SelectedEntry));
         ShowCrop(change.Selected);

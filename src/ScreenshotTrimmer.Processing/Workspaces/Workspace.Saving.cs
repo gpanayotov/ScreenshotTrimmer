@@ -11,7 +11,7 @@ public sealed partial class Workspace
     /// The images saved in Backup mode in this list, by listed path, which is where their Result now is. Their listed
     /// file may hold the Result rather than the Original, so they render from <see cref="BackupSave.LoadOriginal"/>.
     /// </summary>
-    private readonly Dictionary<string, BackupSave> _backupSaves = new(FileNames.Comparer);
+    private readonly Dictionary<ImageKey, BackupSave> _backupSaves = [];
 
     /// <summary>The pixels of <paramref name="image"/>'s Original, which its Result is rendered from.</summary>
     /// <remarks>
@@ -25,7 +25,7 @@ public sealed partial class Workspace
     public RgbaImage LoadOriginal(WorkspaceImage image)
     {
         ArgumentNullException.ThrowIfNull(image);
-        string key;
+        ImageKey key;
         RgbaImage? pastedPixels;
         BackupSave? backupSave;
         lock (_lock)
@@ -35,7 +35,8 @@ public sealed partial class Workspace
             pastedPixels = PastedPixels(key);
             backupSave = _backupSaves.GetValueOrDefault(key);
         }
-        return pastedPixels ?? backupSave?.LoadOriginal() ?? ImageFile.Load(key);
+        // A Pasted image not saved yet always has its pixels, so only a file gets this far.
+        return pastedPixels ?? backupSave?.LoadOriginal() ?? ImageFile.Load(key.Path!);
     }
 
     /// <summary>
@@ -60,6 +61,7 @@ public sealed partial class Workspace
     {
         ArgumentNullException.ThrowIfNull(image);
         string path;
+        ImageKey key;
         Steps steps;
         SaveOptions options;
         RgbaImage? pastedPixels;
@@ -69,10 +71,11 @@ public sealed partial class Workspace
             ObjectDisposedException.ThrowIf(_disposed, this);
             path = Images[RequireListed(image)].Path
                 ?? throw new ArgumentException("A Pasted image is saved with SavePasted until it has a file.", nameof(image));
-            steps = StepsOf(path).Current;
+            key = ImageKey.OfFile(path);
+            steps = StepsOf(key).Current;
             options = SaveOptionsFor(_settings);
-            pastedPixels = PastedPixels(path);
-            backupSave = _backupSaves.GetValueOrDefault(path);
+            pastedPixels = PastedPixels(key);
+            backupSave = _backupSaves.GetValueOrDefault(key);
         }
 
         var original = pastedPixels ?? backupSave?.LoadOriginal() ?? ImageFile.Load(path);
@@ -83,19 +86,19 @@ public sealed partial class Workspace
 
         Update(() =>
         {
-            var savedPath = path;
+            var saved = key;
             if (options.Mode == SaveMode.Backup && !replacing)
             {
-                savedPath = report.Written[0];
-                FollowOwnRename(path, savedPath);
-                _backupSaves[savedPath] = BackupSave.After(report, original);
+                FollowOwnRename(path, report.Written[0]);
+                saved = ImageKey.OfFile(report.Written[0]);
+                _backupSaves[saved] = BackupSave.After(report, original);
             }
-            var state = StepsOf(savedPath);
+            var state = StepsOf(saved);
             if (state.Current == steps)
-                _steps[savedPath] = state with { Saved = steps, MergeKey = null };
+                _steps[saved] = state with { Saved = steps, MergeKey = null };
             // The new files are listed now rather than when the folder watcher notices them, so the badge or the
             // renamed entry shows at once.
-            var selected = Selected is { } current && FileNames.Same(current.Key, path) ? savedPath : Selected is null ? null : Selected.Key;
+            var selected = Selected?.Key == key ? saved : Selected?.Key;
             Relist(_ => (selected is null ? null : Find(selected)) ?? Images.FirstOrDefault());
         });
         return report;
@@ -174,8 +177,8 @@ public sealed partial class Workspace
     {
         if (FileNames.Same(from, to))
             return;
-        if (_steps.Remove(from, out var state))
-            _steps[to] = state;
+        if (_steps.Remove(ImageKey.OfFile(from), out var state))
+            _steps[ImageKey.OfFile(to)] = state;
         _openedPaths = _openedPaths.Select(opened => FileNames.Same(opened, from) ? to : opened).ToList();
     }
 

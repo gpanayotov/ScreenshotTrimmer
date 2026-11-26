@@ -8,7 +8,7 @@ namespace ScreenshotTrimmer.Processing.Workspaces;
 public sealed partial class Workspace
 {
     /// <summary>The images with Steps, by <see cref="WorkspaceImage.Key">key</see>; an image missing here has <c>Steps.None</c> and was never saved.</summary>
-    private readonly Dictionary<string, ImageSteps> _steps = new(FileNames.Comparer);
+    private readonly Dictionary<ImageKey, ImageSteps> _steps = [];
 
     /// <summary>
     /// Whether any listed image has unsaved Steps, so leaving, or replacing the list, would lose work.
@@ -130,9 +130,9 @@ public sealed partial class Workspace
         }
     }
 
-    private ImageSteps StepsOf(string path) => _steps.GetValueOrDefault(path) ?? ImageSteps.New;
+    private ImageSteps StepsOf(ImageKey key) => _steps.GetValueOrDefault(key) ?? ImageSteps.New;
 
-    private bool HasUnsavedSteps(string key) => StepsOf(key) is var state && state.Current != state.Saved;
+    private bool HasUnsavedSteps(ImageKey key) => StepsOf(key) is var state && state.Current != state.Saved;
 
     /// <summary>Announces a change of Steps, with the unsaved markers brought up to date; call under the lock.</summary>
     private void AnnounceSteps()
@@ -164,8 +164,8 @@ public sealed partial class Workspace
     {
         foreach (var (from, state) in _steps.ToList())
         {
-            var to = renamed(from);
-            if (FileNames.Same(from, to))
+            var to = from.Renamed(renamed);
+            if (to == from)
                 continue;
             _steps.Remove(from);
             _steps[to] = state;
@@ -180,9 +180,9 @@ public sealed partial class Workspace
     private List<string> DiscardStepsOfDropped(IEnumerable<string> before)
     {
         var gone = before.Where(path => Find(path) is null).ToList();
-        var unsaved = gone.Where(HasUnsavedSteps).ToList();
+        var unsaved = gone.Where(path => HasUnsavedSteps(ImageKey.OfFile(path))).ToList();
         foreach (var path in gone)
-            _steps.Remove(path);
+            _steps.Remove(ImageKey.OfFile(path));
         return unsaved;
     }
 

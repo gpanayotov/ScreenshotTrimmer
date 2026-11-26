@@ -8,7 +8,7 @@ namespace ScreenshotTrimmer.App;
 // Saving the selected image's Result, or every unsaved one, and reporting how it went.
 public sealed partial class MainWindowViewModel
 {
-    private readonly HashSet<string> _saving = new(FileNames.Comparer);
+    private readonly HashSet<ImageKey> _saving = [];
     private bool _savingAll;
 
     /// <summary>

@@ -127,7 +127,7 @@ public class StepsTests
         Touch(folder, "a.png");
         using var workspace = new Workspace(new UserSettings());
         workspace.Open([folder.Path]);
-        var stranger = new WorkspaceImage { Path = folder.File("elsewhere.png") };
+        var stranger = new WorkspaceImage { Key = ImageKey.OfFile(folder.File("elsewhere.png")) };
 
         Assert.Throws<ArgumentException>(() => workspace.Steps(stranger));
         Assert.Throws<ArgumentException>(() => workspace.SetSteps(stranger, Cropped));

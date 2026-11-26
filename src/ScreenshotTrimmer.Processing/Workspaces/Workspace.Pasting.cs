@@ -66,7 +66,7 @@ public sealed partial class Workspace
         {
             ObjectDisposedException.ThrowIf(_disposed, this);
             RequireListed(image);
-            pasted = _pasted.FirstOrDefault(candidate => candidate.Number == image.PastedNumber)
+            pasted = _pasted.FirstOrDefault(candidate => candidate.Key == image.Key)
                 ?? throw new ArgumentException("The image is not an unsaved Pasted image.", nameof(image));
             steps = StepsOf(pasted.Key).Current;
         }
@@ -79,23 +79,24 @@ public sealed partial class Workspace
             if (!_pasted.Remove(pasted))
                 return; // Removed from the list, or the list replaced, while it was saving.
             var savedPath = report.Written[0];
+            var saved = ImageKey.OfFile(savedPath);
             var state = StepsOf(pasted.Key);
             _steps.Remove(pasted.Key);
-            _steps[savedPath] = state with { Saved = steps, MergeKey = null };
-            _savedPasted.RemoveAll(saved => FileNames.Same(saved.Path, savedPath));
+            _steps[saved] = state with { Saved = steps, MergeKey = null };
+            _savedPasted.RemoveAll(candidate => FileNames.Same(candidate.Path, savedPath));
             _savedPasted.Add(new SavedPasted(savedPath, pasted.Pixels));
-            _backupSaves.Remove(savedPath);
+            _backupSaves.Remove(saved);
             _removed.Remove(savedPath);
-            var selected = Selected is { } current && current.PastedNumber == pasted.Number ? savedPath : Selected is null ? null : Selected.Key;
+            var selected = Selected?.Key == pasted.Key ? saved : Selected?.Key;
             Relist(_ => (selected is null ? null : Find(selected)) ?? Images.FirstOrDefault());
         });
         return report;
     }
 
     /// <summary>The pixels a Pasted image with the key <paramref name="key"/> renders from, saved or not; <c>null</c> for other images.</summary>
-    private RgbaImage? PastedPixels(string key) =>
+    private RgbaImage? PastedPixels(ImageKey key) =>
         _pasted.FirstOrDefault(pasted => pasted.Key == key)?.Pixels
-        ?? _savedPasted.FirstOrDefault(saved => FileNames.Same(saved.Path, key))?.Pixels;
+        ?? _savedPasted.FirstOrDefault(saved => ImageKey.OfFile(saved.Path) == key)?.Pixels;
 
     /// <summary>The files of the saved Pasted images that still exist; call under the lock.</summary>
     private IEnumerable<string> SavedPastedPaths() =>
@@ -120,7 +121,7 @@ public sealed partial class Workspace
     /// <summary>Drops the unsaved Pasted image <paramref name="image"/> with its pixels and Steps; call under the lock.</summary>
     private void DropPasted(WorkspaceImage image)
     {
-        _pasted.RemoveAll(pasted => pasted.Number == image.PastedNumber);
+        _pasted.RemoveAll(pasted => pasted.Key == image.Key);
         _steps.Remove(image.Key);
     }
 
@@ -133,9 +134,9 @@ public sealed partial class Workspace
 
     private sealed record PastedImage(int Number, RgbaImage Pixels)
     {
-        public string Key => Entry.Key;
+        public ImageKey Key => ImageKey.OfPasted(Number);
 
-        public WorkspaceImage Entry => new() { PastedNumber = Number, HasUnsavedSteps = true };
+        public WorkspaceImage Entry => new() { Key = Key, HasUnsavedSteps = true };
     }
 
     private sealed record SavedPasted(string Path, RgbaImage Pixels);
