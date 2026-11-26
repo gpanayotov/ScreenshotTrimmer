@@ -18,3 +18,6 @@ jobs:
           dotnet-version: 10.0.x
       - run: dotnet build ScreenshotTrimmer.slnx --configuration Release
       - run: dotnet test ScreenshotTrimmer.slnx --configuration Release --no-build
+
+  package:
+    uses: ./.github/workflows/package.yml
