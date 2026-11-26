@@ -74,4 +74,12 @@
   <data name="ToolbarCheckerboard" xml:space="preserve"><value>Шахматна дъска</value></data>
   <data name="ToolbarWhite" xml:space="preserve"><value>Бял</value></data>
   <data name="ToolbarDarkGrey" xml:space="preserve"><value>Тъмносив</value></data>
+  <data name="SaveMenu" xml:space="preserve"><value>_Запис</value></data>
+  <data name="UnsavedTip" xml:space="preserve"><value>Това изображение има незаписани промени</value></data>
+  <data name="Saved" xml:space="preserve"><value>Записано: {0}</value></data>
+  <data name="SaveFailed" xml:space="preserve"><value>Резултатът от {0} не можа да бъде записан: {1}</value></data>
+  <data name="SaveFailureTargetIsFolder" xml:space="preserve"><value>на пътя стои папка с името {0}.</value></data>
+  <data name="SaveFailureTargetExists" xml:space="preserve"><value>вече има файл с името {0}.</value></data>
+  <data name="SaveFailureFolderNotFound" xml:space="preserve"><value>папката на {0} не съществува.</value></data>
+  <data name="SaveFailureAccessDenied" xml:space="preserve"><value>няма разрешение за запис на {0}.</value></data>
 </root>

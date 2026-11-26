@@ -16,7 +16,8 @@ public static class BitmapLoading
     /// <exception cref="InvalidDataException">The file is not an image that can be decoded.</exception>
     public static Bitmap Load(string path) => ToBitmap(ImageFile.Load(path));
 
-    private static unsafe Bitmap ToBitmap(RgbaImage image)
+    /// <summary>A bitmap of <paramref name="image"/>'s pixels. Safe to call off the interface thread.</summary>
+    public static unsafe Bitmap ToBitmap(RgbaImage image)
     {
         // The Bitmap copies the pixels, so the pinned span only has to live for the call.
         fixed (byte* pixels = image.Bytes)

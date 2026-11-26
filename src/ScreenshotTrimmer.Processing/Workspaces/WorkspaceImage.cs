@@ -14,4 +14,10 @@ public sealed record WorkspaceImage
 
     /// <summary>The file's content version when it was listed; it changes when the file is overwritten.</summary>
     public ContentVersion ContentVersion { get; init; }
+
+    /// <summary>
+    /// Whether the image's current Steps differ from the Steps at its last successful save in this session
+    /// (<c>Steps.None</c> until then), so its Result on disk does not show them.
+    /// </summary>
+    public bool HasUnsavedSteps { get; init; }
 }

@@ -20,6 +20,7 @@ public class SettingsStoreTests
         Assert.Equal(0.35, settings.ShadowOpacity);
         Assert.True(settings.FrameLines);
         Assert.True(settings.RoundedCorners);
+        Assert.True(settings.Shadow);
         Assert.Equal(Language.System, settings.Language);
     }
 
@@ -36,6 +37,7 @@ public class SettingsStoreTests
             ShadowOpacity = 0.6,
             FrameLines = false,
             RoundedCorners = false,
+            Shadow = false,
             Language = Language.Bg,
         };
 
@@ -97,6 +99,7 @@ public class SettingsStoreTests
     [InlineData("\"shadowOpacity\": 1.5")]
     [InlineData("\"frameLines\": \"yes\"")]
     [InlineData("\"roundedCorners\": 0")]
+    [InlineData("\"shadow\": \"off\"")]
     [InlineData("\"language\": \"fr\"")]
     [InlineData("\"language\": null")]
     public void A_value_outside_its_allowed_range_is_reset_to_the_default_and_the_rest_kept(string badField)
@@ -112,6 +115,7 @@ public class SettingsStoreTests
             ShadowOpacity = 0.8,
             FrameLines = false,
             RoundedCorners = false,
+            Shadow = false,
             Language = Language.Bg,
         };
         store.Save(custom);
@@ -131,10 +135,36 @@ public class SettingsStoreTests
             "shadowOpacity" => custom with { ShadowOpacity = 0.35 },
             "frameLines" => custom with { FrameLines = true },
             "roundedCorners" => custom with { RoundedCorners = true },
+            "shadow" => custom with { Shadow = true },
             "language" => custom with { Language = Language.System },
             _ => throw new ArgumentException(name),
         };
         Assert.Equal(expected, loaded);
+    }
+
+    [Fact]
+    public void An_older_file_without_the_shadow_switch_loads_with_shadow_on()
+    {
+        using var folder = new TempFolder();
+        var store = new SettingsStore(folder.Path);
+        File.WriteAllText(store.FilePath, """
+            {
+              "saveMode": "suffix",
+              "resultSuffix": "-trimmed",
+              "backupSuffix": "-original",
+              "shadowSize": 1.5,
+              "shadowOpacity": 0.5,
+              "frameLines": false,
+              "roundedCorners": true,
+              "language": "bg"
+            }
+            """);
+
+        var settings = store.Load();
+
+        Assert.True(settings.Shadow);
+        Assert.Equal(1.5, settings.ShadowSize);
+        Assert.False(settings.FrameLines);
     }
 
     [Fact]

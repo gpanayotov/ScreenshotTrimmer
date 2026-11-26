@@ -1,6 +1,7 @@
 using Avalonia.Media.Imaging;
 using ScreenshotTrimmer.App.Imaging;
 using ScreenshotTrimmer.App.Mvvm;
+using ScreenshotTrimmer.Processing.Files;
 using ScreenshotTrimmer.Processing.Workspaces;
 
 namespace ScreenshotTrimmer.App;
@@ -16,15 +17,36 @@ public sealed class StripEntry(WorkspaceImage image, ThumbnailCache thumbnails) 
     private CancellationTokenSource? _loading;
     private bool _unloading;
 
-    public WorkspaceImage Image { get; } = image;
+    public WorkspaceImage Image { get; private set; } = image;
 
     public string Name => Path.GetFileName(Image.Path);
 
     /// <summary>Whether this image's Result exists beside it, shown as the "has result" badge.</summary>
     public bool HasResult => Image.HasResult;
 
+    /// <summary>Whether this image has Steps that are not saved, shown as the unsaved marker.</summary>
+    public bool HasUnsavedSteps => Image.HasUnsavedSteps;
+
     /// <summary>Listed Results, shown only when the user asks for them, are dimmed so the Originals stand out.</summary>
     public double Opacity => Image.IsResult ? 0.6 : 1.0;
+
+    /// <summary>
+    /// Whether <paramref name="image"/> is this entry's file with the same content, so the entry can show it by
+    /// <see cref="Update"/> and keep its thumbnail.
+    /// </summary>
+    public bool Shows(WorkspaceImage image) =>
+        FileNames.Same(image.Path, Image.Path) && image.ContentVersion == Image.ContentVersion;
+
+    /// <summary>Shows the markers and badges of <paramref name="image"/>, which this entry <see cref="Shows"/>.</summary>
+    public void Update(WorkspaceImage image)
+    {
+        if (image == Image)
+            return;
+        Image = image;
+        Raise(nameof(HasResult));
+        Raise(nameof(HasUnsavedSteps));
+        Raise(nameof(Opacity));
+    }
 
     /// <summary>
     /// The decoded thumbnail, or <c>null</c> while it loads or when the file cannot be read. Reading it starts the

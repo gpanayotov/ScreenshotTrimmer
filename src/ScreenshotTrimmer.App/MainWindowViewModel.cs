@@ -8,6 +8,8 @@ using ScreenshotTrimmer.App.Imaging;
 using ScreenshotTrimmer.App.Localization;
 using ScreenshotTrimmer.App.Mvvm;
 using ScreenshotTrimmer.Processing.Files;
+using ScreenshotTrimmer.Processing.Imaging;
+using ScreenshotTrimmer.Processing.Rendering;
 using ScreenshotTrimmer.Processing.Settings;
 using ScreenshotTrimmer.Processing.Workspaces;
 
@@ -30,6 +32,9 @@ public sealed class MainWindowViewModel : Observable, IDisposable
     private ViewerBackground _background;
     private string? _openFolder;
     private string? _lastFolder;
+    private PixelRect? _crop;
+    private bool _shownHasShadowPadding;
+    private readonly HashSet<string> _saving = new(FileNames.Comparer);
 
     public MainWindowViewModel(Workspace workspace, IPathPicker picker, SettingsSession settings)
     {
@@ -45,6 +50,7 @@ public sealed class MainWindowViewModel : Observable, IDisposable
         RemoveEntryCommand = new RelayCommand<StripEntry>(Remove);
         DismissNoticesCommand = new RelayCommand(DismissNotices);
         ToggleShowResultsCommand = new RelayCommand(() => ShowResults = !ShowResults);
+        SaveCommand = new RelayCommand(Save, CanSave);
         ChooseBackgroundCommand = new RelayCommand<object>(choice =>
         {
             if (choice is ViewerBackground background)
@@ -76,6 +82,31 @@ public sealed class MainWindowViewModel : Observable, IDisposable
             if (value == _workspace.ShowResults)
                 return;
             _workspace.ShowResults = value;
+            Raise();
+        }
+    }
+
+    /// <summary>
+    /// The selected image's crop in image pixels, or <c>null</c> for none, as its Steps hold it. Setting it, as the
+    /// viewer does at the end of each drawing drag, records one Step; an image's first Step also takes its finishing
+    /// from the remembered settings.
+    /// </summary>
+    public PixelRect? Crop
+    {
+        get => _crop;
+        set
+        {
+            if (value == _crop)
+                return;
+            if (_workspace.Selected is { } image && Image is not null && SamePath(image.Path, _shownPath))
+            {
+                var hasShadowPadding = _shownHasShadowPadding;
+                IfStillListed(image, listed => _workspace.SetSteps(listed, FirstStep.Apply(
+                    _workspace.Steps(listed), Settings, hasShadowPadding,
+                    steps => steps with { Crop = value is { } rectangle ? Processing.Rendering.Crop.Classic(rectangle) : null })));
+            }
+            // The workspace's change has set the crop it recorded; when nothing was recorded, the viewer goes back to
+            // the current one.
             Raise();
         }
     }
@@ -163,6 +194,12 @@ public sealed class MainWindowViewModel : Observable, IDisposable
 
     /// <summary>Sets <see cref="Background"/> to the <see cref="ViewerBackground"/> given as the parameter.</summary>
     public ICommand ChooseBackgroundCommand { get; }
+
+    /// <summary>
+    /// Saves the selected image's Result off the interface thread and reports the file written, or why it could not be,
+    /// as a notice. Enabled while the selected image has unsaved Steps and is not already being saved.
+    /// </summary>
+    public RelayCommand SaveCommand { get; }
 
     /// <summary>
     /// Opens <paramref name="paths"/> in the workspace, replacing the list, and reports any path that does not exist
@@ -306,19 +343,80 @@ public sealed class MainWindowViewModel : Observable, IDisposable
         if (!ReferenceEquals(change.Images, _listedImages))
         {
             _listedImages = change.Images;
-            Entries.Clear();
-            foreach (var image in change.Images)
-                Entries.Add(new StripEntry(image, _thumbnails));
+            ShowInStrip(change.Images);
             Raise(nameof(ShowsHint));
         }
 
         var selected = Entries.FirstOrDefault(entry => SamePath(entry.Image.Path, change.Selected?.Path));
         if (!SamePath(change.Selected?.Path, _shownPath))
-            LoadImage(change.Selected?.Path);
+            LoadImage(change.Selected);
         Set(ref _selectedEntry, selected, nameof(SelectedEntry));
+        ShowCrop(change.Selected);
+        SaveCommand.NotifyCanExecuteChanged();
 
         if (change.UnavailableFolders.Count > 0)
             ReportUnavailable(change.UnavailableFolders);
+    }
+
+    /// <summary>
+    /// Makes the strip show <paramref name="images"/>. When only markers or badges changed, the entries are updated in
+    /// place, so the strip neither flickers nor reloads thumbnails.
+    /// </summary>
+    private void ShowInStrip(IReadOnlyList<WorkspaceImage> images)
+    {
+        if (images.Count == Entries.Count && images.Select((image, i) => Entries[i].Shows(image)).All(same => same))
+        {
+            for (var i = 0; i < images.Count; i++)
+                Entries[i].Update(images[i]);
+            return;
+        }
+        Entries.Clear();
+        foreach (var image in images)
+            Entries.Add(new StripEntry(image, _thumbnails));
+    }
+
+    /// <summary>Shows the crop in <paramref name="image"/>'s Steps.</summary>
+    private void ShowCrop(WorkspaceImage? image)
+    {
+        PixelRect? crop = null;
+        if (image is not null)
+            IfStillListed(image, listed => crop = _workspace.Steps(listed).Crop?.Window);
+        Set(ref _crop, crop, nameof(Crop));
+    }
+
+    private bool CanSave() =>
+        _workspace.Selected is { HasUnsavedSteps: true } selected && !_saving.Contains(selected.Path);
+
+    /// <summary>Saves the selected image's Result off the interface thread and reports how it went as a notice.</summary>
+    private async void Save()
+    {
+        if (_workspace.Selected is not { } image || !_saving.Add(image.Path))
+            return;
+        SaveCommand.NotifyCanExecuteChanged();
+        try
+        {
+            var report = await Task.Run(() => _workspace.Save(image));
+            _notices.Add(new Message("Saved", string.Join(", ", report.Written)));
+        }
+        catch (SaveFailedException e)
+        {
+            _notices.Add(new Message("SaveFailed", Path.GetFileName(image.Path), new SaveFailure(e)));
+        }
+        catch (ArgumentException)
+        {
+            // The image left the list while the save was starting; the strip already shows why.
+        }
+        catch (Exception e)
+        {
+            // The Original could not be read, or anything unforeseen.
+            _notices.Add(new Message("SaveFailed", Path.GetFileName(image.Path), e.Message));
+        }
+        finally
+        {
+            _saving.Remove(image.Path);
+            SaveCommand.NotifyCanExecuteChanged();
+        }
+        RaiseNotices();
     }
 
     /// <summary>
@@ -336,22 +434,35 @@ public sealed class MainWindowViewModel : Observable, IDisposable
         }
     }
 
-    /// <summary>Decodes <paramref name="path"/> off the interface thread; a newer selection wins over an older load.</summary>
-    private async void LoadImage(string? path)
+    /// <summary>
+    /// Decodes <paramref name="image"/>'s Original off the interface thread; a newer selection wins over an older load.
+    /// </summary>
+    private async void LoadImage(WorkspaceImage? image)
     {
         var load = ++_loadNumber;
+        var path = image?.Path;
         _shownPath = path;
         Raise(nameof(StatusFileName));
         Image = null;
         SetViewerMessage(null);
-        if (path is null)
+        if (image is null || path is null)
             return;
 
         Bitmap? bitmap = null;
+        var hasShadowPadding = false;
         Message? failure = null;
         try
         {
-            bitmap = await Task.Run(() => BitmapLoading.Load(path));
+            (bitmap, hasShadowPadding) = await Task.Run(() =>
+            {
+                var original = _workspace.LoadOriginal(image);
+                return (BitmapLoading.ToBitmap(original), AlreadyProcessed.HasShadowPadding(original));
+            });
+        }
+        catch (ArgumentException)
+        {
+            // The image left the list meanwhile; the change that removed it shows what is selected now.
+            return;
         }
         catch (Exception)
         {
@@ -364,6 +475,7 @@ public sealed class MainWindowViewModel : Observable, IDisposable
             bitmap?.Dispose();
             return;
         }
+        _shownHasShadowPadding = hasShadowPadding;
         Image = bitmap;
         SetViewerMessage(failure);
     }
@@ -404,5 +516,18 @@ public sealed class MainWindowViewModel : Observable, IDisposable
     private sealed record Message(string Key, params object?[] Args)
     {
         public string Text => Localizer.Instance.Format(Key, Args);
+    }
+
+    /// <summary>Why a save failed, in the current language when shown.</summary>
+    private sealed record SaveFailure(SaveFailedException Failure)
+    {
+        public override string ToString() => Failure.Reason switch
+        {
+            SaveFailureReason.TargetIsFolder => Localizer.Instance.Format("SaveFailureTargetIsFolder", Failure.TargetPath),
+            SaveFailureReason.TargetExists => Localizer.Instance.Format("SaveFailureTargetExists", Failure.TargetPath),
+            SaveFailureReason.FolderNotFound => Localizer.Instance.Format("SaveFailureFolderNotFound", Failure.TargetPath),
+            SaveFailureReason.AccessDenied => Localizer.Instance.Format("SaveFailureAccessDenied", Failure.TargetPath),
+            _ => Failure.InnerException?.Message ?? Failure.Message,
+        };
     }
 }

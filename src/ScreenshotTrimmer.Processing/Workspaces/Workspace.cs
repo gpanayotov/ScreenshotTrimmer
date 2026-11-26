@@ -7,7 +7,7 @@ namespace ScreenshotTrimmer.Processing.Workspaces;
 /// The images the user opened, in strip order, and which one is selected. Has no interface dependency, so the app's
 /// strip and a command-line tool can share it.
 /// </summary>
-public sealed class Workspace : IDisposable
+public sealed partial class Workspace : IDisposable
 {
     /// <summary>How long the disk must stay quiet after a change before the list is updated.</summary>
     public static readonly TimeSpan DefaultWatchDelay = TimeSpan.FromMilliseconds(300);
@@ -65,7 +65,7 @@ public sealed class Workspace : IDisposable
     /// <summary>
     /// Replaces the list with the images for <paramref name="paths"/>: one file lists its whole folder with that file
     /// selected; a folder or several paths list their images with the first selected. Removed entries are listed
-    /// again. Paths that exist neither as a file nor as a folder are skipped and returned, so the caller can tell the
+    /// again, and every image starts with no Steps. Paths that exist neither as a file nor as a folder are skipped and returned, so the caller can tell the
     /// user.
     /// </summary>
     public IReadOnlyList<string> Open(IReadOnlyList<string> paths)
@@ -88,6 +88,7 @@ public sealed class Workspace : IDisposable
             _unavailableFolders = new HashSet<string>();
             _lastRelistFailed = false;
             _removed = new HashSet<string>(FileNames.Comparer);
+            _steps.Clear();
             _folderWatch.Reset();
             Relist(listing => listing.Selected is { } opened ? Find(opened.Path) : Images.FirstOrDefault());
         });
@@ -214,6 +215,7 @@ public sealed class Workspace : IDisposable
             {
                 Path = image.Path, IsResult = image.IsResult, HasResult = image.HasResult,
                 ContentVersion = ContentVersion.Of(image.Path),
+                HasUnsavedSteps = HasUnsavedSteps(image.Path),
             })
             .ToList();
         if (!images.SequenceEqual(Images))
@@ -383,12 +385,5 @@ public sealed class Workspace : IDisposable
     }
 
     private static ListingOptions ListingOptionsFor(UserSettings settings, bool includeResults) =>
-        ListingOptions.For(
-            new SaveOptions
-            {
-                Mode = settings.SaveMode,
-                ResultSuffix = settings.ResultSuffix,
-                BackupSuffix = settings.BackupSuffix,
-            },
-            includeResults);
+        ListingOptions.For(SaveOptionsFor(settings), includeResults);
 }

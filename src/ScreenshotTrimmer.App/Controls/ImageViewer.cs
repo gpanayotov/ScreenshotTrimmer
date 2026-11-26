@@ -1,12 +1,14 @@
 using System.Windows.Input;
 using Avalonia;
 using Avalonia.Controls;
+using Avalonia.Data;
 using Avalonia.Input;
 using Avalonia.Media;
 using Avalonia.Media.Imaging;
 using Avalonia.Media.Immutable;
 using ScreenshotTrimmer.App.Mvvm;
 using ScreenshotTrimmer.Processing.Viewing;
+using ImageRect = ScreenshotTrimmer.Processing.Imaging.PixelRect;
 
 namespace ScreenshotTrimmer.App.Controls;
 
@@ -24,10 +26,15 @@ public enum ViewerBackground
 /// </summary>
 /// <remarks>
 /// Panning uses the middle button, the left button while <see cref="IsSpaceHeld"/>, Shift with the wheel and the
-/// scroll properties; a plain left-drag is left to the caller. The wheel zooms around the cursor.
+/// scroll properties. A plain left-drag draws the crop rectangle, shown with the image outside it dimmed; the drawn
+/// rectangle is set as <see cref="Crop"/> when the button is released, so one drag is one change. The wheel zooms
+/// around the cursor.
 /// </remarks>
 public sealed class ImageViewer : Control
 {
+    public static readonly StyledProperty<ImageRect?> CropProperty =
+        AvaloniaProperty.Register<ImageViewer, ImageRect?>(nameof(Crop), defaultBindingMode: BindingMode.TwoWay);
+
     private const double KeyboardZoomStep = 1.25;
     private const double WheelZoomStep = 1.2;
     private const double WheelPanStep = 48;
@@ -63,10 +70,15 @@ public sealed class ImageViewer : Control
 
     private static readonly IBrush Checkerboard = CreateCheckerboard();
     private static readonly IBrush DarkGrey = new ImmutableSolidColorBrush(Color.FromRgb(0x40, 0x40, 0x40));
+    private static readonly IBrush CropDim = new ImmutableSolidColorBrush(Color.FromArgb(0x99, 0, 0, 0));
+    private static readonly IPen CropOutline = new ImmutablePen(Brushes.White, 1);
+    private static readonly IPen CropOutlineShade = new ImmutablePen(new ImmutableSolidColorBrush(Color.FromArgb(0xCC, 0, 0, 0)), 3);
 
     private Viewport? _viewport;
     private TopLevel? _topLevel;
     private Point? _panFrom;
+    private ViewPoint? _drawFrom;
+    private CropRectangle? _drawing;
     private bool _isSpaceHeld;
     private double _zoom;
     private double _horizontalScroll;
@@ -78,7 +90,7 @@ public sealed class ImageViewer : Control
 
     static ImageViewer()
     {
-        AffectsRender<ImageViewer>(BackgroundKindProperty);
+        AffectsRender<ImageViewer>(BackgroundKindProperty, CropProperty);
         ClipToBoundsProperty.OverrideDefaultValue<ImageViewer>(true);
     }
 
@@ -100,6 +112,16 @@ public sealed class ImageViewer : Control
     {
         get => GetValue(BackgroundKindProperty);
         set => SetValue(BackgroundKindProperty, value);
+    }
+
+    /// <summary>
+    /// The crop rectangle drawn on the image, in image pixels, or <c>null</c> for none. A drawing drag sets it once,
+    /// when the button is released.
+    /// </summary>
+    public ImageRect? Crop
+    {
+        get => GetValue(CropProperty);
+        set => SetValue(CropProperty, value);
     }
 
     /// <summary>Physical screen pixels per image pixel; 0 when there is no image.</summary>
@@ -203,6 +225,7 @@ public sealed class ImageViewer : Control
         base.OnPropertyChanged(change);
         if (change.Property == SourceProperty)
         {
+            EndDraw();
             Show(Source is { } bitmap
                 ? Viewport.Fitted(bitmap.PixelSize.Width, bitmap.PixelSize.Height, Bounds.Width * Scaling, Bounds.Height * Scaling)
                 : null);
@@ -241,6 +264,17 @@ public sealed class ImageViewer : Control
     {
         base.OnPointerPressed(e);
         var point = e.GetCurrentPoint(this).Properties;
+        if (point.IsLeftButtonPressed && !IsSpaceHeld && _panFrom is null && _drawFrom is null
+            && Source is { } bitmap && _viewport is not null)
+        {
+            var position = e.GetPosition(this);
+            _drawFrom = new ViewPoint(position.X, position.Y);
+            _drawing = CropRectangle.Of(Crop, bitmap.PixelSize.Width, bitmap.PixelSize.Height);
+            e.Pointer.Capture(this);
+            Cursor = new Cursor(StandardCursorType.Cross);
+            e.Handled = true;
+            return;
+        }
         if (!point.IsMiddleButtonPressed && !(point.IsLeftButtonPressed && IsSpaceHeld))
             return;
 
@@ -253,6 +287,12 @@ public sealed class ImageViewer : Control
     protected override void OnPointerMoved(PointerEventArgs e)
     {
         base.OnPointerMoved(e);
+        if (_drawFrom is not null)
+        {
+            _drawing = Drawn(e);
+            InvalidateVisual();
+            return;
+        }
         if (_panFrom is not { } from || _viewport is not { } viewport)
             return;
 
@@ -265,6 +305,15 @@ public sealed class ImageViewer : Control
     protected override void OnPointerReleased(PointerReleasedEventArgs e)
     {
         base.OnPointerReleased(e);
+        if (_drawFrom is not null)
+        {
+            var drawn = Drawn(e)?.Rectangle;
+            e.Pointer.Capture(null);
+            EndDraw();
+            if (drawn != Crop)
+                SetCurrentValue(CropProperty, drawn);
+            return;
+        }
         if (_panFrom is null)
             return;
         e.Pointer.Capture(null);
@@ -274,6 +323,8 @@ public sealed class ImageViewer : Control
     protected override void OnPointerCaptureLost(PointerCaptureLostEventArgs e)
     {
         base.OnPointerCaptureLost(e);
+        // A drag cut short (another window took the pointer) leaves the crop as it was.
+        EndDraw();
         EndPan();
     }
 
@@ -288,8 +339,8 @@ public sealed class ImageViewer : Control
         // whole physical pixel keeps every image pixel the same width at whole zooms.
         var scaling = Scaling;
         var destination = new Rect(
-            Math.Round(viewport.ImageLeft) / scaling,
-            Math.Round(viewport.ImageTop) / scaling,
+            viewport.DrawnLeft / scaling,
+            viewport.DrawnTop / scaling,
             viewport.ShownWidth / scaling,
             viewport.ShownHeight / scaling);
 
@@ -304,6 +355,50 @@ public sealed class ImageViewer : Control
         var interpolation = viewport.Zoom >= 1 ? BitmapInterpolationMode.None : BitmapInterpolationMode.HighQuality;
         using (context.PushRenderOptions(new RenderOptions { BitmapInterpolationMode = interpolation }))
             context.DrawImage(bitmap, new Rect(0, 0, bitmap.PixelSize.Width, bitmap.PixelSize.Height), destination);
+
+        var crop = _drawFrom is not null ? _drawing?.Rectangle : Crop;
+        if (crop is { } rectangle)
+            DrawCrop(context, viewport, destination, rectangle);
+    }
+
+    /// <summary>Dims the image outside <paramref name="crop"/> and outlines it, on whole screen pixels.</summary>
+    private void DrawCrop(DrawingContext context, Viewport viewport, Rect image, ImageRect crop)
+    {
+        var scaling = Scaling;
+        var (left, top) = viewport.ToView(crop.X, crop.Y);
+        var (right, bottom) = viewport.ToView(crop.Right, crop.Bottom);
+        var inside = new Rect(
+            new Point(Math.Round(left) / scaling, Math.Round(top) / scaling),
+            new Point(Math.Round(right) / scaling, Math.Round(bottom) / scaling));
+
+        context.FillRectangle(CropDim, new Rect(image.Left, image.Top, image.Width, inside.Top - image.Top));
+        context.FillRectangle(CropDim, new Rect(image.Left, inside.Bottom, image.Width, image.Bottom - inside.Bottom));
+        context.FillRectangle(CropDim, new Rect(image.Left, inside.Top, inside.Left - image.Left, inside.Height));
+        context.FillRectangle(CropDim, new Rect(inside.Right, inside.Top, image.Right - inside.Right, inside.Height));
+
+        // A light line with a dark edge either side shows on light and dark screenshots alike.
+        context.DrawRectangle(null, CropOutlineShade, inside);
+        context.DrawRectangle(null, CropOutline, inside);
+    }
+
+    /// <summary>The crop the drag in progress has drawn so far, up to the pointer position in <paramref name="e"/>.</summary>
+    private CropRectangle? Drawn(PointerEventArgs e)
+    {
+        if (_drawFrom is not { } from || _drawing is not { } before || _viewport is not { } viewport)
+            return _drawing;
+        var position = e.GetPosition(this);
+        var start = CropRectangle.Of(Crop, before.ImageWidth, before.ImageHeight);
+        return start.Draw(from, new ViewPoint(position.X, position.Y), viewport, Scaling);
+    }
+
+    private void EndDraw()
+    {
+        if (_drawFrom is null)
+            return;
+        _drawFrom = null;
+        _drawing = null;
+        Cursor = IsSpaceHeld ? new Cursor(StandardCursorType.Hand) : null;
+        InvalidateVisual();
     }
 
     private void OnScalingChanged(object? sender, EventArgs e) =>
