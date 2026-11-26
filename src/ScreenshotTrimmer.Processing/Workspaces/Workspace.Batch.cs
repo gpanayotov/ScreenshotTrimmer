@@ -89,6 +89,22 @@ public sealed partial class Workspace
         }
     }
 
+    /// <summary>
+    /// Cancels the running Batch, if any, without waiting for it: the returned task completes once it has stopped, and
+    /// at once when none is running. The images it finished keep their Steps, and its summary says it was cancelled.
+    /// An interface can await this before it opens another list or closes, so it never blocks on the Batch.
+    /// </summary>
+    public Task StopBatchAsync()
+    {
+        lock (_lock)
+        {
+            if (_batch is not { } running)
+                return Task.CompletedTask;
+            running.Cancel();
+            return running.Finished;
+        }
+    }
+
     /// <summary>Waits for <paramref name="run"/>, already cancelled under the lock, to stop; call outside the lock.</summary>
     private void StopBatch(BatchRun run)
     {
@@ -248,6 +264,9 @@ public sealed partial class Workspace
 
         /// <summary>Cancels the Batch; call under the workspace's lock, which keeps the run from finishing meanwhile.</summary>
         public void Cancel() => _stop.Cancel();
+
+        /// <summary>Completes once the run is no longer the workspace's running Batch.</summary>
+        public Task Finished => _finished.Task;
 
         public void WaitUntilFinished() => _finished.Task.Wait();
 

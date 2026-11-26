@@ -226,6 +226,55 @@ public class BatchSafetyTests
         Assert.True(release.IsSet);
     }
 
+    [Fact]
+    public async Task Stopping_cancels_the_Batch_without_waiting_and_completes_once_it_has_stopped()
+    {
+        using var folder = new TempFolder();
+        WriteDialogs(folder, "a.png", "b.png", "c.png");
+        using var workspace = new Workspace(Remembered);
+        workspace.Open([folder.Path]);
+        using var release = new ManualResetEventSlim();
+        var batch = StartHeldAfterFirstImage(workspace, release);
+
+        var stopped = workspace.StopBatchAsync();
+
+        Assert.False(stopped.IsCompleted);
+        release.Set();
+        await stopped.WaitAsync(Timeout);
+        Assert.True(batch.IsCompleted);
+        var summary = await batch;
+        Assert.True(summary.Cancelled);
+        Assert.Equal(1, summary.Processed);
+        Assert.NotEqual(Steps.None, workspace.Steps(Entry(workspace, "a.png")));
+        Assert.Equal(Steps.None, workspace.Steps(Entry(workspace, "b.png")));
+    }
+
+    [Fact]
+    public void Stopping_with_no_Batch_running_is_already_done()
+    {
+        using var workspace = new Workspace(Remembered);
+
+        Assert.True(workspace.StopBatchAsync().IsCompletedSuccessfully);
+    }
+
+    /// <summary>
+    /// Starts a Batch, one image at a time, on another thread and returns once its first image is done. The Batch is
+    /// held in that image's progress report until <paramref name="release"/> is set.
+    /// </summary>
+    private static Task<BatchSummary> StartHeldAfterFirstImage(Workspace workspace, ManualResetEventSlim release)
+    {
+        var reached = new ManualResetEventSlim();
+        var batch = Task.Run(() => workspace.RunBatch(new SynchronousProgress(p =>
+        {
+            if (p.Done != 1)
+                return;
+            reached.Set();
+            Assert.True(release.Wait(Timeout));
+        }), CancellationToken.None, 1));
+        Assert.True(reached.Wait(Timeout));
+        return batch;
+    }
+
     /// <summary>
     /// Starts a Batch, one image at a time, on another thread and returns once its first image is done. The Batch is
     /// held in that image's progress report until the workspace is asked to stop it, so the stop arrives while it runs.
