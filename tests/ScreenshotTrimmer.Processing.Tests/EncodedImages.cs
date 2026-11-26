@@ -1,4 +1,3 @@
-using System.Runtime.InteropServices;
 using ScreenshotTrimmer.Processing.Imaging;
 using SkiaSharp;
 
@@ -20,21 +19,8 @@ internal static class EncodedImages
     /// <summary>Writes <paramref name="image"/> as a PNG to <paramref name="path"/>.</summary>
     public static void WritePng(string path, RgbaImage image)
     {
-        var info = new SKImageInfo(image.Width, image.Height, SKColorType.Rgba8888, SKAlphaType.Unpremul);
-        var bytes = image.Bytes.ToArray();
-        var handle = GCHandle.Alloc(bytes, GCHandleType.Pinned);
-        try
-        {
-            using var pixmap = new SKPixmap(info, handle.AddrOfPinnedObject(), info.RowBytes);
-            using var data = pixmap.Encode(SKEncodedImageFormat.Png, 100)
-                ?? throw new InvalidOperationException("SkiaSharp could not encode the image.");
-            using var file = File.Create(path);
-            data.SaveTo(file);
-        }
-        finally
-        {
-            handle.Free();
-        }
+        using var file = File.Create(path);
+        PngEncoder.Write(image, file);
     }
 
     /// <summary>Writes the bitmap in the format named by the path's extension.</summary>

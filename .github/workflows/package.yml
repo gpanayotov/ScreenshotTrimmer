@@ -9,31 +9,9 @@ on:
         description: The version to embed and name the files with, such as 1.2.3; empty for the commit's development version.
         type: string
         default: ''
-    outputs:
-      version:
-        description: The version the files were built with.
-        value: ${{ jobs.version.outputs.version }}
 
 jobs:
-  version:
-    runs-on: ubuntu-latest
-    outputs:
-      version: ${{ steps.version.outputs.version }}
-    steps:
-      - uses: actions/checkout@v4
-      - name: Test the version rule
-        run: build/version.test.sh
-      - name: Choose the version
-        id: version
-        env:
-          GIVEN: ${{ inputs.version }}
-        run: |
-          version="${GIVEN:-$(build/version.sh "$GITHUB_SHA")}"
-          echo "Version: $version"
-          echo "version=$version" >> "$GITHUB_OUTPUT"
-
   package:
-    needs: version
     strategy:
       fail-fast: false
       matrix:
@@ -46,8 +24,7 @@ jobs:
             executable: ScreenshotTrimmer
     runs-on: ${{ matrix.os }}
     env:
-      VERSION: ${{ needs.version.outputs.version }}
-      ZIP: ScreenshotTrimmer-${{ needs.version.outputs.version }}-${{ matrix.rid }}.zip
+      LAUNCH_SECONDS: 8 # how long each launch check keeps the app running
     defaults:
       run:
         shell: bash # with pipefail, unlike the default shell
@@ -56,6 +33,26 @@ jobs:
       - uses: actions/setup-dotnet@v4
         with:
           dotnet-version: 10.0.x
+
+      - name: Test the build scripts
+        if: runner.os == 'Linux'
+        run: |
+          build/version.test.sh
+          build/appdir.test.sh
+          build/smoke-test.test.sh
+          build/launch-check.test.sh
+
+      # The release workflow passes the tag's version, already checked; anything else gets the development version.
+      # On a pull request github.sha is a temporary merge commit, so the version names the pull request's head commit.
+      - name: Choose the version
+        env:
+          GIVEN: ${{ inputs.version }}
+          COMMIT: ${{ github.event.pull_request.head.sha || github.sha }}
+        run: |
+          version="${GIVEN:-$(build/version.sh "$COMMIT")}"
+          echo "Version: $version"
+          echo "VERSION=$version" >> "$GITHUB_ENV"
+          echo "ZIP=ScreenshotTrimmer-$version-${{ matrix.rid }}.zip" >> "$GITHUB_ENV"
 
       # Self-contained single file with the native libraries (SkiaSharp, HarfBuzz) inside, extracted on first run.
       # No trimming and no native AOT: Avalonia's use of reflection makes them risky.
@@ -81,42 +78,28 @@ jobs:
           test -f "$ZIP"
 
       # The checks below run the executable taken from the zip, as a user would.
-      - name: Smoke test (Windows)
-        if: runner.os == 'Windows'
-        shell: pwsh
-        run: |
-          Expand-Archive -Path $env:ZIP -DestinationPath unzipped
-          $p = Start-Process -FilePath unzipped/${{ matrix.executable }} -ArgumentList '--smoke-test' `
-            -NoNewWindow -Wait -PassThru -RedirectStandardOutput smoke.txt
-          Get-Content smoke.txt
-          if ($p.ExitCode -ne 0) { throw "The smoke test exited with $($p.ExitCode)." }
-          if (-not (Select-String -Path smoke.txt -SimpleMatch "ScreenshotTrimmer $env:VERSION")) { throw "The smoke test did not print version $env:VERSION." }
-
-      - name: Smoke test (Linux)
-        if: runner.os == 'Linux'
+      - name: Smoke test
         run: |
           unzip "$ZIP" -d unzipped
-          test -x unzipped/${{ matrix.executable }}
-          unzipped/${{ matrix.executable }} --smoke-test | tee smoke.txt
-          grep -F "ScreenshotTrimmer $VERSION" smoke.txt
+          build/smoke-test.sh "$VERSION" unzipped/${{ matrix.executable }}
 
+      - name: Install Xvfb
+        if: runner.os == 'Linux'
+        run: command -v xvfb-run || { sudo apt-get update && sudo apt-get install -y xvfb; }
+
+      - name: Launch check (Linux)
+        if: runner.os == 'Linux'
+        run: build/launch-check.sh "$LAUNCH_SECONDS" unzipped/${{ matrix.executable }}
+
+      # Windows needs no virtual display, and PowerShell can stop the app where bash's timeout cannot.
       - name: Launch check (Windows)
         if: runner.os == 'Windows'
         shell: pwsh
         run: |
           $p = Start-Process -FilePath unzipped/${{ matrix.executable }} -PassThru
-          Start-Sleep -Seconds 8
-          if ($p.HasExited) { throw "The app exited with $($p.ExitCode) within 8 seconds." }
+          Start-Sleep -Seconds $env:LAUNCH_SECONDS
+          if ($p.HasExited) { throw "The app exited with $($p.ExitCode) within $env:LAUNCH_SECONDS seconds." }
           Stop-Process -Id $p.Id -Force
-
-      - name: Launch check (Linux)
-        if: runner.os == 'Linux'
-        run: |
-          command -v xvfb-run || { sudo apt-get update && sudo apt-get install -y xvfb; }
-          # timeout exits with 124 only when the app was still running when the time ran out.
-          code=0
-          timeout 8 xvfb-run --auto-servernum unzipped/${{ matrix.executable }} || code=$?
-          if [ "$code" -ne 124 ]; then echo "The app exited with $code within 8 seconds."; exit 1; fi
 
       - uses: actions/upload-artifact@v4
         with:
@@ -130,24 +113,17 @@ jobs:
       - name: AppImage
         if: runner.os == 'Linux'
         run: |
-          build/appdir.test.sh
           build/appimage.sh publish/${{ matrix.executable }} "$VERSION" .
           echo "APPIMAGE=ScreenshotTrimmer-$VERSION-x86_64.AppImage" >> "$GITHUB_ENV"
 
       # The runner has no FUSE, so the AppImage unpacks itself and runs from there, as it would on a desktop without it.
       - name: Smoke test (AppImage)
         if: runner.os == 'Linux'
-        run: |
-          test -x "$APPIMAGE"
-          ./"$APPIMAGE" --appimage-extract-and-run --smoke-test | tee smoke-appimage.txt
-          grep -F "ScreenshotTrimmer $VERSION" smoke-appimage.txt
+        run: build/smoke-test.sh "$VERSION" ./"$APPIMAGE" --appimage-extract-and-run
 
       - name: Launch check (AppImage)
         if: runner.os == 'Linux'
-        run: |
-          code=0
-          timeout 8 xvfb-run --auto-servernum ./"$APPIMAGE" --appimage-extract-and-run || code=$?
-          if [ "$code" -ne 124 ]; then echo "The AppImage exited with $code within 8 seconds."; exit 1; fi
+        run: build/launch-check.sh "$LAUNCH_SECONDS" ./"$APPIMAGE" --appimage-extract-and-run
 
       - if: runner.os == 'Linux'
         uses: actions/upload-artifact@v4

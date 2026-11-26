@@ -12,29 +12,32 @@ internal static class SmokeTest
 {
     public const string Switch = "--smoke-test";
 
-    /// <summary>A Bulgarian string and its text, which only loads when the satellite resources are packaged.</summary>
-    private const string BulgarianKey = "FileMenu";
-    private const string BulgarianText = "_Файл";
+    /// <summary>
+    /// A string whose Bulgarian text lives only in the Bulgarian satellite resource assembly, so finding that text
+    /// proves the satellite resources were packaged.
+    /// </summary>
+    private const string SatelliteProbeKey = "FileMenu";
+    private const string SatelliteProbeText = "_Файл";
 
     /// <summary>Runs the checks, prints the app version and the outcome, and returns the exit code: 0 when all passed.</summary>
     public static int Run(TextWriter output)
     {
         output.WriteLine($"{About.AppName} {About.CurrentVersion}");
 
-        var failure = SelfCheck.Run().Failure ?? CheckBulgarian();
+        var failure = SelfCheck.Run().Failure ?? CheckSatelliteResources();
         output.WriteLine(failure is null ? "Smoke test passed." : $"Smoke test failed. {failure}");
         output.Flush();
         return failure is null ? 0 : 1;
     }
 
-    private static string? CheckBulgarian()
+    private static string? CheckSatelliteResources()
     {
         try
         {
-            var text = Strings.ResourceManager.GetString(BulgarianKey, CultureInfo.GetCultureInfo("bg"));
-            return text == BulgarianText
+            var text = Localizer.Text(SatelliteProbeKey, CultureInfo.GetCultureInfo("bg"));
+            return text == SatelliteProbeText
                 ? null
-                : $"The Bulgarian text of {BulgarianKey} is '{text}', not '{BulgarianText}'.";
+                : $"The Bulgarian text of {SatelliteProbeKey} is '{text}', not '{SatelliteProbeText}'.";
         }
         catch (Exception e)
         {
