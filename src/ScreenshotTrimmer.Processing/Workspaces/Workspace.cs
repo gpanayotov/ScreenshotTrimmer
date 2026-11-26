@@ -248,6 +248,7 @@ public sealed partial class Workspace : IDisposable
         var renamed = _folderWatch.TakeRenames();
         _openedPaths = _openedPaths.Select(renamed).ToList();
         _removed = _removed.Select(renamed).ToHashSet(FileNames.Comparer);
+        FollowRenamesWithSteps(renamed);
         if (_openedOneFile && _openedPaths is [var file] && !File.Exists(file))
         {
             // The file opened on its own is gone; the rest of its folder stays listed.
@@ -284,11 +285,12 @@ public sealed partial class Workspace : IDisposable
             .Where(folder => unavailable.Contains(folder) && !_unavailableFolders.Contains(folder))
             .ToList();
         _unavailableFolders = unavailable;
+        var dropped = DiscardStepsOfDropped(old.Select(image => image with { Path = renamed(image.Path) }).ToList());
 
         // Events for files that are not listed, or writes that left a file as it was, change nothing to show.
         if (ReferenceEquals(Images, old) && Selected == oldSelected && newlyUnavailable.Count == 0)
             return;
-        QueueChange(newlyUnavailable);
+        QueueChange(newlyUnavailable, dropped);
     }
 
     /// <summary>The listed Original of the Result <paramref name="result"/>, if any.</summary>
@@ -350,10 +352,12 @@ public sealed partial class Workspace : IDisposable
     }
 
     /// <summary>Queues the current list and selection to be announced; call under the lock, then <see cref="Announce"/>.</summary>
-    private void QueueChange(IReadOnlyList<string>? unavailableFolders = null) =>
+    private void QueueChange(
+        IReadOnlyList<string>? unavailableFolders = null, IReadOnlyList<string>? droppedWithUnsavedSteps = null) =>
         _pendingChanges.Enqueue(new WorkspaceChange
         {
             Images = Images, Selected = Selected, UnavailableFolders = unavailableFolders ?? [],
+            DroppedWithUnsavedSteps = droppedWithUnsavedSteps ?? [],
         });
 
     /// <summary>

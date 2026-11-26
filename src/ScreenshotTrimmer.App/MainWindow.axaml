@@ -234,6 +234,22 @@
               <TextBox x:Name="ManualRadiusBox" Text="{Binding ManualRadiusText}" Watermark="{loc:Tr ManualRadiusAutomatic}"
                        ToolTip.Tip="{loc:Tr ManualRadiusTip}" />
             </DockPanel>
+
+            <TextBlock Text="{loc:Tr Shadow}" FontWeight="SemiBold" Margin="0,10,0,0" />
+            <TextBlock Text="{loc:Tr ShadowPaddingWarning}" TextWrapping="Wrap" FontSize="12"
+                       IsVisible="{Binding ShowsShadowPaddingWarning}"
+                       Foreground="{DynamicResource SystemControlErrorTextForegroundBrush}" />
+            <CheckBox Content="{loc:Tr ShadowOn}" IsChecked="{Binding ShadowOn, Mode=TwoWay}" />
+            <!-- A drag previews the Result and records one Step at release; see MainWindow. -->
+            <StackPanel Margin="28,0,0,0" IsEnabled="{Binding ShadowOn}">
+              <TextBlock Text="{loc:Tr ShadowSize}" />
+              <Slider x:Name="ShadowSizeSlider" Minimum="{x:Static app:MainWindowViewModel.MinShadowSize}"
+                      Maximum="{x:Static app:MainWindowViewModel.MaxShadowSize}" SmallChange="0.1" LargeChange="0.5"
+                      Value="{Binding ShadowSize, Mode=TwoWay}" />
+              <TextBlock Text="{loc:Tr ShadowOpacity}" />
+              <Slider x:Name="ShadowOpacitySlider" Minimum="0" Maximum="1" SmallChange="0.05" LargeChange="0.1"
+                      Value="{Binding ShadowOpacity, Mode=TwoWay}" />
+            </StackPanel>
           </StackPanel>
         </ScrollViewer>
       </Border>

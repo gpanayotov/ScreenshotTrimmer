@@ -39,9 +39,10 @@ public sealed partial class MainWindowViewModel : Observable, IDisposable
     private readonly HashSet<string> _saving = new(FileNames.Comparer);
     private bool _savingAll;
 
-    public MainWindowViewModel(Workspace workspace, IPathPicker picker, SettingsSession settings)
+    public MainWindowViewModel(Workspace workspace, IPathPicker picker, IQuestions questions, SettingsSession settings)
     {
         _workspace = workspace;
+        _questions = questions;
         _settings = settings;
         OpenFilesCommand = new RelayCommand(() => OpenPicked(() => picker.PickFilesAsync(_lastFolder)));
         OpenFolderCommand = new RelayCommand(() => OpenPicked(() => picker.PickFolderAsync(_lastFolder)));
@@ -204,10 +205,13 @@ public sealed partial class MainWindowViewModel : Observable, IDisposable
     /// <summary>Whether nothing is listed, so the window shows how to open screenshots.</summary>
     public bool ShowsHint => Entries.Count == 0;
 
-    /// <summary>The window title: the open folder's name, or the app's name when no single folder is open.</summary>
-    public string Title => _openFolder is null
+    /// <summary>
+    /// The window title: the open folder's name, or the app's name when no single folder is open, marked while any
+    /// listed image has unsaved Steps.
+    /// </summary>
+    public string Title => MarkUnsaved(_openFolder is null
         ? Localizer.Instance["AppTitle"]
-        : Localizer.Instance.Format("TitleWithFolder", FolderName(_openFolder));
+        : Localizer.Instance.Format("TitleWithFolder", FolderName(_openFolder)));
 
     public string NoticeText => string.Join(Environment.NewLine, _notices.Select(notice => notice.Text));
 
@@ -357,7 +361,20 @@ public sealed partial class MainWindowViewModel : Observable, IDisposable
             Remove(entry.Image);
     }
 
-    private void Remove(WorkspaceImage image) => IfStillListed(image, _workspace.Remove);
+    /// <summary>Removes <paramref name="image"/> from the strip, asking first when that would discard its unsaved Steps.</summary>
+    private async void Remove(WorkspaceImage image)
+    {
+        try
+        {
+            if (image.HasUnsavedSteps && !await _questions.AskToDiscardAsync(Path.GetFileName(image.Path)))
+                return;
+            IfStillListed(image, _workspace.Remove);
+        }
+        catch (Exception e)
+        {
+            ReportFailure(e);
+        }
+    }
 
     /// <summary>
     /// Runs <paramref name="action"/> on <paramref name="image"/> unless the file has left the list on disk meanwhile;
@@ -381,7 +398,7 @@ public sealed partial class MainWindowViewModel : Observable, IDisposable
         {
             var paths = await pick();
             if (paths.Count > 0)
-                Open(paths);
+                await OpenAsync(paths);
         }
         catch (Exception e)
         {
@@ -418,6 +435,9 @@ public sealed partial class MainWindowViewModel : Observable, IDisposable
 
         if (change.UnavailableFolders.Count > 0)
             ReportUnavailable(change.UnavailableFolders);
+        if (change.DroppedWithUnsavedSteps.Count > 0)
+            ReportDroppedWithUnsavedSteps(change.DroppedWithUnsavedSteps);
+        ShowUnsavedWork(change.Images);
     }
 
     /// <summary>
@@ -508,12 +528,19 @@ public sealed partial class MainWindowViewModel : Observable, IDisposable
     }
 
     /// <summary>Saves every image with unsaved Steps off the interface thread and reports how it went as notices.</summary>
-    private async void SaveAll()
+    private async void SaveAll() => await SaveAllAsync();
+
+    /// <summary>
+    /// Saves every image with unsaved Steps off the interface thread and reports how it went as notices.
+    /// </summary>
+    /// <returns>Whether every one saved; <c>false</c> too when a save is already running.</returns>
+    private async Task<bool> SaveAllAsync()
     {
         if (_savingAll)
-            return;
+            return false;
         _savingAll = true;
         NotifySaveCommands();
+        var savedAll = false;
         try
         {
             var outcomes = await Task.Run(_workspace.SaveAll);
@@ -521,6 +548,7 @@ public sealed partial class MainWindowViewModel : Observable, IDisposable
             _notices.Add(new Message("SavedAll", outcomes.Count - failures.Count, outcomes.Count));
             foreach (var failure in failures)
                 _notices.Add(SaveFailedNotice(failure.Image, failure.Failure!));
+            savedAll = failures.Count == 0;
         }
         catch (Exception e)
         {
@@ -532,6 +560,7 @@ public sealed partial class MainWindowViewModel : Observable, IDisposable
             NotifySaveCommands();
         }
         RaiseNotices();
+        return savedAll;
     }
 
     /// <summary>Why saving <paramref name="image"/>'s Result failed, as a notice.</summary>
