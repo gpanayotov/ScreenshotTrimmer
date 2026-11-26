@@ -301,10 +301,8 @@ public sealed partial class Workspace
             Processed = Outcomes.Count(outcome => outcome.Kind == BatchOutcomeKind.Processed),
             NoSubjectFound = ImagesWith(BatchOutcomeKind.NoSubjectFound),
             Failed = ImagesWith(BatchOutcomeKind.Failed),
-            Skipped = _plan.Skipped.Select(skip => (Reason: skip.Key, Count: skip.Value))
-                .Concat(Outcomes.Where(outcome => outcome.Kind == BatchOutcomeKind.Skipped).Select(outcome => (outcome.Reason, Count: 1)))
-                .GroupBy(skip => skip.Reason)
-                .ToDictionary(group => group.Key, group => group.Sum(skip => skip.Count)),
+            Skipped = _plan.Skipped.Plus(
+                Outcomes.Where(outcome => outcome.Kind == BatchOutcomeKind.Skipped).Select(outcome => outcome.Reason)),
             Cancelled = Outcomes.Any(outcome => outcome.Kind == BatchOutcomeKind.Stopped),
         };
 

@@ -48,7 +48,7 @@ public sealed partial class Workspace
         return new BatchPlan
         {
             Images = images.Where((_, i) => reasons[i] is null).Select(image => image.Image).ToList(),
-            Skipped = reasons.OfType<BatchSkip>().GroupBy(reason => reason).ToDictionary(group => group.Key, group => group.Count()),
+            Skipped = new BatchSkipCounts().Plus(reasons.OfType<BatchSkip>()),
         };
     }
 

@@ -63,7 +63,7 @@ public class ReviewingTests
         Assert.True(Entry(workspace, "c-blank.png").NoSubjectFound);
         Assert.Equal(1, summary.Processed);
         Assert.Equal(["c-blank.png"], summary.NoSubjectFound.Select(i => Path.GetFileName(i.Path)));
-        Assert.Equal(1, summary.SkippedFor(BatchSkip.HasSteps));
+        Assert.Equal(1, summary.Skipped.HasSteps);
     }
 
     private static string? SelectedName(Workspace workspace) =>

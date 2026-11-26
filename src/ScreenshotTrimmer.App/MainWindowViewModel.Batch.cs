@@ -62,8 +62,8 @@ public sealed partial class MainWindowViewModel
 
     /// <summary>The Batch command's tooltip: what it does, or why it is disabled when no listed image needs it.</summary>
     public string BatchTip => !ShowsHint && _batchPlan is { Images.Count: 0 } plan
-        ? Localizer.Instance.Format("BatchNothingToProcessTip", plan.SkippedFor(BatchSkip.HasSteps),
-            plan.SkippedFor(BatchSkip.AlreadyProcessed), plan.SkippedFor(BatchSkip.Result))
+        ? Localizer.Instance.Format("BatchNothingToProcessTip", plan.Skipped.HasSteps,
+            plan.Skipped.AlreadyProcessed, plan.Skipped.Result)
         : Localizer.Instance["ToolbarBatchTip"];
 
     private bool CanRunBatch() =>
@@ -80,7 +80,7 @@ public sealed partial class MainWindowViewModel
         {
             plan = await Task.Run(_workspace.PlanBatch);
             ShowBatchPlan(plan);
-            if (plan.Images.Count == 0 || (plan.Skipped.Count > 0 && !await _questions.AskToStartBatchAsync(plan)))
+            if (plan.Images.Count == 0 || (plan.Skipped.Total > 0 && !await _questions.AskToStartBatchAsync(plan)))
                 return;
         }
         catch (Exception e)
@@ -105,10 +105,13 @@ public sealed partial class MainWindowViewModel
         {
             // Opening another list or closing the window stops the Batch first (StopBatchAsync).
             var summary = await Task.Run(() => _workspace.RunBatch(progress, cancellation.Token));
-            _notices.Add(new Message(summary.Cancelled ? "BatchCancelled" : "BatchDone", summary.Processed,
-                summary.NoSubjectFound.Count, summary.SkippedFor(BatchSkip.HasSteps),
-                summary.SkippedFor(BatchSkip.AlreadyProcessed), summary.SkippedFor(BatchSkip.Result),
-                summary.SkippedFor(BatchSkip.Gone), summary.Failed.Count));
+            _notices.Add(new Message(summary.Cancelled ? "BatchCancelled" : "BatchDone",
+                summary.Processed, summary.NoSubjectFound.Count, summary.Failed.Count));
+            if (summary.Skipped is { Total: > 0 } skipped)
+            {
+                _notices.Add(new Message("BatchSkipped",
+                    skipped.HasSteps, skipped.AlreadyProcessed, skipped.Result, skipped.Gone));
+            }
             if (summary.NoSubjectFound.Count > 0)
             {
                 _notices.Add(new Message("BatchNoSubjectFoundIn",

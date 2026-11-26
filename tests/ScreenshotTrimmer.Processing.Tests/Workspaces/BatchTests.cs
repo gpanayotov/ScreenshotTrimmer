@@ -113,9 +113,9 @@ public class BatchTests
         Assert.DoesNotContain(workspace.Images, i => i.NoSubjectFound && Path.GetFileName(i.Path) != "blank.png");
         Assert.Equal(1, summary.Processed);
         Assert.Single(summary.NoSubjectFound);
-        Assert.Equal(1, summary.SkippedFor(BatchSkip.HasSteps));
-        Assert.Equal(1, summary.SkippedFor(BatchSkip.AlreadyProcessed));
-        Assert.Equal(1, summary.SkippedFor(BatchSkip.Result));
+        Assert.Equal(1, summary.Skipped.HasSteps);
+        Assert.Equal(1, summary.Skipped.AlreadyProcessed);
+        Assert.Equal(1, summary.Skipped.Result);
     }
 
     [Fact]

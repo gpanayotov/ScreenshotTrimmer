@@ -54,9 +54,9 @@ public class BatchPlanTests
         var plan = workspace.PlanBatch();
 
         Assert.Equal(["a-new.png", "c-new.png"], Names(plan.Images));
-        Assert.Equal(1, plan.SkippedFor(BatchSkip.HasSteps));
-        Assert.Equal(1, plan.SkippedFor(BatchSkip.AlreadyProcessed));
-        Assert.Equal(1, plan.SkippedFor(BatchSkip.Result));
+        Assert.Equal(1, plan.Skipped.HasSteps);
+        Assert.Equal(1, plan.Skipped.AlreadyProcessed);
+        Assert.Equal(1, plan.Skipped.Result);
 
         var summary = workspace.RunBatch(null, CancellationToken.None);
 
@@ -82,7 +82,7 @@ public class BatchPlanTests
         var plan = workspace.PlanBatch();
 
         Assert.Empty(plan.Images);
-        Assert.Equal(1, plan.SkippedFor(BatchSkip.AlreadyProcessed));
+        Assert.Equal(1, plan.Skipped.AlreadyProcessed);
     }
 
     [Fact]

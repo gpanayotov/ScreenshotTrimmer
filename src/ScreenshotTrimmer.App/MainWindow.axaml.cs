@@ -145,8 +145,8 @@ public partial class MainWindow : Window, IPathPicker, IQuestions
     public Task<bool> AskToStartBatchAsync(BatchPlan plan) =>
         new QuestionWindow<bool>(
             Localizer.Instance["BatchStartTitle"],
-            Localizer.Instance.Format("BatchStartQuestion", plan.Images.Count, plan.SkippedFor(BatchSkip.HasSteps),
-                plan.SkippedFor(BatchSkip.AlreadyProcessed), plan.SkippedFor(BatchSkip.Result)),
+            Localizer.Instance.Format("BatchStartQuestion", plan.Images.Count, plan.Skipped.HasSteps,
+                plan.Skipped.AlreadyProcessed, plan.Skipped.Result),
             [
                 (Localizer.Instance["BatchStartAnswer"], true),
                 (Localizer.Instance["Cancel"], false),

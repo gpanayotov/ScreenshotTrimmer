@@ -80,7 +80,7 @@ public class BatchSafetyTests
         Assert.Equal(HandMade, workspace.Steps(Entry(workspace, "b.png")));
         Assert.NotEqual(Steps.None, workspace.Steps(Entry(workspace, "a.png")));
         Assert.Equal(1, summary.Processed);
-        Assert.Equal(1, summary.SkippedFor(BatchSkip.HasSteps));
+        Assert.Equal(1, summary.Skipped.HasSteps);
     }
 
     [Fact]
@@ -97,7 +97,7 @@ public class BatchSafetyTests
 
         Assert.Equal(["a.png"], Names(workspace.Images));
         Assert.Equal(1, summary.Processed);
-        Assert.Equal(1, summary.SkippedFor(BatchSkip.Gone));
+        Assert.Equal(1, summary.Skipped.Gone);
         Assert.Empty(summary.Failed);
     }
 
@@ -114,7 +114,7 @@ public class BatchSafetyTests
             new SynchronousProgress(p => { if (p.Done == 1) File.Delete(folder.File("b.png")); }), CancellationToken.None, 1);
 
         Assert.Equal(1, summary.Processed);
-        Assert.Equal(1, summary.SkippedFor(BatchSkip.Gone));
+        Assert.Equal(1, summary.Skipped.Gone);
         Assert.Empty(summary.Failed);
     }
 
@@ -186,7 +186,7 @@ public class BatchSafetyTests
 
         Assert.IsType<InvalidOperationException>(refusal);
         Assert.Equal(2, summary.Processed);
-        Assert.Equal(2, workspace.RunBatch(null, CancellationToken.None).SkippedFor(BatchSkip.HasSteps));
+        Assert.Equal(2, workspace.RunBatch(null, CancellationToken.None).Skipped.HasSteps);
     }
 
     [Fact]
