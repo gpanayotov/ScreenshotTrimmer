@@ -16,7 +16,8 @@ public static class SubjectDetection
     /// A light dialog over a page dimmed by a modal backdrop is found by the brightness method, which keeps its exact
     /// edges. Anything else is found by the rectangle method: a dialog over an undimmed page, or a window over another
     /// application or a wallpaper. Of several windows that cast a shadow, the largest is the Subject, so a window wins
-    /// over a menu open on top of it.
+    /// over a menu open on top of it. In a browser screenshot with no dialog, the Subject is the web page below the
+    /// Browser bar.
     /// </remarks>
     /// <exception cref="OperationCanceledException"><paramref name="cancellation"/> was cancelled.</exception>
     public static Subject? Find(RgbaImage image, CancellationToken cancellation = default)
@@ -26,7 +27,7 @@ public static class SubjectDetection
         var rectangles = RectangleMethod.FindRectangles(edges, cancellation);
         var window = ChooseWindow(image, edges, rectangles, cancellation);
         if (window is not { } found || IsWholeImage(found, image))
-            return null;
+            return BrowserBar.FindPage(image, cancellation) is { } page ? new Subject(page) : null;
         return new Subject(found) { Popups = RectangleMethod.Popups(image, edges, rectangles, found) };
     }
 
