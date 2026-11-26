@@ -94,6 +94,42 @@ public sealed partial class Workspace
     }
 
     /// <summary>
+    /// Saves every image with unsaved Steps, in strip order, as <see cref="Save"/> does, carrying on past the ones that
+    /// fail. An image that leaves the list before its turn is skipped.
+    /// </summary>
+    /// <returns>One outcome per image saved or failed, in strip order.</returns>
+    public IReadOnlyList<SaveOutcome> SaveAll()
+    {
+        List<WorkspaceImage> unsaved;
+        lock (_lock)
+        {
+            ObjectDisposedException.ThrowIf(_disposed, this);
+            unsaved = Images.Where(image => image.HasUnsavedSteps).ToList();
+        }
+
+        var outcomes = new List<SaveOutcome>();
+        foreach (var image in unsaved)
+        {
+            lock (_lock)
+            {
+                if (IndexOf(image) < 0)
+                    continue;
+            }
+            try
+            {
+                outcomes.Add(new SaveOutcome { Image = image, Report = Save(image) });
+            }
+            catch (Exception e) when (e is IOException or InvalidDataException or UnauthorizedAccessException
+                                          or ArgumentException)
+            {
+                // ArgumentException: an invalid suffix, or the image left the list just now.
+                outcomes.Add(new SaveOutcome { Image = image, Failure = e });
+            }
+        }
+        return outcomes;
+    }
+
+    /// <summary>
     /// Saves through <see cref="ResultFiles.Save"/>, telling the folder watcher that a Backup-mode move of the Original
     /// to its backup is the workspace's own, so the entry is not dragged along to the backup's name.
     /// </summary>
