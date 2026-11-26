@@ -1,0 +1,96 @@
+using System.Globalization;
+using System.Text;
+using ScreenshotTrimmer.Processing.Detection;
+using ScreenshotTrimmer.Processing.Imaging;
+
+namespace ScreenshotTrimmer.Processing.Tests.Samples;
+
+/// <summary>
+/// The answer the maintainer approved for one sample: the <see cref="Subject"/> detection should find in it, or
+/// <c>null</c> for "none", and the fingerprint of the file it was approved for.
+/// </summary>
+internal sealed record ApprovedAnswer(string Fingerprint, Subject? Subject);
+
+/// <summary>
+/// Reads and writes the approved-answers file of the local samples check. One line per sample, tab separated:
+/// file name, fingerprint, then <c>none</c> or <c>window x,y,w,h</c> followed by a <c>popup x,y,w,h</c> per popup.
+/// Blank lines and lines starting with <c>#</c> are ignored.
+/// </summary>
+internal static class ApprovedAnswers
+{
+    private const string None = "none";
+
+    public static Dictionary<string, ApprovedAnswer> Parse(string text)
+    {
+        var answers = new Dictionary<string, ApprovedAnswer>(StringComparer.Ordinal);
+        var lines = text.ReplaceLineEndings("\n").Split('\n');
+        for (var i = 0; i < lines.Length; i++)
+        {
+            var line = lines[i].Trim();
+            if (line.Length == 0 || line.StartsWith('#'))
+                continue;
+            var fields = line.Split('\t');
+            if (fields.Length != 3 || TryParseSubject(fields[2], out var subject) is false)
+                throw new FormatException($"Approved answers, line {i + 1}: expected \"name<TAB>fingerprint<TAB>answer\", got \"{line}\".");
+            answers[fields[0]] = new ApprovedAnswer(fields[1], subject);
+        }
+        return answers;
+    }
+
+    public static string Format(IReadOnlyDictionary<string, ApprovedAnswer> answers)
+    {
+        var text = new StringBuilder();
+        text.Append("# Approved answers of the local samples check: file name, fingerprint, then \"none\" or the window\n");
+        text.Append("# and popup rectangles (x,y,width,height). Regenerated from detection's output; approve by eye.\n");
+        foreach (var (name, answer) in answers.OrderBy(a => a.Key, StringComparer.Ordinal))
+            text.Append(name).Append('\t').Append(answer.Fingerprint).Append('\t').Append(Describe(answer.Subject)).Append('\n');
+        return text.ToString();
+    }
+
+    /// <summary>The answer as it is written in the file, also used in reports.</summary>
+    public static string Describe(Subject? subject)
+    {
+        if (subject is null)
+            return None;
+        var text = new StringBuilder("window ").Append(Describe(subject.Window));
+        foreach (var popup in subject.Popups)
+            text.Append(" popup ").Append(Describe(popup));
+        return text.ToString();
+    }
+
+    private static string Describe(PixelRect rect) =>
+        string.Create(CultureInfo.InvariantCulture, $"{rect.X},{rect.Y},{rect.Width},{rect.Height}");
+
+    private static bool TryParseSubject(string text, out Subject? subject)
+    {
+        subject = null;
+        if (text == None)
+            return true;
+        var words = text.Split(' ', StringSplitOptions.RemoveEmptyEntries);
+        if (words.Length < 2 || words.Length % 2 != 0 || words[0] != "window" || !TryParseRect(words[1], out var window))
+            return false;
+        var popups = new List<PixelRect>();
+        for (var i = 2; i < words.Length; i += 2)
+        {
+            if (words[i] != "popup" || !TryParseRect(words[i + 1], out var popup))
+                return false;
+            popups.Add(popup);
+        }
+        subject = new Subject(window) { Popups = popups };
+        return true;
+    }
+
+    private static bool TryParseRect(string text, out PixelRect rect)
+    {
+        rect = default;
+        var parts = text.Split(',');
+        if (parts.Length != 4)
+            return false;
+        var numbers = new int[4];
+        for (var i = 0; i < 4; i++)
+            if (!int.TryParse(parts[i], NumberStyles.Integer, CultureInfo.InvariantCulture, out numbers[i]))
+                return false;
+        rect = new PixelRect(numbers[0], numbers[1], numbers[2], numbers[3]);
+        return true;
+    }
+}
