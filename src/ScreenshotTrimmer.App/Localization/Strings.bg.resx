@@ -84,4 +84,11 @@
   <data name="SaveFailureAccessDenied" xml:space="preserve"><value>няма разрешение за запис на {0}.</value></data>
   <data name="SaveAllMenu" xml:space="preserve"><value>Запис на _всички</value></data>
   <data name="SavedAll" xml:space="preserve"><value>Записани Резултати: {0} от {1}.</value></data>
+  <data name="UnsavedTitle" xml:space="preserve"><value>• {0}</value></data>
+  <data name="LeaveTitle" xml:space="preserve"><value>Незаписани промени</value></data>
+  <data name="LeaveQuestion" xml:space="preserve"><value>Някои изображения имат незаписани промени. Да бъдат ли записани, преди да продължите?</value></data>
+  <data name="SaveAllAnswer" xml:space="preserve"><value>Запис на всички</value></data>
+  <data name="DiscardAnswer" xml:space="preserve"><value>Отхвърляне</value></data>
+  <data name="DiscardQuestion" xml:space="preserve"><value>{0} има незаписани промени. Да бъде ли премахнато от списъка, като промените се отхвърлят?</value></data>
+  <data name="UnsavedDropped" xml:space="preserve"><value>Тези изображения бяха изтрити или преместени на диска и незаписаните им промени бяха отхвърлени: {0}</value></data>
 </root>
