@@ -35,6 +35,7 @@ public sealed class MainWindowViewModel : Observable, IDisposable
     private PixelRect? _crop;
     private bool _shownHasShadowPadding;
     private readonly HashSet<string> _saving = new(FileNames.Comparer);
+    private bool _savingAll;
 
     public MainWindowViewModel(Workspace workspace, IPathPicker picker, SettingsSession settings)
     {
@@ -51,6 +52,7 @@ public sealed class MainWindowViewModel : Observable, IDisposable
         DismissNoticesCommand = new RelayCommand(DismissNotices);
         ToggleShowResultsCommand = new RelayCommand(() => ShowResults = !ShowResults);
         SaveCommand = new RelayCommand(Save, CanSave);
+        SaveAllCommand = new RelayCommand(SaveAll, CanSaveAll);
         ChooseBackgroundCommand = new RelayCommand<object>(choice =>
         {
             if (choice is ViewerBackground background)
@@ -200,6 +202,12 @@ public sealed class MainWindowViewModel : Observable, IDisposable
     /// as a notice. Enabled while the selected image has unsaved Steps and is not already being saved.
     /// </summary>
     public RelayCommand SaveCommand { get; }
+
+    /// <summary>
+    /// Saves the Result of every image with unsaved Steps off the interface thread, then reports how many were saved
+    /// and why each failure failed as notices. Enabled while some image has unsaved Steps and no save is running.
+    /// </summary>
+    public RelayCommand SaveAllCommand { get; }
 
     /// <summary>
     /// Opens <paramref name="paths"/> in the workspace, replacing the list, and reports any path that does not exist
@@ -352,7 +360,7 @@ public sealed class MainWindowViewModel : Observable, IDisposable
             LoadImage(change.Selected);
         Set(ref _selectedEntry, selected, nameof(SelectedEntry));
         ShowCrop(change.Selected);
-        SaveCommand.NotifyCanExecuteChanged();
+        NotifySaveCommands();
 
         if (change.UnavailableFolders.Count > 0)
             ReportUnavailable(change.UnavailableFolders);
@@ -385,22 +393,26 @@ public sealed class MainWindowViewModel : Observable, IDisposable
     }
 
     private bool CanSave() =>
-        _workspace.Selected is { HasUnsavedSteps: true } selected && !_saving.Contains(selected.Path);
+        _workspace.Selected is { HasUnsavedSteps: true } selected && !_saving.Contains(selected.Path) && !_savingAll;
+
+    private bool CanSaveAll() => !_savingAll && _saving.Count == 0 && _workspace.Images.Any(image => image.HasUnsavedSteps);
+
+    private void NotifySaveCommands()
+    {
+        SaveCommand.NotifyCanExecuteChanged();
+        SaveAllCommand.NotifyCanExecuteChanged();
+    }
 
     /// <summary>Saves the selected image's Result off the interface thread and reports how it went as a notice.</summary>
     private async void Save()
     {
         if (_workspace.Selected is not { } image || !_saving.Add(image.Path))
             return;
-        SaveCommand.NotifyCanExecuteChanged();
+        NotifySaveCommands();
         try
         {
             var report = await Task.Run(() => _workspace.Save(image));
             _notices.Add(new Message("Saved", string.Join(", ", report.Written)));
-        }
-        catch (SaveFailedException e)
-        {
-            _notices.Add(new Message("SaveFailed", Path.GetFileName(image.Path), new SaveFailure(e)));
         }
         catch (ArgumentException)
         {
@@ -408,16 +420,48 @@ public sealed class MainWindowViewModel : Observable, IDisposable
         }
         catch (Exception e)
         {
-            // The Original could not be read, or anything unforeseen.
-            _notices.Add(new Message("SaveFailed", Path.GetFileName(image.Path), e.Message));
+            // The Result could not be written, the Original could not be read, or anything unforeseen.
+            _notices.Add(SaveFailedNotice(image, e));
         }
         finally
         {
             _saving.Remove(image.Path);
-            SaveCommand.NotifyCanExecuteChanged();
+            NotifySaveCommands();
         }
         RaiseNotices();
     }
+
+    /// <summary>Saves every image with unsaved Steps off the interface thread and reports how it went as notices.</summary>
+    private async void SaveAll()
+    {
+        if (_savingAll)
+            return;
+        _savingAll = true;
+        NotifySaveCommands();
+        try
+        {
+            var outcomes = await Task.Run(_workspace.SaveAll);
+            var failures = outcomes.Where(outcome => outcome.Failure is not null).ToList();
+            _notices.Add(new Message("SavedAll", outcomes.Count - failures.Count, outcomes.Count));
+            foreach (var failure in failures)
+                _notices.Add(SaveFailedNotice(failure.Image, failure.Failure!));
+        }
+        catch (Exception e)
+        {
+            ReportFailure(e);
+        }
+        finally
+        {
+            _savingAll = false;
+            NotifySaveCommands();
+        }
+        RaiseNotices();
+    }
+
+    /// <summary>Why saving <paramref name="image"/>'s Result failed, as a notice.</summary>
+    private static Message SaveFailedNotice(WorkspaceImage image, Exception failure) =>
+        new("SaveFailed", Path.GetFileName(image.Path),
+            failure is SaveFailedException saveFailure ? new SaveFailure(saveFailure) : failure.Message);
 
     /// <summary>
     /// Tells the user which folders went away; the title stops naming the open folder once it is gone. The workspace
