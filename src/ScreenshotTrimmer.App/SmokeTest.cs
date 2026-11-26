@@ -1,5 +1,4 @@
 using System.Globalization;
-using System.Reflection;
 using ScreenshotTrimmer.App.Localization;
 using ScreenshotTrimmer.Processing.SelfChecking;
 
@@ -20,18 +19,13 @@ internal static class SmokeTest
     /// <summary>Runs the checks, prints the app version and the outcome, and returns the exit code: 0 when all passed.</summary>
     public static int Run(TextWriter output)
     {
-        output.WriteLine($"ScreenshotTrimmer {Version}");
+        output.WriteLine($"{About.AppName} {About.CurrentVersion}");
 
         var failure = SelfCheck.Run().Failure ?? CheckBulgarian();
         output.WriteLine(failure is null ? "Smoke test passed." : $"Smoke test failed. {failure}");
         output.Flush();
         return failure is null ? 0 : 1;
     }
-
-    /// <summary>The informational version set at publish time, such as <c>1.2.3</c> or <c>0.0.0-dev+1a2b3c4</c>.</summary>
-    public static string Version =>
-        typeof(SmokeTest).Assembly.GetCustomAttribute<AssemblyInformationalVersionAttribute>()?.InformationalVersion
-        ?? "unknown";
 
     private static string? CheckBulgarian()
     {

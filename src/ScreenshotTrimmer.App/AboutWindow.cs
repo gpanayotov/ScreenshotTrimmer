@@ -32,7 +32,7 @@ public sealed class AboutWindow : Window
         };
         close.Click += (_, _) => Close();
 
-        using var icon = AssetLoader.Open(new Uri("avares://ScreenshotTrimmer.App/Assets/Icon/screenshot-trimmer-128.png"));
+        using var icon = AssetLoader.Open(new Uri("avares://ScreenshotTrimmer/Assets/Icon/screenshot-trimmer-128.png"));
         Content = new StackPanel
         {
             Margin = new Thickness(20),
