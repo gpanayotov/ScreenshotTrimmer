@@ -74,9 +74,11 @@ jobs:
 
       - name: Zip (Linux)
         if: runner.os == 'Linux'
+        # Written in the workspace root, where the later steps and the upload look for it: no cd, no relative path.
+        # -j stores the files without their folders.
         run: |
-          cp LICENSE publish/
-          (cd publish && zip -X "../$ZIP" ${{ matrix.executable }} LICENSE)
+          zip -j "$ZIP" publish/${{ matrix.executable }} LICENSE
+          test -f "$ZIP"
 
       # The checks below run the executable taken from the zip, as a user would.
       - name: Smoke test (Windows)
