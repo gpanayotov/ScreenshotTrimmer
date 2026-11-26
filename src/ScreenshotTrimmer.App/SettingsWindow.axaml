@@ -1,0 +1,62 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:app="using:ScreenshotTrimmer.App"
+        xmlns:loc="using:ScreenshotTrimmer.App.Localization"
+        x:Class="ScreenshotTrimmer.App.SettingsWindow"
+        x:DataType="app:SettingsWindowViewModel"
+        Title="{loc:Tr SettingsTitle}"
+        Width="480" SizeToContent="Height" CanResize="False"
+        WindowStartupLocation="CenterOwner" ShowInTaskbar="False">
+
+  <StackPanel Margin="20" Spacing="16">
+    <StackPanel Spacing="6">
+      <TextBlock Text="{loc:Tr LanguageLabel}" FontWeight="SemiBold" />
+      <ComboBox x:Name="LanguageBox" HorizontalAlignment="Stretch"
+                SelectedIndex="{Binding SelectedLanguageIndex}">
+        <ComboBoxItem Content="{loc:Tr LanguageSystem}" />
+        <ComboBoxItem Content="{loc:Tr LanguageEnglish}" />
+        <ComboBoxItem Content="{loc:Tr LanguageBulgarian}" />
+      </ComboBox>
+    </StackPanel>
+
+    <StackPanel Spacing="6">
+      <TextBlock Text="{loc:Tr SaveModeLabel}" FontWeight="SemiBold" />
+      <RadioButton GroupName="SaveMode" IsChecked="{Binding IsSuffixMode}">
+        <StackPanel>
+          <TextBlock Text="{loc:Tr SuffixMode}" />
+          <TextBlock Text="{loc:Tr SuffixModeHint}" TextWrapping="Wrap" FontSize="12"
+                     Foreground="{DynamicResource SystemControlForegroundBaseMediumBrush}" />
+        </StackPanel>
+      </RadioButton>
+      <RadioButton GroupName="SaveMode" IsChecked="{Binding IsBackupMode}">
+        <StackPanel>
+          <TextBlock Text="{loc:Tr BackupMode}" />
+          <TextBlock Text="{loc:Tr BackupModeHint}" TextWrapping="Wrap" FontSize="12"
+                     Foreground="{DynamicResource SystemControlForegroundBaseMediumBrush}" />
+        </StackPanel>
+      </RadioButton>
+    </StackPanel>
+
+    <StackPanel Spacing="6">
+      <TextBlock Text="{loc:Tr ResultSuffixLabel}" FontWeight="SemiBold" />
+      <TextBox x:Name="ResultSuffixBox" Text="{Binding ResultSuffix}" />
+      <TextBlock Text="{Binding ResultSuffixError}" TextWrapping="Wrap"
+                 IsVisible="{Binding ResultSuffixError, Converter={x:Static StringConverters.IsNotNullOrEmpty}}"
+                 Foreground="{DynamicResource SystemControlErrorTextForegroundBrush}" />
+    </StackPanel>
+
+    <StackPanel Spacing="6">
+      <TextBlock Text="{loc:Tr BackupSuffixLabel}" FontWeight="SemiBold" />
+      <TextBox x:Name="BackupSuffixBox" Text="{Binding BackupSuffix}" />
+      <TextBlock Text="{Binding BackupSuffixError}" TextWrapping="Wrap"
+                 IsVisible="{Binding BackupSuffixError, Converter={x:Static StringConverters.IsNotNullOrEmpty}}"
+                 Foreground="{DynamicResource SystemControlErrorTextForegroundBrush}" />
+    </StackPanel>
+
+    <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" Spacing="8">
+      <Button x:Name="SaveButton" Content="{loc:Tr Save}" IsDefault="True" IsEnabled="{Binding CanSave}"
+              Classes="accent" />
+      <Button x:Name="CancelButton" Content="{loc:Tr Cancel}" IsCancel="True" />
+    </StackPanel>
+  </StackPanel>
+</Window>

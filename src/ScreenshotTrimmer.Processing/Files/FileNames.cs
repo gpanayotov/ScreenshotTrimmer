@@ -4,7 +4,7 @@ namespace ScreenshotTrimmer.Processing.Files;
 /// How file names compare on this operating system: ignoring letter case on Windows and macOS, whose file
 /// systems do by default, and exactly on Linux, where <c>Shot.png</c> and <c>shot.png</c> are different files.
 /// </summary>
-internal static class FileNames
+public static class FileNames
 {
     public static readonly StringComparison Comparison =
         OperatingSystem.IsWindows() || OperatingSystem.IsMacOS()

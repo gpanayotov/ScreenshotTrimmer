@@ -1,0 +1,183 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:app="using:ScreenshotTrimmer.App"
+        xmlns:controls="using:ScreenshotTrimmer.App.Controls"
+        xmlns:imaging="using:ScreenshotTrimmer.App.Imaging"
+        xmlns:loc="using:ScreenshotTrimmer.App.Localization"
+        xmlns:mvvm="using:ScreenshotTrimmer.App.Mvvm"
+        x:Class="ScreenshotTrimmer.App.MainWindow"
+        x:DataType="app:MainWindowViewModel"
+        Title="{Binding Title}"
+        Width="1100" Height="750" MinWidth="500" MinHeight="350"
+        DragDrop.AllowDrop="True">
+
+  <Window.KeyBindings>
+    <KeyBinding Gesture="Ctrl+O" Command="{Binding OpenFilesCommand}" />
+    <KeyBinding Gesture="Ctrl+Shift+O" Command="{Binding OpenFolderCommand}" />
+    <!-- A key binding only sees a Delete that the focused control left unhandled, so text boxes keep theirs. -->
+    <KeyBinding Gesture="Delete" Command="{Binding RemoveSelectedCommand}" />
+  </Window.KeyBindings>
+
+  <DockPanel>
+    <Menu DockPanel.Dock="Top">
+      <MenuItem Header="{loc:Tr FileMenu}">
+        <MenuItem Header="{loc:Tr OpenFiles}" InputGesture="Ctrl+O" Command="{Binding OpenFilesCommand}" />
+        <MenuItem Header="{loc:Tr OpenFolder}" InputGesture="Ctrl+Shift+O" Command="{Binding OpenFolderCommand}" />
+        <Separator />
+        <MenuItem x:Name="SettingsItem" Header="{loc:Tr SettingsMenu}" InputGesture="Ctrl+OemComma" />
+        <Separator />
+        <MenuItem x:Name="ExitItem" Header="{loc:Tr Exit}" />
+      </MenuItem>
+      <MenuItem Header="{loc:Tr ViewMenu}">
+        <!-- A menu item does not check itself when clicked: its command changes the setting, and the binding shows it. -->
+        <MenuItem Header="{loc:Tr ShowResults}" ToggleType="CheckBox"
+                  Command="{Binding ToggleShowResultsCommand}" IsChecked="{Binding ShowResults, Mode=OneWay}" />
+        <Separator />
+        <MenuItem Header="{loc:Tr FitToWindow}" InputGesture="Ctrl+D0" Command="{Binding #Viewer.FitCommand}" />
+        <MenuItem Header="{loc:Tr ActualSize}" InputGesture="Ctrl+D1" Command="{Binding #Viewer.ActualSizeCommand}" />
+        <MenuItem Header="{loc:Tr ZoomIn}" InputGesture="Ctrl+OemPlus" Command="{Binding #Viewer.ZoomInCommand}" />
+        <MenuItem Header="{loc:Tr ZoomOut}" InputGesture="Ctrl+OemMinus" Command="{Binding #Viewer.ZoomOutCommand}" />
+        <Separator />
+        <MenuItem Header="{loc:Tr BackgroundMenu}">
+          <MenuItem Header="{loc:Tr BackgroundCheckerboard}" ToggleType="Radio" GroupName="ViewerBackground"
+                    Command="{Binding ChooseBackgroundCommand}" CommandParameter="{x:Static controls:ViewerBackground.Checkerboard}"
+                    IsChecked="{Binding Background, Mode=OneWay, Converter={x:Static mvvm:IsValueConverter.Instance}, ConverterParameter={x:Static controls:ViewerBackground.Checkerboard}}" />
+          <MenuItem Header="{loc:Tr BackgroundWhite}" ToggleType="Radio" GroupName="ViewerBackground"
+                    Command="{Binding ChooseBackgroundCommand}" CommandParameter="{x:Static controls:ViewerBackground.White}"
+                    IsChecked="{Binding Background, Mode=OneWay, Converter={x:Static mvvm:IsValueConverter.Instance}, ConverterParameter={x:Static controls:ViewerBackground.White}}" />
+          <MenuItem Header="{loc:Tr BackgroundDarkGrey}" ToggleType="Radio" GroupName="ViewerBackground"
+                    Command="{Binding ChooseBackgroundCommand}" CommandParameter="{x:Static controls:ViewerBackground.DarkGrey}"
+                    IsChecked="{Binding Background, Mode=OneWay, Converter={x:Static mvvm:IsValueConverter.Instance}, ConverterParameter={x:Static controls:ViewerBackground.DarkGrey}}" />
+        </MenuItem>
+      </MenuItem>
+      <MenuItem Header="{loc:Tr ImageMenu}">
+        <MenuItem Header="{loc:Tr NextImage}" InputGesture="PageDown" Command="{Binding NextCommand}" />
+        <MenuItem Header="{loc:Tr PreviousImage}" InputGesture="PageUp" Command="{Binding PreviousCommand}" />
+        <Separator />
+        <MenuItem Header="{loc:Tr RemoveFromList}" InputGesture="Delete" Command="{Binding RemoveSelectedCommand}" />
+      </MenuItem>
+    </Menu>
+
+    <!-- The toolbar: the most used commands of the menus, each with a tooltip. -->
+    <Border DockPanel.Dock="Top" Padding="6,4" BorderThickness="0,0,0,1"
+            BorderBrush="{DynamicResource SystemControlForegroundBaseLowBrush}">
+      <StackPanel Orientation="Horizontal" Spacing="4">
+        <Button Content="{loc:Tr ToolbarOpenFiles}" ToolTip.Tip="{loc:Tr ToolbarOpenFilesTip}"
+                Command="{Binding OpenFilesCommand}" />
+        <Button Content="{loc:Tr ToolbarOpenFolder}" ToolTip.Tip="{loc:Tr ToolbarOpenFolderTip}"
+                Command="{Binding OpenFolderCommand}" />
+        <Separator Width="1" Height="20" Margin="6,0" Background="{DynamicResource SystemControlForegroundBaseLowBrush}" />
+        <Button Content="{loc:Tr ToolbarFit}" ToolTip.Tip="{loc:Tr ToolbarFitTip}"
+                Command="{Binding #Viewer.FitCommand}" />
+        <Button Content="{loc:Tr ToolbarActualSize}" ToolTip.Tip="{loc:Tr ToolbarActualSizeTip}"
+                Command="{Binding #Viewer.ActualSizeCommand}" />
+        <Separator Width="1" Height="20" Margin="6,0" Background="{DynamicResource SystemControlForegroundBaseLowBrush}" />
+        <ToggleButton Content="{loc:Tr ToolbarShowResults}" ToolTip.Tip="{loc:Tr ToolbarShowResultsTip}"
+                      IsChecked="{Binding ShowResults, Mode=TwoWay}" />
+        <Separator Width="1" Height="20" Margin="6,0" Background="{DynamicResource SystemControlForegroundBaseLowBrush}" />
+        <TextBlock Text="{loc:Tr ToolbarBackground}" VerticalAlignment="Center" Margin="0,0,4,0"
+                   ToolTip.Tip="{loc:Tr ToolbarBackgroundTip}" />
+        <RadioButton GroupName="ToolbarBackground" Content="{loc:Tr ToolbarCheckerboard}"
+                     ToolTip.Tip="{loc:Tr ToolbarBackgroundTip}"
+                     IsChecked="{Binding Background, Mode=TwoWay, Converter={x:Static mvvm:IsValueConverter.Instance}, ConverterParameter={x:Static controls:ViewerBackground.Checkerboard}}" />
+        <RadioButton GroupName="ToolbarBackground" Content="{loc:Tr ToolbarWhite}"
+                     ToolTip.Tip="{loc:Tr ToolbarBackgroundTip}"
+                     IsChecked="{Binding Background, Mode=TwoWay, Converter={x:Static mvvm:IsValueConverter.Instance}, ConverterParameter={x:Static controls:ViewerBackground.White}}" />
+        <RadioButton GroupName="ToolbarBackground" Content="{loc:Tr ToolbarDarkGrey}"
+                     ToolTip.Tip="{loc:Tr ToolbarBackgroundTip}"
+                     IsChecked="{Binding Background, Mode=TwoWay, Converter={x:Static mvvm:IsValueConverter.Instance}, ConverterParameter={x:Static controls:ViewerBackground.DarkGrey}}" />
+      </StackPanel>
+    </Border>
+
+    <!-- Non-blocking notices, such as "No images found". -->
+    <Border DockPanel.Dock="Top" IsVisible="{Binding HasNotices}" Padding="12,6"
+            Background="{DynamicResource SystemControlBackgroundBaseLowBrush}">
+      <DockPanel>
+        <Button DockPanel.Dock="Right" VerticalAlignment="Center" Content="{loc:Tr Dismiss}"
+                Command="{Binding DismissNoticesCommand}" />
+        <SelectableTextBlock Text="{Binding NoticeText}" TextWrapping="Wrap" VerticalAlignment="Center" />
+      </DockPanel>
+    </Border>
+
+    <!-- Status bar: file name, size in pixels and zoom. -->
+    <Border DockPanel.Dock="Bottom" Padding="8,3" BorderThickness="0,1,0,0"
+            BorderBrush="{DynamicResource SystemControlForegroundBaseLowBrush}">
+      <StackPanel Orientation="Horizontal" Spacing="24">
+        <TextBlock Text="{Binding StatusFileName}" TextTrimming="CharacterEllipsis" MaxWidth="480" />
+        <TextBlock Text="{Binding StatusImageSize}" />
+        <TextBlock Text="{Binding StatusZoom}" />
+      </StackPanel>
+    </Border>
+
+    <Grid x:Name="Panes">
+      <Grid.ColumnDefinitions>
+        <!-- The strip; its width is remembered between sessions. -->
+        <ColumnDefinition Width="240" MinWidth="120" MaxWidth="800" />
+        <ColumnDefinition Width="4" />
+        <ColumnDefinition Width="*" />
+      </Grid.ColumnDefinitions>
+      <ListBox x:Name="Strip" ItemsSource="{Binding Entries}" SelectedItem="{Binding SelectedEntry}">
+        <ListBox.ItemTemplate>
+          <DataTemplate x:DataType="app:StripEntry">
+            <!-- A fixed-size box, so the strip does not jump as placeholders turn into thumbnails.
+                 A listed Result is dimmed; an Original whose Result exists carries the "has result" badge. -->
+            <StackPanel Spacing="4" HorizontalAlignment="Center" Opacity="{Binding Opacity}" Background="Transparent">
+              <StackPanel.ContextMenu>
+                <ContextMenu>
+                  <MenuItem Header="{loc:Tr RemoveFromList}" InputGesture="Delete"
+                            Command="{Binding $parent[ListBox].((app:MainWindowViewModel)DataContext).RemoveEntryCommand}"
+                            CommandParameter="{Binding}" />
+                </ContextMenu>
+              </StackPanel.ContextMenu>
+              <Border Width="{x:Static imaging:ThumbnailCache.Width}" Height="{x:Static imaging:ThumbnailCache.Height}"
+                      CornerRadius="2" Background="{DynamicResource SystemControlBackgroundBaseLowBrush}">
+                <Panel>
+                  <Image Source="{Binding Thumbnail}" Stretch="None"
+                         HorizontalAlignment="Center" VerticalAlignment="Center" />
+                  <StackPanel IsVisible="{Binding IsUnreadable}" Spacing="4"
+                              HorizontalAlignment="Center" VerticalAlignment="Center">
+                    <PathIcon Width="28" Height="28" Foreground="{DynamicResource SystemControlErrorTextForegroundBrush}"
+                              Data="M12,2 L23,21 L1,21 Z M11,9 L13,9 L13,15 L11,15 Z M11,17 L13,17 L13,19 L11,19 Z" />
+                    <TextBlock Text="{loc:Tr ThumbnailUnreadable}" TextAlignment="Center" TextWrapping="Wrap"
+                               FontSize="12" Foreground="{DynamicResource SystemControlForegroundBaseMediumBrush}" />
+                  </StackPanel>
+                </Panel>
+              </Border>
+              <DockPanel Width="{x:Static imaging:ThumbnailCache.Width}">
+                <Border DockPanel.Dock="Right" IsVisible="{Binding HasResult}" Margin="6,0,0,0" Padding="5,1"
+                        CornerRadius="3" VerticalAlignment="Center"
+                        Background="{DynamicResource SystemControlBackgroundAccentBrush}"
+                        ToolTip.Tip="{loc:Tr HasResultTip}">
+                  <TextBlock Text="{loc:Tr HasResultBadge}" FontSize="11" Foreground="White" />
+                </Border>
+                <TextBlock Text="{Binding Name}" TextTrimming="CharacterEllipsis" TextAlignment="Center"
+                           VerticalAlignment="Center" ToolTip.Tip="{Binding Name}" />
+              </DockPanel>
+            </StackPanel>
+          </DataTemplate>
+        </ListBox.ItemTemplate>
+      </ListBox>
+
+      <GridSplitter Grid.Column="1" ResizeDirection="Columns" />
+
+      <Panel Grid.Column="2">
+        <Grid ColumnDefinitions="*,Auto" RowDefinitions="*,Auto">
+          <controls:ImageViewer x:Name="Viewer" Source="{Binding Image}" BackgroundKind="{Binding Background}" />
+          <ScrollBar Grid.Column="1" Orientation="Vertical" Visibility="Auto" AllowAutoHide="False"
+                     Maximum="{Binding #Viewer.VerticalScrollMax}" ViewportSize="{Binding #Viewer.ViewHeight}"
+                     LargeChange="{Binding #Viewer.ViewHeight}" SmallChange="48"
+                     Value="{Binding #Viewer.VerticalScroll, Mode=TwoWay}" />
+          <ScrollBar Grid.Row="1" Orientation="Horizontal" Visibility="Auto" AllowAutoHide="False"
+                     Maximum="{Binding #Viewer.HorizontalScrollMax}" ViewportSize="{Binding #Viewer.ViewWidth}"
+                     LargeChange="{Binding #Viewer.ViewWidth}" SmallChange="48"
+                     Value="{Binding #Viewer.HorizontalScroll, Mode=TwoWay}" />
+        </Grid>
+        <TextBlock Text="{Binding ViewerMessage}" IsVisible="{Binding ViewerMessage, Converter={x:Static StringConverters.IsNotNullOrEmpty}}"
+                   HorizontalAlignment="Center" VerticalAlignment="Center" TextWrapping="Wrap" Margin="24" />
+        <TextBlock Text="{loc:Tr EmptyHint}" IsVisible="{Binding ShowsHint}" MaxWidth="480"
+                   HorizontalAlignment="Center" VerticalAlignment="Center" TextAlignment="Center" TextWrapping="Wrap"
+                   Foreground="{DynamicResource SystemControlForegroundBaseMediumBrush}" />
+      </Panel>
+    </Grid>
+  </DockPanel>
+</Window>
