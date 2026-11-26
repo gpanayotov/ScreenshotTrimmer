@@ -43,10 +43,11 @@ jobs:
           build/launch-check.test.sh
 
       # The release workflow passes the tag's version, already checked; anything else gets the development version.
+      # On a pull request github.sha is a temporary merge commit, so the version names the pull request's head commit.
       - name: Choose the version
         env:
           GIVEN: ${{ inputs.version }}
-          COMMIT: ${{ github.sha }}
+          COMMIT: ${{ github.event.pull_request.head.sha || github.sha }}
         run: |
           version="${GIVEN:-$(build/version.sh "$COMMIT")}"
           echo "Version: $version"
