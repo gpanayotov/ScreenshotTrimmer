@@ -9,31 +9,9 @@ on:
         description: The version to embed and name the files with, such as 1.2.3; empty for the commit's development version.
         type: string
         default: ''
-    outputs:
-      version:
-        description: The version the files were built with.
-        value: ${{ jobs.version.outputs.version }}
 
 jobs:
-  version:
-    runs-on: ubuntu-latest
-    outputs:
-      version: ${{ steps.version.outputs.version }}
-    steps:
-      - uses: actions/checkout@v4
-      - name: Test the version rule
-        run: build/version.test.sh
-      - name: Choose the version
-        id: version
-        env:
-          GIVEN: ${{ inputs.version }}
-        run: |
-          version="${GIVEN:-$(build/version.sh "$GITHUB_SHA")}"
-          echo "Version: $version"
-          echo "version=$version" >> "$GITHUB_OUTPUT"
-
   package:
-    needs: version
     strategy:
       fail-fast: false
       matrix:
@@ -46,8 +24,6 @@ jobs:
             executable: ScreenshotTrimmer
     runs-on: ${{ matrix.os }}
     env:
-      VERSION: ${{ needs.version.outputs.version }}
-      ZIP: ScreenshotTrimmer-${{ needs.version.outputs.version }}-${{ matrix.rid }}.zip
       LAUNCH_SECONDS: 8 # how long each launch check keeps the app running
     defaults:
       run:
@@ -61,9 +37,21 @@ jobs:
       - name: Test the build scripts
         if: runner.os == 'Linux'
         run: |
+          build/version.test.sh
           build/appdir.test.sh
           build/smoke-test.test.sh
           build/launch-check.test.sh
+
+      # The release workflow passes the tag's version, already checked; anything else gets the development version.
+      - name: Choose the version
+        env:
+          GIVEN: ${{ inputs.version }}
+          COMMIT: ${{ github.sha }}
+        run: |
+          version="${GIVEN:-$(build/version.sh "$COMMIT")}"
+          echo "Version: $version"
+          echo "VERSION=$version" >> "$GITHUB_ENV"
+          echo "ZIP=ScreenshotTrimmer-$version-${{ matrix.rid }}.zip" >> "$GITHUB_ENV"
 
       # Self-contained single file with the native libraries (SkiaSharp, HarfBuzz) inside, extracted on first run.
       # No trimming and no native AOT: Avalonia's use of reflection makes them risky.

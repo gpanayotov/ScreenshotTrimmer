@@ -13,7 +13,8 @@ concurrency:
   group: release-${{ github.ref_name }}
 
 jobs:
-  # Fails on a tag that is not v plus a semantic version, before anything is built.
+  # Fails on a tag that is not v plus a semantic version, before anything is built. The only version job: the
+  # package workflow takes the version it gives, and runs the version rule's tests with the other build scripts'.
   version:
     runs-on: ubuntu-latest
     outputs:
@@ -21,8 +22,6 @@ jobs:
       prerelease: ${{ steps.version.outputs.prerelease }}
     steps:
       - uses: actions/checkout@v4
-      - name: Test the version rule
-        run: build/version.test.sh
       - name: Version from the tag
         id: version
         env:
