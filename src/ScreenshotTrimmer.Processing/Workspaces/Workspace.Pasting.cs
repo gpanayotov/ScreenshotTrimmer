@@ -83,6 +83,8 @@ public sealed partial class Workspace
             var state = StepsOf(pasted.Key);
             _steps.Remove(pasted.Key);
             _steps[saved] = state with { Saved = steps, MergeKey = null };
+            if (_noSubjectFound.Remove(pasted.Key))
+                _noSubjectFound.Add(saved);
             _savedPasted.RemoveAll(candidate => FileNames.Same(candidate.Path, savedPath));
             _savedPasted.Add(new SavedPasted(savedPath, pasted.Pixels));
             _backupSaves.Remove(saved);
@@ -103,7 +105,8 @@ public sealed partial class Workspace
         _savedPasted.Select(saved => saved.Path).Where(File.Exists);
 
     /// <summary>The entries of the Pasted images not saved yet; call under the lock.</summary>
-    private IEnumerable<WorkspaceImage> PastedEntries() => _pasted.Select(pasted => pasted.Entry);
+    private IEnumerable<WorkspaceImage> PastedEntries() =>
+        _pasted.Select(pasted => pasted.Entry with { NoSubjectFound = _noSubjectFound.Contains(pasted.Key) });
 
     /// <summary>Moves the saved Pasted images whose files were renamed on disk to their new paths; call under the lock.</summary>
     private void FollowRenamesOfSavedPasted(Func<string, string> renamed)
