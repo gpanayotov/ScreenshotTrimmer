@@ -31,4 +31,14 @@ expect "a short commit hash is used as it is" "0.0.0-dev+1a2b3c4" "1a2b3c4"
 expect_failure "no commit fails" ""
 expect_failure "a commit that is not a hash fails" "main"
 
+expect "a version tag gives its version" "1.2.3" --tag v1.2.3
+expect "a pre-release tag keeps its suffix" "1.2.3-rc.1" --tag v1.2.3-rc.1
+expect_failure "a tag without the v fails" --tag 1.2.3
+expect_failure "a tag with two numbers fails" --tag v1.2
+expect_failure "a tag with leading zeros fails" --tag v01.2.3
+expect_failure "a tag with an empty suffix fails" --tag v1.2.3-
+expect_failure "a tag with a word fails" --tag v1.2.3.beta
+expect_failure "a tag that is not a version fails" --tag release
+expect_failure "no tag fails" --tag ""
+
 [ "$failures" -eq 0 ] || { echo "$failures failed"; exit 1; }
