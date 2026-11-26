@@ -19,6 +19,9 @@ internal sealed class FolderWatch : IDisposable
     private readonly Dictionary<string, FileSystemWatcher> _parentWatchers = new(FileNames.Comparer);
     private readonly ConcurrentQueue<(string From, string To)> _renames = new();
 
+    /// <summary>Paths whose next rename the workspace makes itself; guarded by locking the list.</summary>
+    private readonly List<string> _ignoredRenames = [];
+
     /// <param name="quietDelay">How long the disk must stay quiet after a change before <paramref name="onQuiet"/>.</param>
     /// <param name="onQuiet">Called on a thread-pool thread once the disk is quiet.</param>
     public FolderWatch(TimeSpan quietDelay, Action onQuiet)
@@ -135,11 +138,40 @@ internal sealed class FolderWatch : IDisposable
     /// <summary>Puts the callback off until the disk has been quiet for the delay.</summary>
     private void OnDiskChanged(object sender, FileSystemEventArgs e) => CallBackSoon();
 
-    /// <summary>Notes a rename, so the workspace can follow the file to its new name.</summary>
+    /// <summary>
+    /// Leaves the next rename of the file at <paramref name="path"/> out of <see cref="TakeRenames"/>: the workspace is
+    /// about to make it itself (a Backup-mode save moving the Original to its backup) and has already followed it.
+    /// </summary>
+    public void IgnoreNextRenameOf(string path)
+    {
+        lock (_ignoredRenames)
+            _ignoredRenames.Add(path);
+    }
+
+    /// <summary>Undoes <see cref="IgnoreNextRenameOf"/> for a rename that did not happen after all.</summary>
+    public void StopIgnoringRenameOf(string path)
+    {
+        lock (_ignoredRenames)
+            RemoveIgnored(path);
+    }
+
+    /// <summary>Notes a rename, so the workspace can follow the file to its new name, unless it made the rename itself.</summary>
     private void OnRenamed(object sender, RenamedEventArgs e)
     {
-        _renames.Enqueue((e.OldFullPath, e.FullPath));
+        bool ignored;
+        lock (_ignoredRenames)
+            ignored = RemoveIgnored(e.OldFullPath);
+        if (!ignored)
+            _renames.Enqueue((e.OldFullPath, e.FullPath));
         CallBackSoon();
+    }
+
+    private bool RemoveIgnored(string path)
+    {
+        var index = _ignoredRenames.FindIndex(ignored => FileNames.Same(ignored, path));
+        if (index >= 0)
+            _ignoredRenames.RemoveAt(index);
+        return index >= 0;
     }
 
     /// <summary>A watcher overflowed or lost its folder: call back, and the next <see cref="Watch"/> replaces it.</summary>
