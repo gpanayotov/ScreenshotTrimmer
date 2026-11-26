@@ -53,8 +53,8 @@ public sealed partial class MainWindowViewModel : Observable, IDisposable
         OpenFolderCommand = new RelayCommand(() => OpenPicked(() => picker.PickFolderAsync(_lastFolder)));
         _workspace.Changed += OnWorkspaceChanged;
         Localizer.Instance.PropertyChanged += OnLanguageChanged;
-        NextCommand = new RelayCommand(_workspace.Next);
-        PreviousCommand = new RelayCommand(_workspace.Previous);
+        NextCommand = new RelayCommand(Next);
+        PreviousCommand = new RelayCommand(Previous);
         RemoveSelectedCommand = new RelayCommand(RemoveSelected);
         RemoveEntryCommand = new RelayCommand<StripEntry>(Remove);
         DismissNoticesCommand = new RelayCommand(DismissNotices);
@@ -198,7 +198,7 @@ public sealed partial class MainWindowViewModel : Observable, IDisposable
     public string? ViewerMessage => _viewerMessage?.Text;
 
     /// <summary>Whether nothing is listed, so the window shows how to open screenshots.</summary>
-    public bool ShowsHint => Entries.Count == 0;
+    public bool ShowsHint => _listedImages is not { Count: > 0 };
 
     /// <summary>
     /// The window title: the open folder's name, or the app's name when no single folder is open, marked while any
@@ -244,6 +244,8 @@ public sealed partial class MainWindowViewModel : Observable, IDisposable
     /// </summary>
     public void Open(IReadOnlyList<string> paths)
     {
+        _showOnlyNoSubjectFound = false;
+        Raise(nameof(ShowOnlyNoSubjectFound));
         var missing = _workspace.Open(paths);
         var opened = paths.Select(Path.GetFullPath).Except(missing, FileNames.Comparer).ToList();
         _openFolder = OpenFolder(opened);
@@ -252,6 +254,7 @@ public sealed partial class MainWindowViewModel : Observable, IDisposable
         Raise(nameof(Title));
 
         _notices.Clear();
+        OfferShowNoSubjectFound(false);
         if (missing.Count > 0)
             _notices.Add(new Message("PathsNotFound", string.Join(", ", missing)));
         if (_workspace.Images.Count == 0)
@@ -422,14 +425,18 @@ public sealed partial class MainWindowViewModel : Observable, IDisposable
         if (!ReferenceEquals(change.Images, _listedImages))
         {
             _listedImages = change.Images;
-            ShowInStrip(change.Images);
             Raise(nameof(ShowsHint));
-            BatchCommand.NotifyCanExecuteChanged();
+            PlanBatch();
         }
 
+        // Also when only the selection moved: the filter keeps the selected image in the strip.
+        ShowInStrip(change.Images, change.Selected);
         var selected = Entries.FirstOrDefault(entry => entry.Image.Key == change.Selected?.Key);
         if (change.Selected?.Key != _shown?.Key)
+        {
+            ShowBatchResultOf(change.Selected);
             LoadImage(change.Selected);
+        }
         else if (!string.Equals(change.Selected?.Path, _shown?.Path, StringComparison.Ordinal))
         {
             // The shown file was renamed with only its letter case changed: same image, new name.
@@ -450,20 +457,29 @@ public sealed partial class MainWindowViewModel : Observable, IDisposable
     }
 
     /// <summary>
-    /// Makes the strip show <paramref name="images"/>. When only markers or badges changed, the entries are updated in
-    /// place, so the strip neither flickers nor reloads thumbnails.
+    /// Makes the strip show those of <paramref name="listed"/> that <see cref="ShowOnlyNoSubjectFound"/> lets through,
+    /// with <paramref name="selected"/> selected. Entries that still show the same image are kept and updated in place,
+    /// and only the others are removed or added, so the strip neither flickers nor reloads thumbnails, and the filter
+    /// dropping the entry just left does not disturb the one just clicked.
     /// </summary>
-    private void ShowInStrip(IReadOnlyList<WorkspaceImage> images)
+    private void ShowInStrip(IReadOnlyList<WorkspaceImage> listed, WorkspaceImage? selected)
     {
-        if (images.Count == Entries.Count && images.Select((image, i) => Entries[i].Shows(image)).All(same => same))
+        var images = listed.Where(image => InStrip(image, selected)).ToList();
+        var shown = images.Select(image => (image.Key, image.ContentVersion)).ToHashSet();
+        for (var i = Entries.Count - 1; i >= 0; i--)
         {
-            for (var i = 0; i < images.Count; i++)
-                Entries[i].Update(images[i]);
-            return;
+            if (!shown.Contains((Entries[i].Image.Key, Entries[i].Image.ContentVersion)))
+                Entries.RemoveAt(i);
         }
-        Entries.Clear();
-        foreach (var image in images)
-            Entries.Add(new StripEntry(image, _thumbnails, _workspace.LoadOriginal));
+        for (var i = 0; i < images.Count; i++)
+        {
+            if (i < Entries.Count && Entries[i].Shows(images[i]))
+                Entries[i].Update(images[i]);
+            else
+                Entries.Insert(i, new StripEntry(images[i], _thumbnails, _workspace.LoadOriginal));
+        }
+        while (Entries.Count > images.Count)
+            Entries.RemoveAt(Entries.Count - 1);
     }
 
     /// <summary>Shows the crop in <paramref name="image"/>'s Steps.</summary>
@@ -542,6 +558,7 @@ public sealed partial class MainWindowViewModel : Observable, IDisposable
     private void DismissNotices()
     {
         _notices.Clear();
+        OfferShowNoSubjectFound(false);
         RaiseNotices();
     }
 
@@ -575,6 +592,7 @@ public sealed partial class MainWindowViewModel : Observable, IDisposable
         Raise(nameof(StatusFileName));
         Raise(nameof(Title));
         Raise(nameof(BatchProgressText));
+        Raise(nameof(BatchTip));
     }
 
     /// <summary>A string from the resources with its arguments, formatted in the current language when shown.</summary>

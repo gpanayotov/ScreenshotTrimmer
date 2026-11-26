@@ -192,6 +192,7 @@ public sealed partial class Workspace
             {
                 _noSubjectFound.Remove(key);
                 RecordSteps(key, steps, mergeKey: null);
+                _steps[key] = StepsOf(key) with { FromBatch = true };
                 outcome = BatchOutcome.Processed;
             }
         }

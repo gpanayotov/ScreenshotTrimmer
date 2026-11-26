@@ -57,12 +57,15 @@ public sealed partial class Workspace
         var state = StepsOf(key);
         if (state.Current == steps)
             return;
+        // Steps fix what a Batch could not, so the image no longer needs reviewing as a miss.
+        if (steps != Rendering.Steps.None)
+            _noSubjectFound.Remove(key);
         var merging = mergeKey is not null && Equals(mergeKey, state.MergeKey) && !state.Earlier.IsEmpty;
         var earlier = merging ? state.Earlier : state.Earlier.Push(state.Current);
         _steps[key] = earlier.Peek() == steps
             // A run that came back to where it started has nothing left to undo.
-            ? state with { Current = steps, Earlier = earlier.Pop(), Later = [], MergeKey = null }
-            : state with { Current = steps, Earlier = earlier, Later = [], MergeKey = mergeKey };
+            ? state with { Current = steps, Earlier = earlier.Pop(), Later = [], MergeKey = null, FromBatch = false }
+            : state with { Current = steps, Earlier = earlier, Later = [], MergeKey = mergeKey, FromBatch = false };
         AnnounceSteps();
     }
 
@@ -83,7 +86,7 @@ public sealed partial class Workspace
             _steps[image.Key] = state with
             {
                 Current = state.Earlier.Peek(), Earlier = state.Earlier.Pop(), Later = state.Later.Push(state.Current),
-                MergeKey = null,
+                MergeKey = null, FromBatch = false,
             };
             AnnounceSteps();
         });
@@ -106,7 +109,7 @@ public sealed partial class Workspace
             _steps[image.Key] = state with
             {
                 Current = state.Later.Peek(), Earlier = state.Earlier.Push(state.Current), Later = state.Later.Pop(),
-                MergeKey = null,
+                MergeKey = null, FromBatch = false,
             };
             AnnounceSteps();
         });
@@ -118,6 +121,13 @@ public sealed partial class Workspace
     /// </summary>
     /// <exception cref="ArgumentException"><paramref name="image"/> is not listed.</exception>
     public void Reset(WorkspaceImage image) => SetSteps(image, Rendering.Steps.None);
+
+    /// <summary>
+    /// Whether <paramref name="image"/>'s current Steps are the ones a Batch gave it, unchanged since, so the Result is
+    /// what there is to review.
+    /// </summary>
+    /// <exception cref="ArgumentException"><paramref name="image"/> is not listed.</exception>
+    public bool HasBatchSteps(WorkspaceImage image) => Read(image).FromBatch;
 
     /// <summary>Whether <paramref name="image"/> has Steps to <see cref="Undo"/>.</summary>
     /// <exception cref="ArgumentException"><paramref name="image"/> is not listed.</exception>
@@ -212,5 +222,8 @@ public sealed partial class Workspace
         Steps Current, Steps Saved, ImmutableStack<Steps> Earlier, ImmutableStack<Steps> Later, object? MergeKey)
     {
         public static ImageSteps New { get; } = new(Rendering.Steps.None, Rendering.Steps.None, [], [], null);
+
+        /// <summary>Whether <see cref="Current"/> are the Steps a Batch recorded; any later change of Steps clears it.</summary>
+        public bool FromBatch { get; init; }
     }
 }

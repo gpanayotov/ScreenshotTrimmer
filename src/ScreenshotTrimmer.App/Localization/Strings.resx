@@ -151,4 +151,15 @@
   <data name="CancelBatchTip" xml:space="preserve"><value>Stop the Batch; the images it has processed keep their Steps</value></data>
   <data name="BatchNoSubjectFoundIn" xml:space="preserve"><value>No subject found in: {0}</value></data>
   <data name="NoSubjectFoundTip" xml:space="preserve"><value>The Batch found no subject in this image</value></data>
+  <data name="NextNoSubjectFound" xml:space="preserve"><value>Next with no _subject found</value></data>
+  <data name="PreviousNoSubjectFound" xml:space="preserve"><value>Previous with no subject _found</value></data>
+  <data name="NextUnsaved" xml:space="preserve"><value>Next _unsaved</value></data>
+  <data name="PreviousUnsaved" xml:space="preserve"><value>Previous unsa_ved</value></data>
+  <data name="ShowOnlyNoSubjectFound" xml:space="preserve"><value>Only images with _no subject found</value></data>
+  <data name="ShowNoSubjectFound" xml:space="preserve"><value>Show</value></data>
+  <data name="ShowNoSubjectFoundTip" xml:space="preserve"><value>Show only the images with no subject found in the strip</value></data>
+  <data name="BatchNothingToProcessTip" xml:space="preserve"><value>Nothing to process: every listed image is already edited ({0}), already processed ({1}) or a Result ({2})</value></data>
+  <data name="BatchStartTitle" xml:space="preserve"><value>Batch</value></data>
+  <data name="BatchStartQuestion" xml:space="preserve"><value>The Batch will process {0} images and skip {1} already edited, {2} already processed and {3} Results. Nothing is saved until you save. Start it?</value></data>
+  <data name="BatchStartAnswer" xml:space="preserve"><value>Start</value></data>
 </root>
