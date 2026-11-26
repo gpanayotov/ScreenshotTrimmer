@@ -1,3 +1,5 @@
+using ScreenshotTrimmer.Processing.Workspaces;
+
 namespace ScreenshotTrimmer.App;
 
 /// <summary>What the user chose when leaving, or replacing the list, would lose unsaved work.</summary>
@@ -13,7 +15,7 @@ public enum LeaveAnswer
     Discard,
 }
 
-/// <summary>Asks the user before unsaved work would be lost.</summary>
+/// <summary>Asks the user before unsaved work would be lost, or before a Batch starts.</summary>
 public interface IQuestions
 {
     /// <summary>Asks whether to save all, discard or cancel before closing the window or replacing the list.</summary>
@@ -26,4 +28,8 @@ public interface IQuestions
     /// <summary>Asks whether to replace the existing file at <paramref name="path"/>.</summary>
     /// <returns><c>true</c> to replace it; <c>false</c> to leave it alone.</returns>
     Task<bool> AskToOverwriteAsync(string path);
+
+    /// <summary>Asks whether to start a Batch that would do <paramref name="plan"/>, showing what it processes and skips.</summary>
+    /// <returns><c>true</c> to start it; <c>false</c> to leave everything as it is.</returns>
+    Task<bool> AskToStartBatchAsync(BatchPlan plan);
 }
