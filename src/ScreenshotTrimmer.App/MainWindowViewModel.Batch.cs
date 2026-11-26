@@ -11,6 +11,9 @@ public sealed partial class MainWindowViewModel
     private RelayCommand? _batchCommand;
     private RelayCommand? _cancelBatchCommand;
     private CancellationTokenSource? _batchCancellation;
+
+    /// <summary>Completes once the running Batch has stopped and reported; <c>null</c> while none runs.</summary>
+    private TaskCompletionSource? _batchStopped;
     private bool _isBatchRunning;
     private bool _isStartingBatch;
     private BatchProgress _batchProgress;
@@ -92,13 +95,15 @@ public sealed partial class MainWindowViewModel
             BatchCommand.NotifyCanExecuteChanged();
         }
         IsBatchRunning = true;
+        var stopped = new TaskCompletionSource();
+        _batchStopped = stopped;
         ShowBatchProgress(new BatchProgress(0, _workspace.Images.Count));
         var progress = new Progress<BatchProgress>(ShowBatchProgress);
         using var cancellation = new CancellationTokenSource();
         _batchCancellation = cancellation;
         try
         {
-            // Opening another list or closing the window cancels the Batch in the workspace and waits for it.
+            // Opening another list or closing the window stops the Batch first (StopBatchAsync).
             var summary = await Task.Run(() => _workspace.RunBatch(progress, cancellation.Token));
             _notices.Add(new Message(summary.Cancelled ? "BatchCancelled" : "BatchDone", summary.Processed,
                 summary.NoSubjectFound.Count, summary.SkippedFor(BatchSkip.HasSteps),
@@ -121,8 +126,24 @@ public sealed partial class MainWindowViewModel
         finally
         {
             _batchCancellation = null;
+            _batchStopped = null;
             IsBatchRunning = false;
+            stopped.SetResult();
         }
+    }
+
+    /// <summary>
+    /// Cancels the running Batch, if any, and completes once it has stopped and reported what it did, without blocking
+    /// the interface thread meanwhile.
+    /// </summary>
+    private async Task StopBatchAsync()
+    {
+        var stopped = _batchStopped;
+        // Also a Batch the app has started but the workspace has not begun yet.
+        _batchCancellation?.Cancel();
+        await _workspace.StopBatchAsync();
+        if (stopped is not null)
+            await stopped.Task;
     }
 
     /// <summary>Plans a Batch off the interface thread, so the command can disable itself and say why.</summary>
