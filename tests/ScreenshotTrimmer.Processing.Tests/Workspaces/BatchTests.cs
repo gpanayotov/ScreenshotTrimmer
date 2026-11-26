@@ -54,6 +54,22 @@ public class BatchTests
     }
 
     [Fact]
+    public void A_Batch_uses_the_finishing_settings_applied_last()
+    {
+        using var folder = new TempFolder();
+        EncodedImages.WritePng(folder.File("a.png"), DimmedDialog(new PixelRect(100, 80, 400, 250)));
+        using var workspace = new Workspace(Remembered);
+        workspace.Open([folder.Path]);
+
+        workspace.ApplySettings(Remembered with { FrameLines = false, ShadowOn = false });
+        workspace.RunBatch(null, CancellationToken.None);
+
+        var steps = workspace.Steps(Entry(workspace, "a.png"));
+        Assert.False(steps.FrameLines);
+        Assert.Null(steps.Shadow);
+    }
+
+    [Fact]
     public void A_featureless_image_is_marked_No_Subject_found_and_gets_no_Steps()
     {
         using var folder = new TempFolder();

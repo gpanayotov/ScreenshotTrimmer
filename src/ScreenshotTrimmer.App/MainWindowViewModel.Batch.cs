@@ -73,8 +73,6 @@ public sealed partial class MainWindowViewModel
     {
         if (!CanRunBatch())
             return;
-        // The finishing settings are remembered without the workspace hearing of it; the Batch uses the current ones.
-        _workspace.ApplySettings(Settings);
         _isStartingBatch = true;
         BatchCommand.NotifyCanExecuteChanged();
         try

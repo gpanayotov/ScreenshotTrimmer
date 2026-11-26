@@ -120,17 +120,19 @@ public sealed partial class Workspace : IDisposable
     }
 
     /// <summary>
-    /// Lists the opened paths again with <paramref name="settings"/>' save mode and Result suffix, which decide which
-    /// files are Results. The selection stays where the selected file is still listed; otherwise it passes to the
-    /// entry now in its place.
+    /// Makes <paramref name="settings"/> the settings in use: saves and the next Batch use them. When their save mode or
+    /// suffixes changed, which decide which files are Results, the opened paths are listed again: the selection stays
+    /// where the selected file is still listed; otherwise it passes to the entry now in its place. A change of the
+    /// finishing alone lists nothing again and announces nothing.
     /// </summary>
     public void ApplySettings(UserSettings settings)
     {
         ArgumentNullException.ThrowIfNull(settings);
         Update(() =>
         {
+            var listingChanged = SaveOptionsFor(settings) != SaveOptionsFor(_settings);
             _settings = settings;
-            if (_openedPaths.Count == 0)
+            if (_openedPaths.Count == 0 || !listingChanged)
                 return;
             var selectedIndex = SelectedIndex;
             var selected = Selected;

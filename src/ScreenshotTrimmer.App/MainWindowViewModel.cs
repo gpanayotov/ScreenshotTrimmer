@@ -271,9 +271,18 @@ public sealed partial class MainWindowViewModel : Observable, IDisposable
     /// </summary>
     public void ApplySettings(UserSettings settings)
     {
+        Remember(settings);
+        ShowFinishing(_workspace.Selected);
+    }
+
+    /// <summary>
+    /// Makes <paramref name="settings"/> current in the app and the workspace, so the next Batch uses them, and saves
+    /// them, reporting a settings file that cannot be written as a notice.
+    /// </summary>
+    private void Remember(UserSettings settings)
+    {
         var failure = _settings.Change(settings);
         _workspace.ApplySettings(settings);
-        ShowFinishing(_workspace.Selected);
         if (failure is not null)
             AddNotice("SettingsNotSaved", _settings.FilePath, failure);
     }

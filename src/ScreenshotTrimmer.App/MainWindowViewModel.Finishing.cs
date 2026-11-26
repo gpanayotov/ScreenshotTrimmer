@@ -243,8 +243,8 @@ public sealed partial class MainWindowViewModel
     /// </summary>
     private void ChangeFinishing(Func<Steps, Steps> change, UserSettings remembered)
     {
-        if (remembered != Settings && _settings.Change(remembered) is { } failure)
-            AddNotice("SettingsNotSaved", _settings.FilePath, failure);
+        if (remembered != Settings)
+            Remember(remembered);
         ChangeShownSteps(change);
         ShowsResult = true;
         ShowFinishing(_workspace.Selected);
