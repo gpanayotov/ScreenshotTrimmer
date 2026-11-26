@@ -20,7 +20,7 @@ public class SettingsStoreTests
         Assert.Equal(0.35, settings.ShadowOpacity);
         Assert.True(settings.FrameLines);
         Assert.True(settings.RoundedCorners);
-        Assert.True(settings.Shadow);
+        Assert.True(settings.ShadowOn);
         Assert.Equal(Language.System, settings.Language);
     }
 
@@ -37,7 +37,7 @@ public class SettingsStoreTests
             ShadowOpacity = 0.6,
             FrameLines = false,
             RoundedCorners = false,
-            Shadow = false,
+            ShadowOn = false,
             Language = Language.Bg,
         };
 
@@ -115,7 +115,7 @@ public class SettingsStoreTests
             ShadowOpacity = 0.8,
             FrameLines = false,
             RoundedCorners = false,
-            Shadow = false,
+            ShadowOn = false,
             Language = Language.Bg,
         };
         store.Save(custom);
@@ -135,7 +135,7 @@ public class SettingsStoreTests
             "shadowOpacity" => custom with { ShadowOpacity = 0.35 },
             "frameLines" => custom with { FrameLines = true },
             "roundedCorners" => custom with { RoundedCorners = true },
-            "shadow" => custom with { Shadow = true },
+            "shadow" => custom with { ShadowOn = true },
             "language" => custom with { Language = Language.System },
             _ => throw new ArgumentException(name),
         };
@@ -162,7 +162,7 @@ public class SettingsStoreTests
 
         var settings = store.Load();
 
-        Assert.True(settings.Shadow);
+        Assert.True(settings.ShadowOn);
         Assert.Equal(1.5, settings.ShadowSize);
         Assert.False(settings.FrameLines);
     }

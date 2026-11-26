@@ -28,7 +28,7 @@ public static class FirstStep
         {
             FrameLines = remembered.FrameLines,
             RoundedCorners = remembered.RoundedCorners ? new RoundedCorners() : null,
-            Shadow = remembered.Shadow && !originalHasShadowPadding
+            Shadow = remembered.ShadowOn && !originalHasShadowPadding
                 ? new Shadow { Size = remembered.ShadowSize, Opacity = remembered.ShadowOpacity }
                 : null,
         });

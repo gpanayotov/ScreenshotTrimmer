@@ -44,7 +44,7 @@ public class CleanEdgesTests
     {
         var remembered = new UserSettings
         {
-            FrameLines = true, RoundedCorners = true, Shadow = true, ShadowSize = 2, ShadowOpacity = 0.5,
+            FrameLines = true, RoundedCorners = true, ShadowOn = true, ShadowSize = 2, ShadowOpacity = 0.5,
         };
 
         var steps = FirstStep.Apply(Steps.None, remembered, originalHasShadowPadding: false, CleanEdges.SetFrameLines(false));
@@ -94,7 +94,7 @@ public class CleanEdgesTests
     [Fact]
     public void A_manual_radius_on_an_image_with_no_steps_seeds_rounded_corners_from_the_settings()
     {
-        var remembered = new UserSettings { FrameLines = false, RoundedCorners = true, Shadow = false };
+        var remembered = new UserSettings { FrameLines = false, RoundedCorners = true, ShadowOn = false };
 
         var steps = FirstStep.Apply(Steps.None, remembered, originalHasShadowPadding: false, CleanEdges.SetManualRadius(9));
 

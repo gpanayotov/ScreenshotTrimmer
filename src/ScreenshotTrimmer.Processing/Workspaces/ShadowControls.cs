@@ -38,7 +38,7 @@ public sealed record ShadowControls(bool On, double Size, double Opacity)
 
         if (steps.Shadow is { } shadow)
             return new ShadowControls(true, shadow.Size, shadow.Opacity);
-        var on = steps == Steps.None && remembered.Shadow && !originalHasShadowPadding;
+        var on = steps == Steps.None && remembered.ShadowOn && !originalHasShadowPadding;
         return new ShadowControls(on, remembered.ShadowSize, remembered.ShadowOpacity);
     }
 
@@ -53,6 +53,6 @@ public sealed record ShadowControls(bool On, double Size, double Opacity)
     public UserSettings Remember(UserSettings settings)
     {
         ArgumentNullException.ThrowIfNull(settings);
-        return settings with { Shadow = On, ShadowSize = Size, ShadowOpacity = Opacity };
+        return settings with { ShadowOn = On, ShadowSize = Size, ShadowOpacity = Opacity };
     }
 }

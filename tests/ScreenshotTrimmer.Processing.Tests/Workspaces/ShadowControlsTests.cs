@@ -10,7 +10,7 @@ public class ShadowControlsTests
     [Fact]
     public void An_image_with_no_steps_shows_the_remembered_shadow()
     {
-        var remembered = new UserSettings { Shadow = true, ShadowSize = 2.5, ShadowOpacity = 0.6 };
+        var remembered = new UserSettings { ShadowOn = true, ShadowSize = 2.5, ShadowOpacity = 0.6 };
 
         var shown = ShadowControls.Shown(Steps.None, remembered, originalHasShadowPadding: false);
 
@@ -20,7 +20,7 @@ public class ShadowControlsTests
     [Fact]
     public void An_original_with_shadow_padding_and_no_steps_shows_the_shadow_off_with_the_remembered_sliders()
     {
-        var remembered = new UserSettings { Shadow = true, ShadowSize = 2.5, ShadowOpacity = 0.6 };
+        var remembered = new UserSettings { ShadowOn = true, ShadowSize = 2.5, ShadowOpacity = 0.6 };
 
         var shown = ShadowControls.Shown(Steps.None, remembered, originalHasShadowPadding: true);
 
@@ -31,7 +31,7 @@ public class ShadowControlsTests
     public void An_image_with_steps_shows_its_own_shadow_whatever_the_settings()
     {
         var steps = new Steps { Shadow = new Shadow { Size = 3, Opacity = 0.2 } };
-        var remembered = new UserSettings { Shadow = false, ShadowSize = 1, ShadowOpacity = 0.5 };
+        var remembered = new UserSettings { ShadowOn = false, ShadowSize = 1, ShadowOpacity = 0.5 };
 
         var shown = ShadowControls.Shown(steps, remembered, originalHasShadowPadding: true);
 
@@ -42,7 +42,7 @@ public class ShadowControlsTests
     public void An_image_whose_steps_leave_out_the_shadow_shows_it_off_with_the_remembered_sliders()
     {
         var steps = new Steps { FrameLines = true };
-        var remembered = new UserSettings { Shadow = true, ShadowSize = 1.5, ShadowOpacity = 0.4 };
+        var remembered = new UserSettings { ShadowOn = true, ShadowSize = 1.5, ShadowOpacity = 0.4 };
 
         var shown = ShadowControls.Shown(steps, remembered, originalHasShadowPadding: false);
 
@@ -52,7 +52,7 @@ public class ShadowControlsTests
     [Fact]
     public void An_already_processed_original_seeds_with_shadow_off_even_when_the_shadow_setting_is_on()
     {
-        var remembered = new UserSettings { FrameLines = true, RoundedCorners = false, Shadow = true };
+        var remembered = new UserSettings { FrameLines = true, RoundedCorners = false, ShadowOn = true };
         var drawn = Crop.Classic(new PixelRect(2, 2, 10, 10));
 
         var steps = FirstStep.Apply(Steps.None, remembered, originalHasShadowPadding: true, s => s with { Crop = drawn });
@@ -64,7 +64,7 @@ public class ShadowControlsTests
     [Fact]
     public void The_shadow_can_still_be_turned_on_for_an_already_processed_original()
     {
-        var remembered = new UserSettings { FrameLines = false, RoundedCorners = false, Shadow = true, ShadowSize = 2, ShadowOpacity = 0.5 };
+        var remembered = new UserSettings { FrameLines = false, RoundedCorners = false, ShadowOn = true, ShadowSize = 2, ShadowOpacity = 0.5 };
         var wanted = new ShadowControls(On: true, Size: 2, Opacity: 0.5);
 
         var steps = FirstStep.Apply(Steps.None, remembered, originalHasShadowPadding: true, wanted.Change);
@@ -101,7 +101,7 @@ public class ShadowControlsTests
     public void The_shadow_controls_become_the_remembered_settings_and_survive_a_restart()
     {
         using var folder = new TempFolder();
-        var before = new UserSettings { FrameLines = false, Shadow = true, ShadowSize = 1, ShadowOpacity = 0.35 };
+        var before = new UserSettings { FrameLines = false, ShadowOn = true, ShadowSize = 1, ShadowOpacity = 0.35 };
         var chosen = new ShadowControls(On: false, Size: 3.25, Opacity: 0.7);
 
         new SettingsStore(folder.Path).Save(chosen.Remember(before));
