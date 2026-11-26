@@ -1,0 +1,89 @@
+name: Release
+
+# Publishes the GitHub release for a version tag: the tests and every smoke test must pass first.
+# Rerunning it for the same tag is safe: the release is updated and its files replaced.
+on:
+  push:
+    tags: ['v*']
+
+permissions:
+  contents: read
+
+concurrency:
+  group: release-${{ github.ref_name }}
+
+jobs:
+  # Fails on a tag that is not v plus a semantic version, before anything is built.
+  version:
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.version.outputs.version }}
+      prerelease: ${{ steps.version.outputs.prerelease }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Test the version rule
+        run: build/version.test.sh
+      - name: Version from the tag
+        id: version
+        env:
+          TAG: ${{ github.ref_name }}
+        run: |
+          version="$(build/version.sh --tag "$TAG")"
+          # A pre-release has a suffix after the patch number (build metadata after + does not count).
+          prerelease=false
+          [[ "${version%%+*}" == *-* ]] && prerelease=true
+          echo "Version: $version, pre-release: $prerelease"
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+          echo "prerelease=$prerelease" >> "$GITHUB_OUTPUT"
+
+  # The tests and the package workflow (publish and smoke-test each download), with the tag's version.
+  ci:
+    needs: version
+    uses: ./.github/workflows/ci.yml
+    with:
+      version: ${{ needs.version.outputs.version }}
+
+  release:
+    needs: [version, ci]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    env:
+      GH_TOKEN: ${{ github.token }}
+      GH_REPO: ${{ github.repository }}
+      TAG: ${{ github.ref_name }}
+      VERSION: ${{ needs.version.outputs.version }}
+      PRERELEASE: ${{ needs.version.outputs.prerelease }}
+    steps:
+      - uses: actions/checkout@v4
+
+      # Every download the package workflow built, whatever their number and kind.
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: ScreenshotTrimmer-${{ needs.version.outputs.version }}-*
+          merge-multiple: true
+          path: dist
+
+      - name: Checksums
+        working-directory: dist
+        run: |
+          shopt -s failglob
+          sha256sum -- ScreenshotTrimmer-* > SHA256SUMS.txt
+          cat SHA256SUMS.txt
+
+      - name: Create or update the release
+        run: |
+          if gh release view "$TAG" > /dev/null 2>&1; then
+            gh release edit "$TAG" --prerelease="$PRERELEASE"
+          else
+            gh release create "$TAG" --verify-tag --title "ScreenshotTrimmer $VERSION" \
+              --generate-notes --notes-file build/release-notes.md --prerelease="$PRERELEASE"
+          fi
+
+      - name: Upload the files
+        run: gh release upload "$TAG" dist/* --clobber
+
+      - name: Check the published checksums
+        run: |
+          gh release download "$TAG" --dir published --clobber
+          (cd published && sha256sum --check SHA256SUMS.txt)
