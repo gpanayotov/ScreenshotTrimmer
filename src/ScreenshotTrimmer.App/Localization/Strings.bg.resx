@@ -49,6 +49,8 @@
   <data name="ManualRadiusTip" xml:space="preserve"><value>Радиус на ъглите в пиксели само за това изображение; оставете празно, за да се използва измереният радиус</value></data>
   <data name="PixelsUnit" xml:space="preserve"><value>пиксела</value></data>
   <data name="ManualRadiusInvalid" xml:space="preserve"><value>Радиусът на ъглите трябва да е брой пиксели от 0 до {0} или празно за измерения радиус.</value></data>
+  <data name="CropSize" xml:space="preserve"><value>Изрязване: {0:N0} × {1:N0} пиксела в позиция {2:N0}, {3:N0}</value></data>
+  <data name="ClearCrop" xml:space="preserve"><value>_Изчистване на изрязването</value></data>
   <data name="ThumbnailUnreadable" xml:space="preserve"><value>Не може да бъде прочетено</value></data>
   <data name="ShowResults" xml:space="preserve"><value>Показване на _Резултатите</value></data>
   <data name="HasResultBadge" xml:space="preserve"><value>Резултат</value></data>
@@ -98,4 +100,11 @@
   <data name="SaveFailureAccessDenied" xml:space="preserve"><value>няма разрешение за запис на {0}.</value></data>
   <data name="SaveAllMenu" xml:space="preserve"><value>Запис на _всички</value></data>
   <data name="SavedAll" xml:space="preserve"><value>Записани Резултати: {0} от {1}.</value></data>
+  <data name="UnsavedTitle" xml:space="preserve"><value>• {0}</value></data>
+  <data name="LeaveTitle" xml:space="preserve"><value>Незаписани промени</value></data>
+  <data name="LeaveQuestion" xml:space="preserve"><value>Някои изображения имат незаписани промени. Да бъдат ли записани, преди да продължите?</value></data>
+  <data name="SaveAllAnswer" xml:space="preserve"><value>Запис на всички</value></data>
+  <data name="DiscardAnswer" xml:space="preserve"><value>Отхвърляне</value></data>
+  <data name="DiscardQuestion" xml:space="preserve"><value>{0} има незаписани промени. Да бъде ли премахнато от списъка, като промените се отхвърлят?</value></data>
+  <data name="UnsavedDropped" xml:space="preserve"><value>Тези изображения бяха изтрити или преместени на диска и незаписаните им промени бяха отхвърлени: {0}</value></data>
 </root>

@@ -9,6 +9,18 @@ public sealed partial class Workspace
     /// <summary>The images with Steps, by <see cref="KeyOf">key</see>; an image missing here has <c>Steps.None</c> and was never saved.</summary>
     private readonly Dictionary<string, ImageSteps> _steps = new(FileNames.Comparer);
 
+    /// <summary>
+    /// Whether any listed image has unsaved Steps, so leaving, or replacing the list, would lose work.
+    /// </summary>
+    public bool HasUnsavedWork
+    {
+        get
+        {
+            lock (_lock)
+                return Images.Any(image => image.HasUnsavedSteps);
+        }
+    }
+
     /// <summary><paramref name="image"/>'s current Steps; <c>Steps.None</c> for an image with none.</summary>
     /// <exception cref="ArgumentException"><paramref name="image"/> is not listed.</exception>
     public Steps Steps(WorkspaceImage image)
@@ -60,6 +72,33 @@ public sealed partial class Workspace
         Images = images;
         Selected = Selected is null ? null : Find(KeyOf(Selected));
         QueueChange();
+    }
+
+    /// <summary>Moves the Steps of files renamed on disk to their new paths; call under the lock.</summary>
+    private void FollowRenamesWithSteps(Func<string, string> renamed)
+    {
+        foreach (var (from, state) in _steps.ToList())
+        {
+            var to = renamed(from);
+            if (FileNames.Same(from, to))
+                continue;
+            _steps.Remove(from);
+            _steps[to] = state;
+        }
+    }
+
+    /// <summary>
+    /// Discards the Steps of the images in <paramref name="before"/> that are no longer listed, so a file that comes
+    /// back under the same name starts afresh; call under the lock after re-listing.
+    /// </summary>
+    /// <returns>The paths of the dropped images that had unsaved Steps, in strip order.</returns>
+    private List<string> DiscardStepsOfDropped(IReadOnlyList<WorkspaceImage> before)
+    {
+        var gone = before.Where(image => Find(image.Path) is null).ToList();
+        var unsaved = gone.Where(image => HasUnsavedSteps(image.Path)).Select(image => image.Path).ToList();
+        foreach (var image in gone)
+            _steps.Remove(image.Path);
+        return unsaved;
     }
 
     /// <param name="Current">The Steps the image has now.</param>
