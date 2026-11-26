@@ -20,7 +20,7 @@ public class PopupOverhangDetectionTests
         var popup = new PixelRect(x, y, width, height);
         DrawUndimmedPopup(image, popup);
 
-        var subject = SubjectDetection.Find(image);
+        var subject = SubjectDetection.Find(image).Subject;
 
         Assert.NotNull(subject);
         Assert.Equal(UndimmedWindow, subject.Window);
@@ -40,7 +40,7 @@ public class PopupOverhangDetectionTests
         var popup = new PixelRect(x, y, width, height);
         DrawDimmedPopup(image, popup);
 
-        var subject = SubjectDetection.Find(image);
+        var subject = SubjectDetection.Find(image).Subject;
 
         Assert.NotNull(subject);
         Assert.Equal(DimmedDialog, subject.Window);
@@ -57,7 +57,7 @@ public class PopupOverhangDetectionTests
         DrawUndimmedPopup(image, menu);
         DrawUndimmedPopup(image, submenu);
 
-        var subject = SubjectDetection.Find(image);
+        var subject = SubjectDetection.Find(image).Subject;
 
         Assert.NotNull(subject);
         Assert.Equal(UndimmedWindow, subject.Window);
@@ -74,7 +74,7 @@ public class PopupOverhangDetectionTests
         DrawDimmedPopup(image, menu);
         DrawDimmedPopup(image, submenu);
 
-        var subject = SubjectDetection.Find(image);
+        var subject = SubjectDetection.Find(image).Subject;
 
         Assert.NotNull(subject);
         Assert.Equal(DimmedDialog, subject.Window);
@@ -88,7 +88,7 @@ public class PopupOverhangDetectionTests
         var popup = new PixelRect(300, 380, 180, 160);
         DrawUndimmedPopup(image, popup);
 
-        var crop = SubjectDetection.Find(image)!.ToCrop();
+        var crop = SubjectDetection.Find(image).Subject!.ToCrop();
         var result = Renderer.Render(image, new Steps { Crop = crop }).Result;
 
         // The Result spans the window and the popup below it: 141..668 x 87..540.

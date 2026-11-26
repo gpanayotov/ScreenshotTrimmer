@@ -27,7 +27,7 @@ public class BatchTests
             var image = Entry(workspace, name);
             Assert.Equal(new Steps
             {
-                Crop = SubjectDetection.Find(original)!.ToCrop(),
+                Crop = SubjectDetection.Find(original).Subject!.ToCrop(),
                 FrameLines = true,
                 Shadow = new Shadow { Size = 1.5, Opacity = 0.5 },
             }, workspace.Steps(image));
@@ -73,6 +73,45 @@ public class BatchTests
     }
 
     [Fact]
+    public void An_already_cropped_image_gets_one_Step_with_the_remembered_finishing_and_no_crop_and_is_counted_apart()
+    {
+        using var folder = new TempFolder();
+        var cropped = Synthetic.Plain(420, 300, Synthetic.DimmedPage);
+        Synthetic.DrawDialog(cropped, new PixelRect(0, 0, 420, 300), 8);
+        EncodedImages.WritePng(folder.File("cropped.png"), cropped);
+        EncodedImages.WritePng(folder.File("dialog.png"), Synthetic.DialogOverDimmedApplication());
+        using var workspace = new Workspace(Remembered);
+        workspace.Open([folder.Path]);
+
+        var summary = workspace.RunBatch(null, CancellationToken.None);
+
+        var image = Entry(workspace, "cropped.png");
+        Assert.Equal(new Steps { FrameLines = true, Shadow = new Shadow { Size = 1.5, Opacity = 0.5 } }, workspace.Steps(image));
+        Assert.True(image.HasUnsavedSteps);
+        Assert.False(image.NoSubjectFound);
+        Assert.Equal(1, summary.Processed);
+        Assert.Equal(1, summary.AlreadyCropped);
+        Assert.Empty(summary.NoSubjectFound);
+    }
+
+    [Fact]
+    public void An_already_processed_image_is_skipped_rather_than_finished_again_as_already_cropped()
+    {
+        using var folder = new TempFolder();
+        var cropped = Synthetic.Plain(420, 300, Synthetic.DimmedPage);
+        Synthetic.DrawDialog(cropped, new PixelRect(0, 0, 420, 300), 8);
+        EncodedImages.WritePng(folder.File("processed.png"), Renderer.Render(cropped, new Steps { Shadow = new Shadow() }).Result);
+        using var workspace = new Workspace(Remembered);
+        workspace.Open([folder.Path]);
+
+        var summary = workspace.RunBatch(null, CancellationToken.None);
+
+        Assert.Equal(Steps.None, workspace.Steps(Entry(workspace, "processed.png")));
+        Assert.Equal(1, summary.Skipped.AlreadyProcessed);
+        Assert.Equal(0, summary.AlreadyCropped);
+    }
+
+    [Fact]
     public void Images_with_Steps_already_processed_images_and_Results_are_skipped_and_counted()
     {
         using var folder = new TempFolder();
@@ -112,7 +151,7 @@ public class BatchTests
 
         var summary = workspace.RunBatch(null, CancellationToken.None);
 
-        Assert.Equal(SubjectDetection.Find(original)!.ToCrop(), workspace.Steps(pasted).Crop);
+        Assert.Equal(SubjectDetection.Find(original).Subject!.ToCrop(), workspace.Steps(pasted).Crop);
         Assert.Equal(1, summary.Processed);
     }
 

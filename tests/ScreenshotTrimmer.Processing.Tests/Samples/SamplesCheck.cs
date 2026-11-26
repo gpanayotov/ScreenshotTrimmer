@@ -43,7 +43,7 @@ internal static class SamplesCheck
     private static readonly HashSet<string> ImageExtensions =
         new([".png", ".jpg", ".jpeg", ".webp", ".bmp"], StringComparer.OrdinalIgnoreCase);
 
-    private sealed record Outcome(string Name, SampleVerdict Verdict, TimeSpan Took, Subject? Found, string Fingerprint, ApprovedAnswer? Approved)
+    private sealed record Outcome(string Name, SampleVerdict Verdict, TimeSpan Took, Finding Found, string Fingerprint, ApprovedAnswer? Approved)
     {
         public bool Dark => Approved?.Dark ?? false;
     }
@@ -70,7 +70,7 @@ internal static class SamplesCheck
             outcomes.Add(new Outcome(name, verdict, clock.Elapsed, found, fingerprint, answer));
             SampleOverview.Write(
                 Path.Combine(overview, Path.GetFileNameWithoutExtension(name) + ".overview.png"),
-                image, found, verdict == SampleVerdict.Fail ? answer?.Subject : null);
+                image, found.Subject, verdict == SampleVerdict.Fail ? answer?.Subject : null);
         }
 
         if (approving != Approving.No)
@@ -88,13 +88,19 @@ internal static class SamplesCheck
         Dictionary<string, ApprovedAnswer> approved, List<Outcome> outcomes, Approving approving)
     {
         if (approving == Approving.Everything)
-            return outcomes.ToDictionary(o => o.Name, o => new ApprovedAnswer(o.Fingerprint, o.Found) { Dark = o.Dark }, StringComparer.Ordinal);
+            return outcomes.ToDictionary(o => o.Name, o => Answer(o) with { Dark = o.Dark }, StringComparer.Ordinal);
 
         var answers = new Dictionary<string, ApprovedAnswer>(approved, StringComparer.Ordinal);
         foreach (var o in outcomes.Where(o => o.Approved is null))
-            answers[o.Name] = new ApprovedAnswer(o.Fingerprint, o.Found);
+            answers[o.Name] = Answer(o);
         return answers;
     }
+
+    /// <summary>Detection's answer for the sample of <paramref name="outcome"/>, as it would be approved.</summary>
+    private static ApprovedAnswer Answer(Outcome outcome) =>
+        outcome.Found.IsAlreadyCropped
+            ? ApprovedAnswer.AlreadyCroppedAnswer(outcome.Fingerprint)
+            : new ApprovedAnswer(outcome.Fingerprint, outcome.Found.Subject);
 
     private static IEnumerable<string> SampleImages(string samples) =>
         Directory.EnumerateFiles(samples)
@@ -133,8 +139,6 @@ internal static class SamplesCheck
                 SampleVerdict.Fail => $"\n        expected {ApprovedAnswers.Describe(o.Approved!)}\n        found    {ApprovedAnswers.Describe(o.Found)}",
                 SampleVerdict.Changed => $"\n        approved {ApprovedAnswers.Describe(o.Approved!)} for an earlier file\n"
                     + $"        found    {ApprovedAnswers.Describe(o.Found)} in the file with fingerprint {o.Fingerprint}",
-                SampleVerdict.Pass when o.Approved!.AlreadyCropped =>
-                    $": {ApprovedAnswers.Describe(o.Approved)} (found none: detection cannot yet tell them apart)",
                 _ => $": {ApprovedAnswers.Describe(o.Found)}",
             });
             text.Append('\n');

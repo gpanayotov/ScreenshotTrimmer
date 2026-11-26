@@ -21,8 +21,9 @@ public sealed partial class MainWindowViewModel
 
     /// <summary>
     /// Finds the Subject of the selected image and records it as its crop, as one Step that replaces only the crop and
-    /// shows the Original; an image's first Step also takes its finishing from the remembered settings. When no Subject
-    /// is found, nothing is recorded and a notice says so.
+    /// shows the Original; an image's first Step also takes its finishing from the remembered settings. When the image is
+    /// <b>Already cropped</b> to its Subject, a notice says so, and an image with no Steps gets its finishing with no
+    /// crop, shown as its Result. When no Subject is found, nothing is recorded and a notice says so.
     /// </summary>
     public RelayCommand AutoCropCommand => _autoCropCommand ??= new RelayCommand(AutoCrop);
 
@@ -87,13 +88,28 @@ public sealed partial class MainWindowViewModel
     }
 
     private void AutoCrop() =>
-        Detect(SubjectDetection.Find, subject =>
+        Detect(SubjectDetection.Find, finding =>
         {
-            if (subject is null)
-                AddNotice("NoSubjectFound");
-            else
+            if (finding.Subject is { } subject)
                 RecordFound(subject.ToCrop());
+            else if (finding.IsAlreadyCropped)
+                RecordFinishingOnly();
+            else
+                AddNotice("NoSubjectFound");
         });
+
+    /// <summary>
+    /// Says the selected image is already cropped and, when it has no Steps, records its first Step with the remembered
+    /// finishing and no crop, showing the Result; an image with Steps keeps them.
+    /// </summary>
+    private void RecordFinishingOnly()
+    {
+        AddNotice("AlreadyCropped");
+        if (!ShowsSelected(out var image, out _) || ListedSteps(image) != Steps.None)
+            return;
+        ChangeShownSteps(steps => steps);
+        ShowsResult = true;
+    }
 
     /// <summary>
     /// Finds the largest Subject inside <paramref name="region"/> of the selected image, in image pixels, and records it
@@ -120,7 +136,7 @@ public sealed partial class MainWindowViewModel
     /// Runs <paramref name="find"/> on the selected image's Original off the interface thread, replacing any detection
     /// that is running, then passes its answer to <paramref name="record"/> unless the selection has moved on.
     /// </summary>
-    private async void Detect(Func<RgbaImage, CancellationToken, Subject?> find, Action<Subject?> record)
+    private async void Detect<T>(Func<RgbaImage, CancellationToken, T> find, Action<T> record)
     {
         if (!ShowsSelected(out var image, out var original))
             return;
@@ -131,11 +147,11 @@ public sealed partial class MainWindowViewModel
         ShowProgressAfterDelay(detection);
         try
         {
-            var subject = await Task.Run(() => find(original, token), token);
+            var found = await Task.Run(() => find(original, token), token);
             // A late answer never lands on another image: moving away cancels it.
             if (token.IsCancellationRequested || !ShowsSelected(out var shown, out _) || shown.Key != image.Key)
                 return;
-            record(subject);
+            record(found);
         }
         catch (OperationCanceledException)
         {

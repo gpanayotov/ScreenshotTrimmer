@@ -6,6 +6,12 @@ public sealed record BatchSummary
     /// <summary>How many images got a Step with the Subject found in them.</summary>
     public int Processed { get; init; }
 
+    /// <summary>
+    /// How many images were <b>Already cropped</b> to their Subject and got a Step with the finishing only; they are not
+    /// counted in <see cref="Processed"/> and are never marked No Subject found.
+    /// </summary>
+    public int AlreadyCropped { get; init; }
+
     /// <summary>The images in which no Subject was found, in strip order, as they were listed when the Batch reached them.</summary>
     public IReadOnlyList<WorkspaceImage> NoSubjectFound { get; init; } = [];
 

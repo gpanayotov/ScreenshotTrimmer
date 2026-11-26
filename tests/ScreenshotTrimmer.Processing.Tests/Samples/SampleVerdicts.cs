@@ -22,19 +22,21 @@ internal enum SampleVerdict
 internal static class SampleVerdicts
 {
     /// <summary>
-    /// Judges detection's answer against the approved one, each edge within the approved tolerance. Until detection
-    /// reports "already cropped" separately (#54), an approved "already cropped" passes on nothing found.
+    /// Judges detection's answer against the approved one, each edge within the approved tolerance. "Already cropped"
+    /// passes only on already cropped, and "none" only on nothing found.
     /// </summary>
     /// <param name="approved">The approved answer for the sample, or <c>null</c> when there is none.</param>
     /// <param name="fingerprint">The fingerprint of the sample's file as it is now.</param>
-    /// <param name="found">What detection found, or <c>null</c> for nothing.</param>
-    public static SampleVerdict Judge(ApprovedAnswer? approved, string fingerprint, Subject? found)
+    /// <param name="found">What detection found.</param>
+    public static SampleVerdict Judge(ApprovedAnswer? approved, string fingerprint, Finding found)
     {
         if (approved is null)
             return SampleVerdict.New;
         if (approved.Fingerprint != fingerprint)
             return SampleVerdict.Changed;
-        return Matches(approved.Subject, found, approved.Tolerance) ? SampleVerdict.Pass : SampleVerdict.Fail;
+        var matches = approved.AlreadyCropped == found.IsAlreadyCropped
+            && Matches(approved.Subject, found.Subject, approved.Tolerance);
+        return matches ? SampleVerdict.Pass : SampleVerdict.Fail;
     }
 
     private static bool Matches(Subject? approved, Subject? found, int tolerance) =>

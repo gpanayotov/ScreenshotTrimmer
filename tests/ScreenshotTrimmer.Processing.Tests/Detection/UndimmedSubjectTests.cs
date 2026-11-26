@@ -17,7 +17,7 @@ public class UndimmedSubjectTests
         Synthetic.DrawShadow(image, dialog, 5, 110, radius);
         Synthetic.DrawDialog(image, dialog, radius);
 
-        var subject = SubjectDetection.Find(image);
+        var subject = SubjectDetection.Find(image).Subject;
 
         Assert.Equal(dialog, subject?.Window);
     }
@@ -25,7 +25,7 @@ public class UndimmedSubjectTests
     [Fact]
     public void Nothing_is_found_in_a_light_page_under_a_dark_header_with_no_dialog()
     {
-        Assert.Null(SubjectDetection.Find(Synthetic.LightApplication(800, 520)));
+        Assert.Equal(Finding.NothingFound, SubjectDetection.Find(Synthetic.LightApplication(800, 520)));
     }
 
     [Theory]
@@ -39,7 +39,7 @@ public class UndimmedSubjectTests
         Synthetic.DrawShadow(image, window, 6, 140, radius);
         Synthetic.DrawWindow(image, window, new Rgba(titleR, titleG, titleB, 255), new Rgba(bodyR, bodyG, bodyB, 255), radius);
 
-        var subject = SubjectDetection.Find(image);
+        var subject = SubjectDetection.Find(image).Subject;
 
         Assert.Equal(window, subject?.Window);
     }
@@ -55,7 +55,7 @@ public class UndimmedSubjectTests
         Synthetic.DrawShadow(image, window, 6, 70, 8);
         Synthetic.DrawWindow(image, window, new Rgba(40, 112, 140, 255), new Rgba(122, 84, 56, 255), 8);
 
-        var subject = SubjectDetection.Find(image);
+        var subject = SubjectDetection.Find(image).Subject;
 
         Assert.Equal(window, subject?.Window);
     }
@@ -74,7 +74,7 @@ public class UndimmedSubjectTests
         Synthetic.DrawShadow(image, topmost, 5, 110, radius);
         Synthetic.DrawDialog(image, topmost, radius);
 
-        var subject = SubjectDetection.Find(image);
+        var subject = SubjectDetection.Find(image).Subject;
 
         Assert.Equal(topmost, subject?.Window);
     }
@@ -91,7 +91,7 @@ public class UndimmedSubjectTests
                 Synthetic.DrawDialog(image, card, 6, new Rgba(255, 255, 255, 255));
             }
 
-        Assert.Null(SubjectDetection.Find(image));
+        Assert.Equal(Finding.NothingFound, SubjectDetection.Find(image));
     }
 
     [Theory]
@@ -107,7 +107,7 @@ public class UndimmedSubjectTests
         Synthetic.DrawOutline(image, dialog, lineWidth, new Rgba(186, 186, 189, 255), radius);
         Synthetic.DrawDialog(image, dialog, radius);
 
-        var subject = SubjectDetection.Find(image);
+        var subject = SubjectDetection.Find(image).Subject;
 
         Assert.Equal(dialog, subject?.Window);
     }
@@ -133,7 +133,7 @@ public class UndimmedSubjectTests
         Synthetic.DrawShadow(image, menu, 4, 120, 4);
         Synthetic.DrawDialog(image, menu, 4, new Rgba(menuLevel, menuLevel, menuLevel, 255));
 
-        var subject = SubjectDetection.Find(image);
+        var subject = SubjectDetection.Find(image).Subject;
 
         Assert.Equal(window, subject?.Window);
     }
@@ -152,7 +152,7 @@ public class UndimmedSubjectTests
         SubjectDetection.Find(Synthetic.Plain(64, 64, Synthetic.LightPage));
 
         var stopwatch = System.Diagnostics.Stopwatch.StartNew();
-        var subject = SubjectDetection.Find(image);
+        var subject = SubjectDetection.Find(image).Subject;
         stopwatch.Stop();
 
         Assert.Equal(window, subject?.Window);
