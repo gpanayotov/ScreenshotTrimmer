@@ -70,7 +70,12 @@ The save rule where the **Result** takes the **Original**'s name and the Origina
 _Avoid_: Overwrite mode, in-place mode
 
 **Batch**:
-Applying **Auto crop** and the current finishing settings to every listed image, each **Result** reviewable before saving.
+Applying **Auto crop** and the current finishing settings, as one pending **Step**, to every listed image that needs it, each **Result** reviewable before saving. A Batch skips images that already have Steps, images already processed (they already have a **Shadow**'s transparent padding) and listed **Results**, and writes nothing to disk.
+_Avoid_: Bulk process, run all
+
+**No Subject found**:
+The mark a **Batch** leaves on an image in which it found no **Subject**: the image gets no Step and stays marked until it gets Steps, by hand or from a later Batch.
+_Avoid_: Miss, failed, unprocessed
 
 ### Bulgarian names
 
@@ -91,3 +96,4 @@ The Bulgarian interface uses exactly these names for the terms above.
 | **Suffix mode** | Режим с наставка |
 | **Backup mode** | Режим с резервно копие |
 | **Batch** | Пакетна обработка |
+| **No Subject found** | Без намерен обект |
