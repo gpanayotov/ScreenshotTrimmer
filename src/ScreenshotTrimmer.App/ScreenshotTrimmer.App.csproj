@@ -31,4 +31,13 @@
     </EmbeddedResource>
   </ItemGroup>
 
+  <!-- The icon, for the Windows executable and every window; Assets/Icon/regenerate.py makes it from the SVG. -->
+  <PropertyGroup>
+    <ApplicationIcon>Assets\Icon\screenshot-trimmer.ico</ApplicationIcon>
+  </PropertyGroup>
+  <ItemGroup>
+    <AvaloniaResource Include="Assets\Icon\screenshot-trimmer.ico" />
+    <AvaloniaResource Include="Assets\Icon\screenshot-trimmer-128.png" />
+  </ItemGroup>
+
 </Project>

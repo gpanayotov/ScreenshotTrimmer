@@ -109,6 +109,9 @@
         <Separator />
         <MenuItem Header="{loc:Tr ClearCrop}" Command="{Binding ClearCropCommand}" />
       </MenuItem>
+      <MenuItem Header="{loc:Tr HelpMenu}">
+        <MenuItem x:Name="AboutItem" Header="{loc:Tr AboutMenu}" />
+      </MenuItem>
     </Menu>
 
     <!-- The toolbar: the most used commands of the menus, each with a tooltip. -->

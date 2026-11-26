@@ -5,5 +5,9 @@
   <!-- Default follows the system's light or dark theme, and switches when it does. -->
   <Application.Styles>
     <FluentTheme />
+    <!-- Every window, the dialogs too, shows the app's icon. -->
+    <Style Selector=":is(Window)">
+      <Setter Property="Icon" Value="/Assets/Icon/screenshot-trimmer.ico" />
+    </Style>
   </Application.Styles>
 </Application>
