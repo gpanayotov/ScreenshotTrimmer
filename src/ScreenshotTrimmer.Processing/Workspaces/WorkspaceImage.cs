@@ -36,7 +36,8 @@ public sealed record WorkspaceImage
 
     /// <summary>
     /// Whether a Batch found no Subject in this image and so gave it no Steps, shown as the "No subject found" marker.
-    /// Session-only: dropped with the image and when another list is opened.
+    /// Cleared when the image gets Steps, by hand or from a later Batch. Session-only: dropped with the image and when
+    /// another list is opened.
     /// </summary>
     public bool NoSubjectFound { get; init; }
 }

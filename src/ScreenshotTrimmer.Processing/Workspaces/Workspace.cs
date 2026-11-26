@@ -172,6 +172,46 @@ public sealed partial class Workspace : IDisposable
     /// <summary>Selects the previous image; does nothing on the first one.</summary>
     public void Previous() => Update(() => SelectAt(SelectedIndex - 1));
 
+    /// <summary>
+    /// Selects the first image after the selected one that is <paramref name="matching"/>, such as the next image with
+    /// No Subject found; does nothing when none follows. With nothing selected, it looks from the start of the list.
+    /// </summary>
+    public void Next(Func<WorkspaceImage, bool> matching)
+    {
+        ArgumentNullException.ThrowIfNull(matching);
+        Update(() =>
+        {
+            for (var i = SelectedIndex + 1; i < Images.Count; i++)
+            {
+                if (matching(Images[i]))
+                {
+                    SelectAt(i);
+                    return;
+                }
+            }
+        });
+    }
+
+    /// <summary>
+    /// Selects the last image before the selected one that is <paramref name="matching"/>; does nothing when none comes
+    /// before it.
+    /// </summary>
+    public void Previous(Func<WorkspaceImage, bool> matching)
+    {
+        ArgumentNullException.ThrowIfNull(matching);
+        Update(() =>
+        {
+            for (var i = SelectedIndex - 1; i >= 0; i--)
+            {
+                if (matching(Images[i]))
+                {
+                    SelectAt(i);
+                    return;
+                }
+            }
+        });
+    }
+
     /// <summary>Stops watching the disk. Every later update throws <see cref="ObjectDisposedException"/>.</summary>
     public void Dispose()
     {

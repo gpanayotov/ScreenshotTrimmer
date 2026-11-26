@@ -148,4 +148,11 @@
   <data name="BatchDone" xml:space="preserve"><value>Batch finished: {0} processed, {1} with no subject found. Skipped: {2} already edited, {3} already processed, {4} Results. Nothing is saved until you save.</value></data>
   <data name="BatchNoSubjectFoundIn" xml:space="preserve"><value>No subject found in: {0}</value></data>
   <data name="NoSubjectFoundTip" xml:space="preserve"><value>The Batch found no subject in this image</value></data>
+  <data name="NextNoSubjectFound" xml:space="preserve"><value>Next with no _subject found</value></data>
+  <data name="PreviousNoSubjectFound" xml:space="preserve"><value>Previous with no subject _found</value></data>
+  <data name="NextUnsaved" xml:space="preserve"><value>Next _unsaved</value></data>
+  <data name="PreviousUnsaved" xml:space="preserve"><value>Previous unsa_ved</value></data>
+  <data name="ShowOnlyNoSubjectFound" xml:space="preserve"><value>Only images with _no subject found</value></data>
+  <data name="ShowNoSubjectFound" xml:space="preserve"><value>Show</value></data>
+  <data name="ShowNoSubjectFoundTip" xml:space="preserve"><value>Show only the images with no subject found in the strip</value></data>
 </root>

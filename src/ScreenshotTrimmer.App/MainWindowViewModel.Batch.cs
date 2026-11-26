@@ -60,6 +60,7 @@ public sealed partial class MainWindowViewModel
             {
                 _notices.Add(new Message("BatchNoSubjectFoundIn",
                     string.Join(", ", summary.NoSubjectFound.Select(StripEntry.DisplayName))));
+                OfferShowNoSubjectFound(true);
             }
             RaiseNotices();
         }

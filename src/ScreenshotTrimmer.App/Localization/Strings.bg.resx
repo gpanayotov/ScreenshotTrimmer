@@ -148,4 +148,11 @@
   <data name="BatchDone" xml:space="preserve"><value>Пакетната обработка приключи: обработени {0}, без намерен обект {1}. Пропуснати: {2} вече редактирани, {3} вече обработени, {4} Резултати. Нищо не е записано, докато не запишете.</value></data>
   <data name="BatchNoSubjectFoundIn" xml:space="preserve"><value>Не е намерен обект в: {0}</value></data>
   <data name="NoSubjectFoundTip" xml:space="preserve"><value>Пакетната обработка не намери обект в това изображение</value></data>
+  <data name="NextNoSubjectFound" xml:space="preserve"><value>Следващо _без намерен обект</value></data>
+  <data name="PreviousNoSubjectFound" xml:space="preserve"><value>Предишно без нам_ерен обект</value></data>
+  <data name="NextUnsaved" xml:space="preserve"><value>Следващо _незаписано</value></data>
+  <data name="PreviousUnsaved" xml:space="preserve"><value>Предишно не_записано</value></data>
+  <data name="ShowOnlyNoSubjectFound" xml:space="preserve"><value>Само изображенията _без намерен обект</value></data>
+  <data name="ShowNoSubjectFound" xml:space="preserve"><value>Показване</value></data>
+  <data name="ShowNoSubjectFoundTip" xml:space="preserve"><value>Показване само на изображенията без намерен обект в лентата</value></data>
 </root>
