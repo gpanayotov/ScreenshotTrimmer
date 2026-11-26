@@ -6,6 +6,10 @@
     <Nullable>enable</Nullable>
   </PropertyGroup>
 
+  <ItemGroup>
+    <InternalsVisibleTo Include="ScreenshotTrimmer.Processing.Tests" />
+  </ItemGroup>
+
   <!-- Pinned to the SkiaSharp version Avalonia 11.3.23 depends on, so the app uses one image stack. -->
   <ItemGroup>
     <PackageReference Include="SkiaSharp" Version="2.88.9" />

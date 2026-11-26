@@ -9,6 +9,12 @@ public sealed record BatchSummary
     /// <summary>The images in which no Subject was found, in strip order, as they were listed when the Batch reached them.</summary>
     public IReadOnlyList<WorkspaceImage> NoSubjectFound { get; init; } = [];
 
+    /// <summary>The images that could not be read, in strip order, as they were listed when the Batch reached them.</summary>
+    public IReadOnlyList<WorkspaceImage> Failed { get; init; } = [];
+
+    /// <summary>Whether the Batch was cancelled before it went through every image; the counts say what it did.</summary>
+    public bool Cancelled { get; init; }
+
     /// <summary>How many images were skipped for each reason; a reason no image was skipped for is missing.</summary>
     public IReadOnlyDictionary<BatchSkip, int> Skipped { get; init; } = new Dictionary<BatchSkip, int>();
 

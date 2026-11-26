@@ -186,7 +186,9 @@
         <StackPanel Orientation="Horizontal" Spacing="6" IsVisible="{Binding IsBatchRunning}">
           <ProgressBar Width="120" MinWidth="120" VerticalAlignment="Center"
                        Minimum="0" Maximum="{Binding BatchTotal}" Value="{Binding BatchDone}" />
-          <TextBlock Text="{Binding BatchProgressText}" />
+          <TextBlock Text="{Binding BatchProgressText}" VerticalAlignment="Center" />
+          <Button Content="{loc:Tr Cancel}" ToolTip.Tip="{loc:Tr CancelBatchTip}" Padding="6,0"
+                  Command="{Binding CancelBatchCommand}" />
         </StackPanel>
       </StackPanel>
     </Border>
