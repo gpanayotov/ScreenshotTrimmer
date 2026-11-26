@@ -87,7 +87,11 @@ internal sealed class EdgeMap
         return found >= 0 && runs[found].End >= to - 1 - MaxGap;
     }
 
-    private static byte Step(ReadOnlySpan<byte> pixels, int a, int b) =>
+    /// <summary>
+    /// The colour step between the pixels at byte offsets <paramref name="a"/> and <paramref name="b"/>: the largest
+    /// difference in any channel.
+    /// </summary>
+    public static byte Step(ReadOnlySpan<byte> pixels, int a, int b) =>
         (byte)Math.Max(
             Math.Abs(pixels[a] - pixels[b]),
             Math.Max(Math.Abs(pixels[a + 1] - pixels[b + 1]), Math.Abs(pixels[a + 2] - pixels[b + 2])));
