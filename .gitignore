@@ -1,7 +1,8 @@
 .agents
 .claude
 skills-lock.json
-samples/
+/samples
+/samples-overview/
 bin/
 obj/
 TestResults/
