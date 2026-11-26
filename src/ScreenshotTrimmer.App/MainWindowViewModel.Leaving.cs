@@ -79,7 +79,6 @@ public sealed partial class MainWindowViewModel
     /// <summary>Tells the user which images' unsaved Steps were discarded because the disk took their files away.</summary>
     private void ReportDroppedWithUnsavedSteps(IReadOnlyList<string> paths)
     {
-        _notices.Add(new Message("UnsavedDropped", string.Join(", ", paths.Select(Path.GetFileName))));
-        RaiseNotices();
+        AddNotice("UnsavedDropped", string.Join(", ", paths.Select(Path.GetFileName)));
     }
 }

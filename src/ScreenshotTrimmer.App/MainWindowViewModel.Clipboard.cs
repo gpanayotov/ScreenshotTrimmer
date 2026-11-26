@@ -34,8 +34,7 @@ public sealed partial class MainWindowViewModel
                 _workspace.Paste(pixels);
                 return;
             }
-            _notices.Add(new Message("ClipboardHasNoImage"));
-            RaiseNotices();
+            AddNotice("ClipboardHasNoImage");
         }
         catch (Exception e)
         {
@@ -46,15 +45,14 @@ public sealed partial class MainWindowViewModel
     private async void CopyResult()
     {
         // The shown image's Original is the one loaded; while another loads there is nothing to copy yet.
-        if (_workspace.Selected is not { } image || _original is not { } original || !SamePath(image.Key, _shown?.Key))
+        if (!ShowsSelected(out var image, out var original))
             return;
         try
         {
             var steps = _workspace.Steps(image);
             var result = await Task.Run(() => Renderer.Render(original, steps).Result);
             await _clipboard.SetImageAsync(result);
-            _notices.Add(new Message("ResultCopied", StripEntry.DisplayName(image)));
-            RaiseNotices();
+            AddNotice("ResultCopied", StripEntry.DisplayName(image));
         }
         catch (ArgumentException)
         {

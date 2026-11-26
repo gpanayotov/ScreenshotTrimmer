@@ -1,5 +1,6 @@
 using System.Collections.ObjectModel;
 using System.ComponentModel;
+using System.Diagnostics.CodeAnalysis;
 using System.Windows.Input;
 using Avalonia.Media.Imaging;
 using Avalonia.Threading;
@@ -123,13 +124,7 @@ public sealed partial class MainWindowViewModel : Observable, IDisposable
     {
         if (crop == _crop)
             return;
-        if (_workspace.Selected is { } image && Image is not null && SamePath(image.Key, _shown?.Key))
-        {
-            var hasShadowPadding = _shownHasShadowPadding;
-            IfStillListed(image, listed => _workspace.SetSteps(listed, FirstStep.Apply(
-                _workspace.Steps(listed), Settings, hasShadowPadding,
-                steps => steps with { Crop = crop }), mergeKey));
-        }
+        ChangeShownSteps(steps => steps with { Crop = crop }, mergeKey);
         // The workspace's change has set the crop it recorded; when nothing was recorded, the viewer goes back to the
         // current one.
         Raise(nameof(Crop));
@@ -281,17 +276,13 @@ public sealed partial class MainWindowViewModel : Observable, IDisposable
         _workspace.ApplySettings(settings);
         ShowFinishing(_workspace.Selected);
         if (failure is not null)
-        {
-            _notices.Add(new Message("SettingsNotSaved", _settings.FilePath, failure));
-            RaiseNotices();
-        }
+            AddNotice("SettingsNotSaved", _settings.FilePath, failure);
     }
 
     /// <summary>Reports something that went wrong unexpectedly as a notice, instead of letting it end the app.</summary>
     public void ReportFailure(Exception failure)
     {
-        _notices.Add(new Message("UnexpectedError", failure.Message));
-        RaiseNotices();
+        AddNotice("UnexpectedError", failure.Message);
     }
 
     /// <summary>Lets go of the language, the workspace and the shown image; the window is closing.</summary>
@@ -357,6 +348,44 @@ public sealed partial class MainWindowViewModel : Observable, IDisposable
         {
             ReportFailure(e);
         }
+    }
+
+    /// <summary>
+    /// Whether the selected image is the one shown and its Original has loaded, giving both; while another image
+    /// loads, the selected one has nothing shown to change or copy yet.
+    /// </summary>
+    private bool ShowsSelected([NotNullWhen(true)] out WorkspaceImage? image, [NotNullWhen(true)] out RgbaImage? original)
+    {
+        if (_workspace.Selected is { } selected && _original is { } loaded && SamePath(selected.Key, _shown?.Key))
+        {
+            (image, original) = (selected, loaded);
+            return true;
+        }
+        (image, original) = (null, null);
+        return false;
+    }
+
+    /// <summary>
+    /// Changes the shown selected image's Steps with <paramref name="change"/>, its first Step seeded from the
+    /// remembered settings, merged with the previous Step when it has the same <paramref name="mergeKey"/>. Nothing
+    /// happens while the selected image is not shown yet or has left the list.
+    /// </summary>
+    private void ChangeShownSteps(Func<Steps, Steps> change, object? mergeKey = null)
+    {
+        if (!ShowsSelected(out var image, out _))
+            return;
+        var hasShadowPadding = _shownHasShadowPadding;
+        IfStillListed(image, listed => _workspace.SetSteps(listed,
+            FirstStep.Apply(_workspace.Steps(listed), Settings, hasShadowPadding, change), mergeKey));
+    }
+
+    /// <summary><paramref name="image"/>'s current Steps; <c>Steps.None</c> for no image or one no longer listed.</summary>
+    private Steps ListedSteps(WorkspaceImage? image)
+    {
+        var steps = Steps.None;
+        if (image is not null)
+            IfStillListed(image, listed => steps = _workspace.Steps(listed));
+        return steps;
     }
 
     /// <summary>
@@ -441,13 +470,7 @@ public sealed partial class MainWindowViewModel : Observable, IDisposable
     }
 
     /// <summary>Shows the crop in <paramref name="image"/>'s Steps.</summary>
-    private void ShowCrop(WorkspaceImage? image)
-    {
-        Crop? crop = null;
-        if (image is not null)
-            IfStillListed(image, listed => crop = _workspace.Steps(listed).Crop);
-        Set(ref _crop, crop, nameof(Crop));
-    }
+    private void ShowCrop(WorkspaceImage? image) => Set(ref _crop, ListedSteps(image).Crop, nameof(Crop));
 
     /// <summary>
     /// Tells the user which folders went away; the title stops naming the open folder once it is gone. The workspace
@@ -455,8 +478,7 @@ public sealed partial class MainWindowViewModel : Observable, IDisposable
     /// </summary>
     private void ReportUnavailable(IReadOnlyList<string> folders)
     {
-        _notices.Add(new Message("FolderUnavailable", string.Join(", ", folders)));
-        RaiseNotices();
+        AddNotice("FolderUnavailable", string.Join(", ", folders));
         if (_openFolder is not null && folders.Any(folder => FileNames.Same(folder, _openFolder)))
         {
             _openFolder = null;
@@ -522,6 +544,13 @@ public sealed partial class MainWindowViewModel : Observable, IDisposable
     private void DismissNotices()
     {
         _notices.Clear();
+        RaiseNotices();
+    }
+
+    /// <summary>Adds the notice the resource <paramref name="key"/> formats with <paramref name="args"/> and shows it.</summary>
+    private void AddNotice(string key, params object?[] args)
+    {
+        _notices.Add(new Message(key, args));
         RaiseNotices();
     }
 
