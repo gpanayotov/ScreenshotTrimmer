@@ -65,7 +65,8 @@ public sealed partial class Workspace : IDisposable
     /// <summary>
     /// Replaces the list with the images for <paramref name="paths"/>: one file lists its whole folder with that file
     /// selected; a folder or several paths list their images with the first selected. Removed entries are listed
-    /// again, Pasted images leave the list, and every image starts with no Steps. Paths that exist neither as a file nor as a folder are skipped and returned, so the caller can tell the
+    /// again, Pasted images leave the list, and every image starts with no Steps. A running Batch is cancelled and waited
+    /// for first. Paths that exist neither as a file nor as a folder are skipped and returned, so the caller can tell the
     /// user.
     /// </summary>
     public IReadOnlyList<string> Open(IReadOnlyList<string> paths)
@@ -76,7 +77,7 @@ public sealed partial class Workspace : IDisposable
         var missing = fullPaths.Where(path => !File.Exists(path) && !Directory.Exists(path)).ToList();
         var existing = fullPaths.Except(missing).ToList();
 
-        Update(() =>
+        UpdateWithNoBatch(() =>
         {
             _openedPaths = existing;
             _openedOneFile = existing is [var only] && File.Exists(only);
@@ -172,16 +173,24 @@ public sealed partial class Workspace : IDisposable
     /// <summary>Selects the previous image; does nothing on the first one.</summary>
     public void Previous() => Update(() => SelectAt(SelectedIndex - 1));
 
-    /// <summary>Stops watching the disk. Every later update throws <see cref="ObjectDisposedException"/>.</summary>
+    /// <summary>
+    /// Stops watching the disk, and cancels a running Batch and waits for it to stop. Every later update throws
+    /// <see cref="ObjectDisposedException"/>.
+    /// </summary>
     public void Dispose()
     {
+        BatchRun? running;
         lock (_lock)
         {
             if (_disposed)
                 return;
             _disposed = true;
             _folderWatch.Dispose();
+            running = _batch;
+            running?.Cancel();
         }
+        if (running is not null)
+            StopBatch(running);
     }
 
     /// <summary>

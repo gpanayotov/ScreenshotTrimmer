@@ -14,6 +14,9 @@ public enum BatchSkip
 
     /// <summary>The image is the Result of another listed image.</summary>
     Result,
+
+    /// <summary>The image left the list or the disk while the Batch ran.</summary>
+    Gone,
 }
 
 /// <summary>Decides which listed images a <b>Batch</b> processes, so it never redoes finished work or overwrites hand work.</summary>

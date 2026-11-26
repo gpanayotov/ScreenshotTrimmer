@@ -5,10 +5,12 @@ using ScreenshotTrimmer.Processing.Workspaces;
 namespace ScreenshotTrimmer.App;
 
 // The Batch: Auto crop and the current finishing for every listed image that needs it, run off the interface thread,
-// with its progress and a summary notice.
+// with its progress, a Cancel button and a summary notice.
 public sealed partial class MainWindowViewModel
 {
     private RelayCommand? _batchCommand;
+    private RelayCommand? _cancelBatchCommand;
+    private CancellationTokenSource? _batchCancellation;
     private bool _isBatchRunning;
     private BatchProgress _batchProgress;
 
@@ -27,8 +29,16 @@ public sealed partial class MainWindowViewModel
             if (!Set(ref _isBatchRunning, value))
                 return;
             BatchCommand.NotifyCanExecuteChanged();
+            CancelBatchCommand.NotifyCanExecuteChanged();
         }
     }
+
+    /// <summary>
+    /// Cancels the running Batch: it starts no more images and stops the ones in flight; the images it finished keep
+    /// their Steps, and its summary says it was cancelled.
+    /// </summary>
+    public RelayCommand CancelBatchCommand => _cancelBatchCommand ??= new RelayCommand(
+        () => _batchCancellation?.Cancel(), () => IsBatchRunning);
 
     /// <summary>How many listed images the running Batch has done.</summary>
     public int BatchDone => _batchProgress.Done;
@@ -50,17 +60,23 @@ public sealed partial class MainWindowViewModel
         IsBatchRunning = true;
         ShowBatchProgress(new BatchProgress(0, _workspace.Images.Count));
         var progress = new Progress<BatchProgress>(ShowBatchProgress);
+        using var cancellation = new CancellationTokenSource();
+        _batchCancellation = cancellation;
         try
         {
-            var summary = await Task.Run(() => _workspace.RunBatch(progress, CancellationToken.None));
-            _notices.Add(new Message("BatchDone", summary.Processed, summary.NoSubjectFound.Count,
-                summary.SkippedFor(BatchSkip.HasSteps), summary.SkippedFor(BatchSkip.AlreadyProcessed),
-                summary.SkippedFor(BatchSkip.Result)));
+            // Opening another list or closing the window cancels the Batch in the workspace and waits for it.
+            var summary = await Task.Run(() => _workspace.RunBatch(progress, cancellation.Token));
+            _notices.Add(new Message(summary.Cancelled ? "BatchCancelled" : "BatchDone", summary.Processed,
+                summary.NoSubjectFound.Count, summary.SkippedFor(BatchSkip.HasSteps),
+                summary.SkippedFor(BatchSkip.AlreadyProcessed), summary.SkippedFor(BatchSkip.Result),
+                summary.SkippedFor(BatchSkip.Gone), summary.Failed.Count));
             if (summary.NoSubjectFound.Count > 0)
             {
                 _notices.Add(new Message("BatchNoSubjectFoundIn",
                     string.Join(", ", summary.NoSubjectFound.Select(StripEntry.DisplayName))));
             }
+            if (summary.Failed.Count > 0)
+                _notices.Add(new Message("BatchFailedIn", string.Join(", ", summary.Failed.Select(StripEntry.DisplayName))));
             RaiseNotices();
         }
         catch (Exception e)
@@ -69,6 +85,7 @@ public sealed partial class MainWindowViewModel
         }
         finally
         {
+            _batchCancellation = null;
             IsBatchRunning = false;
         }
     }

@@ -25,18 +25,25 @@ public sealed partial class Workspace
     public RgbaImage LoadOriginal(WorkspaceImage image)
     {
         ArgumentNullException.ThrowIfNull(image);
-        ImageKey key;
-        RgbaImage? pastedPixels;
-        BackupSave? backupSave;
+        Func<RgbaImage> load;
         lock (_lock)
         {
             ObjectDisposedException.ThrowIf(_disposed, this);
-            key = Images[RequireListed(image)].Key;
-            pastedPixels = PastedPixels(key);
-            backupSave = _backupSaves.GetValueOrDefault(key);
+            load = OriginalLoader(Images[RequireListed(image)].Key);
         }
+        return load();
+    }
+
+    /// <summary>
+    /// Reads the Original of the listed image with the key <paramref name="key"/>, as <see cref="LoadOriginal"/> does,
+    /// when called; get it under the lock and call it outside, so the file is read without holding the lock.
+    /// </summary>
+    private Func<RgbaImage> OriginalLoader(ImageKey key)
+    {
+        var pastedPixels = PastedPixels(key);
+        var backupSave = _backupSaves.GetValueOrDefault(key);
         // A Pasted image not saved yet always has its pixels, so only a file gets this far.
-        return pastedPixels ?? backupSave?.LoadOriginal() ?? ImageFile.Load(key.Path!);
+        return () => pastedPixels ?? backupSave?.LoadOriginal() ?? ImageFile.Load(key.Path!);
     }
 
     /// <summary>

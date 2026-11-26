@@ -145,7 +145,10 @@
   <data name="ToolbarBatch" xml:space="preserve"><value>Batch</value></data>
   <data name="ToolbarBatchTip" xml:space="preserve"><value>Auto crop every listed image that needs it with the current Clean edges and Shadow settings, for review before saving (Ctrl+B)</value></data>
   <data name="BatchProgress" xml:space="preserve"><value>Batch: {0} of {1}</value></data>
-  <data name="BatchDone" xml:space="preserve"><value>Batch finished: {0} processed, {1} with no subject found. Skipped: {2} already edited, {3} already processed, {4} Results. Nothing is saved until you save.</value></data>
+  <data name="BatchDone" xml:space="preserve"><value>Batch finished: {0} processed, {1} with no subject found, {6} could not be read. Skipped: {2} already edited, {3} already processed, {4} Results, {5} gone from the list. Nothing is saved until you save.</value></data>
+  <data name="BatchCancelled" xml:space="preserve"><value>Batch cancelled: {0} processed, {1} with no subject found, {6} could not be read before it stopped. Skipped: {2} already edited, {3} already processed, {4} Results, {5} gone from the list. The processed images keep their Steps; nothing is saved until you save.</value></data>
+  <data name="BatchFailedIn" xml:space="preserve"><value>Could not read: {0}</value></data>
+  <data name="CancelBatchTip" xml:space="preserve"><value>Stop the Batch; the images it has processed keep their Steps</value></data>
   <data name="BatchNoSubjectFoundIn" xml:space="preserve"><value>No subject found in: {0}</value></data>
   <data name="NoSubjectFoundTip" xml:space="preserve"><value>The Batch found no subject in this image</value></data>
 </root>
