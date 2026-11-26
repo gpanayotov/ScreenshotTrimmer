@@ -7,6 +7,13 @@
     <Nullable>enable</Nullable>
     <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
     <AvaloniaUseCompiledBindingsByDefault>true</AvaloniaUseCompiledBindingsByDefault>
+    <!-- The executable users download is ScreenshotTrimmer(.exe); the code keeps its namespace. -->
+    <AssemblyName>ScreenshotTrimmer</AssemblyName>
+    <RootNamespace>ScreenshotTrimmer.App</RootNamespace>
+    <!-- Builds carry a development version unless CI passes the real one as InformationalVersion
+         (see build/version.sh); the SDK must not append its own commit hash to it. -->
+    <Version>0.0.0-dev</Version>
+    <IncludeSourceRevisionInInformationalVersion>false</IncludeSourceRevisionInInformationalVersion>
   </PropertyGroup>
 
   <!-- Avalonia 11.3.23 depends on SkiaSharp 2.88.9, the version the processing library is pinned to. -->
