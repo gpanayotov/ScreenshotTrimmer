@@ -45,17 +45,25 @@ public sealed partial class Workspace
         Update(() =>
         {
             RequireListed(image);
-            var state = StepsOf(image.Key);
-            if (state.Current == steps)
-                return;
-            var merging = mergeKey is not null && Equals(mergeKey, state.MergeKey) && !state.Earlier.IsEmpty;
-            var earlier = merging ? state.Earlier : state.Earlier.Push(state.Current);
-            _steps[image.Key] = earlier.Peek() == steps
-                // A run that came back to where it started has nothing left to undo.
-                ? state with { Current = steps, Earlier = earlier.Pop(), Later = [], MergeKey = null }
-                : state with { Current = steps, Earlier = earlier, Later = [], MergeKey = mergeKey };
-            AnnounceSteps();
+            RecordSteps(image.Key, steps, mergeKey);
         });
+    }
+
+    /// <summary>
+    /// <see cref="SetSteps"/> for the listed image with the key <paramref name="key"/>; call under the lock.
+    /// </summary>
+    private void RecordSteps(ImageKey key, Steps steps, object? mergeKey)
+    {
+        var state = StepsOf(key);
+        if (state.Current == steps)
+            return;
+        var merging = mergeKey is not null && Equals(mergeKey, state.MergeKey) && !state.Earlier.IsEmpty;
+        var earlier = merging ? state.Earlier : state.Earlier.Push(state.Current);
+        _steps[key] = earlier.Peek() == steps
+            // A run that came back to where it started has nothing left to undo.
+            ? state with { Current = steps, Earlier = earlier.Pop(), Later = [], MergeKey = null }
+            : state with { Current = steps, Earlier = earlier, Later = [], MergeKey = mergeKey };
+        AnnounceSteps();
     }
 
     /// <summary>
@@ -137,19 +145,24 @@ public sealed partial class Workspace
     /// <summary>Announces a change of Steps, with the unsaved markers brought up to date; call under the lock.</summary>
     private void AnnounceSteps()
     {
-        if (!RefreshUnsavedMarkers())
+        if (!RefreshMarkers())
             QueueChange();
     }
 
     /// <summary>
-    /// Brings every listed entry's <see cref="WorkspaceImage.HasUnsavedSteps"/> up to date and queues a change when one
-    /// changed; call under the lock.
+    /// Brings every listed entry's <see cref="WorkspaceImage.HasUnsavedSteps"/> and
+    /// <see cref="WorkspaceImage.NoSubjectFound"/> markers up to date and queues a change when one changed; call under
+    /// the lock.
     /// </summary>
     /// <returns>Whether a marker changed, and so a change was queued.</returns>
-    private bool RefreshUnsavedMarkers()
+    private bool RefreshMarkers()
     {
         var images = Images
-            .Select(image => image with { HasUnsavedSteps = image.IsPasted || HasUnsavedSteps(image.Key) })
+            .Select(image => image with
+            {
+                HasUnsavedSteps = image.IsPasted || HasUnsavedSteps(image.Key),
+                NoSubjectFound = _noSubjectFound.Contains(image.Key),
+            })
             .ToList();
         if (images.SequenceEqual(Images))
             return false;
@@ -173,7 +186,7 @@ public sealed partial class Workspace
     }
 
     /// <summary>
-    /// Discards the Steps and Backup-mode saves of the files in <paramref name="before"/> that are no longer listed, so
+    /// Discards the Steps, Backup-mode saves and No Subject found flags of the files in <paramref name="before"/> that are no longer listed, so
     /// a file that comes back under the same name starts afresh; call under the lock after re-listing.
     /// </summary>
     /// <returns>The paths of the dropped images that had unsaved Steps, in strip order.</returns>
@@ -185,6 +198,7 @@ public sealed partial class Workspace
         {
             _steps.Remove(key);
             _backupSaves.Remove(key);
+            _noSubjectFound.Remove(key);
         }
         return unsaved;
     }

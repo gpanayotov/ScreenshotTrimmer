@@ -33,4 +33,10 @@ public sealed record WorkspaceImage
     /// not been saved yet.
     /// </summary>
     public bool HasUnsavedSteps { get; init; }
+
+    /// <summary>
+    /// Whether a Batch found no Subject in this image and so gave it no Steps, shown as the "No subject found" marker.
+    /// Session-only: dropped with the image and when another list is opened.
+    /// </summary>
+    public bool NoSubjectFound { get; init; }
 }

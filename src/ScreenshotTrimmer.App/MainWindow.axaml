@@ -17,6 +17,7 @@
     <KeyBinding Gesture="Ctrl+S" Command="{Binding SaveCommand}" />
     <KeyBinding Gesture="Ctrl+Shift+S" Command="{Binding SaveAllCommand}" />
     <KeyBinding Gesture="Ctrl+Shift+A" Command="{Binding AutoCropCommand}" />
+    <KeyBinding Gesture="Ctrl+B" Command="{Binding BatchCommand}" />
     <!-- Like Delete, undo and redo reach these bindings only when the focused text box left them unhandled. -->
     <KeyBinding Gesture="Ctrl+Z" Command="{Binding UndoCommand}" />
     <KeyBinding Gesture="Ctrl+Y" Command="{Binding RedoCommand}" />
@@ -83,6 +84,7 @@
         <MenuItem Header="{loc:Tr RemoveFromList}" InputGesture="Delete" Command="{Binding RemoveSelectedCommand}" />
         <Separator />
         <MenuItem Header="{loc:Tr AutoCropMenu}" InputGesture="Ctrl+Shift+A" Command="{Binding AutoCropCommand}" />
+        <MenuItem Header="{loc:Tr BatchMenu}" InputGesture="Ctrl+B" Command="{Binding BatchCommand}" />
         <Separator />
         <!-- The crop tool: what a newly drawn rectangle does. -->
         <MenuItem Header="{loc:Tr ClassicCropTool}" ToggleType="Radio" GroupName="CropTool"
@@ -112,6 +114,8 @@
         <Separator Width="1" Height="20" Margin="6,0" Background="{DynamicResource SystemControlForegroundBaseLowBrush}" />
         <Button Content="{loc:Tr ToolbarAutoCrop}" ToolTip.Tip="{loc:Tr ToolbarAutoCropTip}"
                 Command="{Binding AutoCropCommand}" />
+        <Button Content="{loc:Tr ToolbarBatch}" ToolTip.Tip="{loc:Tr ToolbarBatchTip}"
+                Command="{Binding BatchCommand}" />
         <RadioButton GroupName="ToolbarCropTool" Content="{loc:Tr ToolbarClassicCrop}"
                      ToolTip.Tip="{loc:Tr ToolbarClassicCropTip}"
                      IsChecked="{Binding IsClassicCropTool, Mode=TwoWay}" />
@@ -160,6 +164,12 @@
         <StackPanel Orientation="Horizontal" Spacing="6" IsVisible="{Binding IsDetecting}">
           <ProgressBar IsIndeterminate="True" Width="80" MinWidth="80" VerticalAlignment="Center" />
           <TextBlock Text="{loc:Tr FindingSubject}" />
+        </StackPanel>
+        <!-- The running Batch's progress; the rest of the window stays usable. -->
+        <StackPanel Orientation="Horizontal" Spacing="6" IsVisible="{Binding IsBatchRunning}">
+          <ProgressBar Width="120" MinWidth="120" VerticalAlignment="Center"
+                       Minimum="0" Maximum="{Binding BatchTotal}" Value="{Binding BatchDone}" />
+          <TextBlock Text="{Binding BatchProgressText}" />
         </StackPanel>
       </StackPanel>
     </Border>
@@ -212,6 +222,12 @@
                          Margin="0,0,6,0" VerticalAlignment="Center"
                          Fill="{DynamicResource SystemControlForegroundAccentBrush}"
                          ToolTip.Tip="{loc:Tr UnsavedTip}" />
+                <!-- The "No subject found" marker: a Batch found nothing to crop this image to. -->
+                <PathIcon DockPanel.Dock="Left" IsVisible="{Binding NoSubjectFound}" Width="12" Height="12"
+                          Margin="0,0,6,0" VerticalAlignment="Center"
+                          Foreground="{DynamicResource SystemControlErrorTextForegroundBrush}"
+                          Data="M12,2 L23,21 L1,21 Z M11,9 L13,9 L13,15 L11,15 Z M11,17 L13,17 L13,19 L11,19 Z"
+                          ToolTip.Tip="{loc:Tr NoSubjectFoundTip}" />
                 <TextBlock Text="{Binding Name}" TextTrimming="CharacterEllipsis" TextAlignment="Center"
                            VerticalAlignment="Center" ToolTip.Tip="{Binding Name}" />
               </DockPanel>

@@ -1,7 +1,5 @@
-using System.Runtime.InteropServices;
 using ScreenshotTrimmer.Processing.Detection;
 using ScreenshotTrimmer.Processing.Imaging;
-using SkiaSharp;
 
 namespace ScreenshotTrimmer.Processing.Tests.Samples;
 
@@ -25,7 +23,7 @@ internal static class SampleOverview
             Outline(picture, approvedWhenDifferent, Approved, Approved, gap: Line);
         if (found is not null)
             Outline(picture, found, Window, Popup, gap: 0);
-        Encode(picture, path);
+        EncodedImages.WritePng(path, picture);
     }
 
     private static void Outline(RgbaImage picture, Subject subject, Rgba window, Rgba popup, int gap)
@@ -57,24 +55,5 @@ internal static class SampleOverview
     {
         if (x >= 0 && y >= 0 && x < picture.Width && y < picture.Height)
             picture[x, y] = colour;
-    }
-
-    private static void Encode(RgbaImage picture, string path)
-    {
-        var info = new SKImageInfo(picture.Width, picture.Height, SKColorType.Rgba8888, SKAlphaType.Unpremul);
-        var bytes = picture.Bytes.ToArray();
-        var handle = GCHandle.Alloc(bytes, GCHandleType.Pinned);
-        try
-        {
-            using var pixmap = new SKPixmap(info, handle.AddrOfPinnedObject(), info.RowBytes);
-            using var data = pixmap.Encode(SKEncodedImageFormat.Png, 100)
-                ?? throw new InvalidOperationException("SkiaSharp could not encode the overview picture.");
-            using var file = File.Create(path);
-            data.SaveTo(file);
-        }
-        finally
-        {
-            handle.Free();
-        }
     }
 }

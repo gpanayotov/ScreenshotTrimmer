@@ -141,4 +141,11 @@
   <data name="OverwriteTitle" xml:space="preserve"><value>Replace file</value></data>
   <data name="OverwriteQuestion" xml:space="preserve"><value>{0} already exists. Replace it?</value></data>
   <data name="ReplaceAnswer" xml:space="preserve"><value>Replace</value></data>
+  <data name="BatchMenu" xml:space="preserve"><value>_Batch</value></data>
+  <data name="ToolbarBatch" xml:space="preserve"><value>Batch</value></data>
+  <data name="ToolbarBatchTip" xml:space="preserve"><value>Auto crop every listed image that needs it with the current Clean edges and Shadow settings, for review before saving (Ctrl+B)</value></data>
+  <data name="BatchProgress" xml:space="preserve"><value>Batch: {0} of {1}</value></data>
+  <data name="BatchDone" xml:space="preserve"><value>Batch finished: {0} processed, {1} with no subject found. Skipped: {2} already edited, {3} already processed, {4} Results. Nothing is saved until you save.</value></data>
+  <data name="BatchNoSubjectFoundIn" xml:space="preserve"><value>No subject found in: {0}</value></data>
+  <data name="NoSubjectFoundTip" xml:space="preserve"><value>The Batch found no subject in this image</value></data>
 </root>

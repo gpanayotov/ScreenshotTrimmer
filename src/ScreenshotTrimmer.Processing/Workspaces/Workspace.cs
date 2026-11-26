@@ -90,6 +90,7 @@ public sealed partial class Workspace : IDisposable
             _removed = new HashSet<string>(FileNames.Comparer);
             _steps.Clear();
             _backupSaves.Clear();
+            _noSubjectFound.Clear();
             ForgetPasted();
             _folderWatch.Reset();
             Relist(listing => listing.Selected is { } opened ? Find(opened.Path) : Images.FirstOrDefault());
@@ -149,6 +150,7 @@ public sealed partial class Workspace : IDisposable
             RequireListed(image);
             var before = Images.Select(image => image.Key).ToList();
             var selectedIndex = SelectedIndex;
+            _noSubjectFound.Remove(image.Key);
             if (image.Path is { } path)
                 _removed.Add(path);
             else
@@ -234,6 +236,7 @@ public sealed partial class Workspace : IDisposable
                     Key = key, IsResult = file.IsResult, HasResult = file.HasResult,
                     ContentVersion = ContentVersion.Of(file.Path),
                     HasUnsavedSteps = HasUnsavedSteps(key),
+                    NoSubjectFound = _noSubjectFound.Contains(key),
                 };
             })
             .Concat(PastedEntries())
@@ -271,6 +274,7 @@ public sealed partial class Workspace : IDisposable
         _removed = _removed.Select(renamed).ToHashSet(FileNames.Comparer);
         FollowRenamesOfSavedPasted(renamed);
         FollowRenamesWithSteps(renamed);
+        FollowRenamesOfNoSubjectFound(renamed);
         FollowRenamesOfBackupSaves(renamed);
         if (_openedOneFile && _openedPaths is [var file] && !File.Exists(file))
         {
