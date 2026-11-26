@@ -18,6 +18,10 @@
     <KeyBinding Gesture="Ctrl+Shift+S" Command="{Binding SaveAllCommand}" />
     <KeyBinding Gesture="Ctrl+Shift+A" Command="{Binding AutoCropCommand}" />
     <KeyBinding Gesture="Ctrl+B" Command="{Binding BatchCommand}" />
+    <KeyBinding Gesture="F3" Command="{Binding NextNoSubjectFoundCommand}" />
+    <KeyBinding Gesture="Shift+F3" Command="{Binding PreviousNoSubjectFoundCommand}" />
+    <KeyBinding Gesture="F4" Command="{Binding NextUnsavedCommand}" />
+    <KeyBinding Gesture="Shift+F4" Command="{Binding PreviousUnsavedCommand}" />
     <!-- Like Delete, undo and redo reach these bindings only when the focused text box left them unhandled. -->
     <KeyBinding Gesture="Ctrl+Z" Command="{Binding UndoCommand}" />
     <KeyBinding Gesture="Ctrl+Y" Command="{Binding RedoCommand}" />
@@ -55,6 +59,9 @@
         <!-- A menu item does not check itself when clicked: its command changes the setting, and the binding shows it. -->
         <MenuItem Header="{loc:Tr ShowResults}" ToggleType="CheckBox"
                   Command="{Binding ToggleShowResultsCommand}" IsChecked="{Binding ShowResults, Mode=OneWay}" />
+        <MenuItem Header="{loc:Tr ShowOnlyNoSubjectFound}" ToggleType="CheckBox"
+                  Command="{Binding ToggleShowOnlyNoSubjectFoundCommand}"
+                  IsChecked="{Binding ShowOnlyNoSubjectFound, Mode=OneWay}" />
         <Separator />
         <!-- Tab toggles it while the viewer has focus; see MainWindow.OnViewerKeyDown. -->
         <MenuItem Header="{loc:Tr ResultView}" ToggleType="CheckBox" InputGesture="Tab"
@@ -80,6 +87,11 @@
       <MenuItem Header="{loc:Tr ImageMenu}">
         <MenuItem Header="{loc:Tr NextImage}" InputGesture="PageDown" Command="{Binding NextCommand}" />
         <MenuItem Header="{loc:Tr PreviousImage}" InputGesture="PageUp" Command="{Binding PreviousCommand}" />
+        <MenuItem Header="{loc:Tr NextNoSubjectFound}" InputGesture="F3" Command="{Binding NextNoSubjectFoundCommand}" />
+        <MenuItem Header="{loc:Tr PreviousNoSubjectFound}" InputGesture="Shift+F3"
+                  Command="{Binding PreviousNoSubjectFoundCommand}" />
+        <MenuItem Header="{loc:Tr NextUnsaved}" InputGesture="F4" Command="{Binding NextUnsavedCommand}" />
+        <MenuItem Header="{loc:Tr PreviousUnsaved}" InputGesture="Shift+F4" Command="{Binding PreviousUnsavedCommand}" />
         <Separator />
         <MenuItem Header="{loc:Tr RemoveFromList}" InputGesture="Delete" Command="{Binding RemoveSelectedCommand}" />
         <Separator />
@@ -149,6 +161,10 @@
       <DockPanel>
         <Button DockPanel.Dock="Right" VerticalAlignment="Center" Content="{loc:Tr Dismiss}"
                 Command="{Binding DismissNoticesCommand}" />
+        <!-- The Batch summary's action: show only the images with no Subject found. -->
+        <Button DockPanel.Dock="Right" VerticalAlignment="Center" Margin="0,0,6,0"
+                Content="{loc:Tr ShowNoSubjectFound}" ToolTip.Tip="{loc:Tr ShowNoSubjectFoundTip}"
+                IsVisible="{Binding OffersShowNoSubjectFound}" Command="{Binding ShowNoSubjectFoundCommand}" />
         <SelectableTextBlock Text="{Binding NoticeText}" TextWrapping="Wrap" VerticalAlignment="Center" />
       </DockPanel>
     </Border>

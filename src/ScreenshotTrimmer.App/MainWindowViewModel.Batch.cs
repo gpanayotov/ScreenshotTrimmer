@@ -48,13 +48,13 @@ public sealed partial class MainWindowViewModel
     public string BatchProgressText => Localizer.Instance.Format("BatchProgress", BatchDone, BatchTotal);
 
     /// <summary>The Batch command's tooltip: what it does, or why it is disabled when no listed image needs it.</summary>
-    public string BatchTip => Entries.Count > 0 && _batchPlan is { Images.Count: 0 } plan
+    public string BatchTip => !ShowsHint && _batchPlan is { Images.Count: 0 } plan
         ? Localizer.Instance.Format("BatchNothingToProcessTip", plan.SkippedFor(BatchSkip.HasSteps),
             plan.SkippedFor(BatchSkip.AlreadyProcessed), plan.SkippedFor(BatchSkip.Result))
         : Localizer.Instance["ToolbarBatchTip"];
 
     private bool CanRunBatch() =>
-        !IsBatchRunning && !_isStartingBatch && Entries.Count > 0 && _batchPlan is not { Images.Count: 0 };
+        !IsBatchRunning && !_isStartingBatch && !ShowsHint && _batchPlan is not { Images.Count: 0 };
 
     private async void RunBatch()
     {
@@ -94,6 +94,7 @@ public sealed partial class MainWindowViewModel
             {
                 _notices.Add(new Message("BatchNoSubjectFoundIn",
                     string.Join(", ", summary.NoSubjectFound.Select(StripEntry.DisplayName))));
+                OfferShowNoSubjectFound(true);
             }
             RaiseNotices();
         }
