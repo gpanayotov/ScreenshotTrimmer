@@ -4,12 +4,6 @@ using ScreenshotTrimmer.Processing.Rendering;
 namespace ScreenshotTrimmer.Processing.Viewing;
 
 /// <summary>
-/// A point on screen in a viewer, in device-independent units from the view's top-left corner, as pointer events give
-/// it. The display scaling turns it into the physical pixels a <see cref="Viewport"/> works in.
-/// </summary>
-public readonly record struct ViewPoint(double X, double Y);
-
-/// <summary>
 /// The crop rectangle being edited on an image, in whole image pixels and always inside the image, with the rules for
 /// editing it through a <see cref="Viewport"/>. Has no interface dependency and knows nothing about where its rectangle
 /// came from, so a Classic crop and a detected crop are edited the same way. Any edit that changes the rectangle gives
