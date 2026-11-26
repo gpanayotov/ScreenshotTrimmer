@@ -10,6 +10,9 @@ public sealed partial class MainWindowViewModel
 {
     private bool _showOnlyNoSubjectFound;
     private bool _offersShowNoSubjectFound;
+
+    /// <summary>Whether the Result view shows only because a Batch image was selected, not by the user's choice.</summary>
+    private bool _showsResultForBatch;
     private ICommand? _nextNoSubjectFoundCommand;
     private ICommand? _previousNoSubjectFoundCommand;
     private ICommand? _nextUnsavedCommand;
@@ -88,11 +91,20 @@ public sealed partial class MainWindowViewModel
 
     /// <summary>
     /// Shows <paramref name="image"/>, just selected, in the Result view when its Steps came from a Batch, so it can be
-    /// judged straight away.
+    /// judged straight away. The view is only borrowed: selecting an image without Batch Steps next goes back to the
+    /// Original, unless the user chose the view meanwhile (toggling it, or editing, which sets it as usual).
     /// </summary>
     private void ShowBatchResultOf(WorkspaceImage? image)
     {
+        var fromBatch = false;
         if (image is not null)
-            IfStillListed(image, listed => ShowsResult |= _workspace.HasBatchSteps(listed));
+            IfStillListed(image, listed => fromBatch = _workspace.HasBatchSteps(listed));
+        if (fromBatch && !ShowsResult)
+        {
+            ShowsResult = true;
+            _showsResultForBatch = true;
+        }
+        else if (!fromBatch && _showsResultForBatch)
+            ShowsResult = false;
     }
 }

@@ -43,13 +43,15 @@ public sealed partial class MainWindowViewModel
 
     /// <summary>
     /// Whether the viewer shows the rendered Result rather than the Original with the crop. Editing the crop switches
-    /// to the Original; changing finishing switches to the Result.
+    /// to the Original; changing finishing switches to the Result; selecting an image with Batch Steps borrows the
+    /// Result view until an image without them is selected.
     /// </summary>
     public bool ShowsResult
     {
         get => _showsResult;
         set
         {
+            _showsResultForBatch = false;
             if (!Set(ref _showsResult, value))
                 return;
             Raise(nameof(ViewerImage));
