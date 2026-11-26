@@ -13,7 +13,7 @@ public class BrowserBarTests
     {
         var image = BrowserScreenshot(Synthetic.LightApplication(width, height - BarHeight), separator: true);
 
-        var subject = SubjectDetection.Find(image);
+        var subject = SubjectDetection.Find(image).Subject;
 
         Assert.Equal(new PixelRect(0, BarHeight, width, height - BarHeight), subject?.Window);
     }
@@ -23,7 +23,7 @@ public class BrowserBarTests
     {
         var image = BrowserScreenshot(Synthetic.LightApplication(1280, 635), separator: false);
 
-        var subject = SubjectDetection.Find(image);
+        var subject = SubjectDetection.Find(image).Subject;
 
         Assert.Equal(new PixelRect(0, BarHeight, 1280, 635), subject?.Window);
     }
@@ -36,7 +36,7 @@ public class BrowserBarTests
         Synthetic.DrawDialog(page, dialog, 8);
         var image = BrowserScreenshot(page, separator: true);
 
-        var subject = SubjectDetection.Find(image);
+        var subject = SubjectDetection.Find(image).Subject;
 
         Assert.Equal(dialog with { Y = dialog.Y + BarHeight }, subject?.Window);
     }
@@ -50,7 +50,7 @@ public class BrowserBarTests
         Synthetic.DrawDialog(page, dialog, 8);
         var image = BrowserScreenshot(page, separator: true);
 
-        var subject = SubjectDetection.Find(image);
+        var subject = SubjectDetection.Find(image).Subject;
 
         Assert.Equal(dialog with { Y = dialog.Y + BarHeight }, subject?.Window);
     }
@@ -68,7 +68,7 @@ public class BrowserBarTests
         FillRounded(image, new PixelRect(820, 58, 400, 32), 16, FieldBorder);
         FillRounded(image, new PixelRect(821, 59, 398, 30), 15, Field);
 
-        Assert.Null(SubjectDetection.Find(image));
+        Assert.Equal(Finding.NothingFound, SubjectDetection.Find(image));
     }
 
     /// <summary>The height of the Browser bar <see cref="BrowserScreenshot"/> draws, its separator line included.</summary>

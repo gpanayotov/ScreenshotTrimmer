@@ -27,8 +27,9 @@ public sealed partial class Workspace
     /// time as there are processor cores. Each image that <see cref="BatchSelection"/> takes gets the Subject
     /// <see cref="SubjectDetection.Find"/> finds in its Original as one Step, built with the <see cref="FirstStep"/>
     /// rule from the settings at the start, so it is unsaved and undoable like a hand Auto crop; its Steps depend only
-    /// on its pixels and those settings. An image with no Subject found gets no Step and is marked
-    /// <see cref="WorkspaceImage.NoSubjectFound"/>. Nothing is written to disk.
+    /// on its pixels and those settings. An image <b>Already cropped</b> to its Subject gets the same Step with the
+    /// finishing only and no crop, counted as <see cref="BatchSummary.AlreadyCropped"/>. An image with no Subject found
+    /// gets no Step and is marked <see cref="WorkspaceImage.NoSubjectFound"/>. Nothing is written to disk.
     /// </summary>
     /// <remarks>
     /// Loading and detection run outside the workspace's lock, so the list stays usable. An image is checked again
@@ -173,27 +174,28 @@ public sealed partial class Workspace
                 : BatchOutcome.Failed(image);
         }
 
-        Subject? subject;
+        Finding finding;
         try
         {
-            subject = SubjectDetection.Find(original!, run.Cancellation);
+            finding = SubjectDetection.Find(original!, run.Cancellation);
         }
         catch (OperationCanceledException) when (run.IsCancelled)
         {
             return BatchOutcome.Stopped;
         }
-        var steps = subject is null
+        // An already-cropped image keeps its whole Original: its Step is the finishing only.
+        var steps = finding.Subject is null && !finding.IsAlreadyCropped
             ? null
             : FirstStep.Apply(Rendering.Steps.None, run.Settings, originalHasShadowPadding: false,
-                steps => steps with { Crop = subject.ToCrop() });
-        return ApplyBatchResult(run, key, steps);
+                steps => finding.Subject is { } subject ? steps with { Crop = subject.ToCrop() } : steps);
+        return ApplyBatchResult(run, key, steps, finding.IsAlreadyCropped);
     }
 
     /// <summary>
     /// Records <paramref name="steps"/> as the image's one Step, or marks it <see cref="WorkspaceImage.NoSubjectFound"/>
     /// when they are <c>null</c>, unless the Batch was cancelled, or the image left the list or gained Steps meanwhile.
     /// </summary>
-    private BatchOutcome ApplyBatchResult(BatchRun run, ImageKey key, Steps? steps)
+    private BatchOutcome ApplyBatchResult(BatchRun run, ImageKey key, Steps? steps, bool alreadyCropped)
     {
         BatchOutcome outcome;
         lock (_lock)
@@ -214,7 +216,7 @@ public sealed partial class Workspace
             {
                 _noSubjectFound.Remove(key);
                 RecordSteps(key, steps, mergeKey: null, fromBatch: true);
-                outcome = BatchOutcome.Processed;
+                outcome = alreadyCropped ? BatchOutcome.AlreadyCropped : BatchOutcome.Processed;
             }
         }
         Announce();
@@ -233,7 +235,7 @@ public sealed partial class Workspace
         _noSubjectFound.UnionWith(keys);
     }
 
-    private enum BatchOutcomeKind { Stopped, Processed, NoSubjectFound, Skipped, Failed }
+    private enum BatchOutcomeKind { Stopped, Processed, AlreadyCropped, NoSubjectFound, Skipped, Failed }
 
     /// <summary>What a Batch did with one image; <see cref="Image"/> is set for no Subject found and failed.</summary>
     private readonly record struct BatchOutcome(BatchOutcomeKind Kind, BatchSkip Reason = default, WorkspaceImage? Image = null)
@@ -242,6 +244,8 @@ public sealed partial class Workspace
         public static BatchOutcome Stopped => new(BatchOutcomeKind.Stopped);
 
         public static BatchOutcome Processed => new(BatchOutcomeKind.Processed);
+
+        public static BatchOutcome AlreadyCropped => new(BatchOutcomeKind.AlreadyCropped);
 
         public static BatchOutcome NoSubjectFound(WorkspaceImage image) => new(BatchOutcomeKind.NoSubjectFound, Image: image);
 
@@ -299,6 +303,7 @@ public sealed partial class Workspace
         public BatchSummary Summary() => new()
         {
             Processed = Outcomes.Count(outcome => outcome.Kind == BatchOutcomeKind.Processed),
+            AlreadyCropped = Outcomes.Count(outcome => outcome.Kind == BatchOutcomeKind.AlreadyCropped),
             NoSubjectFound = ImagesWith(BatchOutcomeKind.NoSubjectFound),
             Failed = ImagesWith(BatchOutcomeKind.Failed),
             Skipped = _plan.Skipped.Plus(

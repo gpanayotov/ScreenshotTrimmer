@@ -9,8 +9,8 @@ namespace ScreenshotTrimmer.Processing.Detection;
 public static class SubjectDetection
 {
     /// <summary>
-    /// The Subject in the whole image, or <c>null</c> when none is found, including when the Subject is the whole image
-    /// because the screenshot is already cropped to it.
+    /// What the whole image holds: the Subject to crop to, that the image is <b>Already cropped</b> to its Subject, or
+    /// nothing found.
     /// </summary>
     /// <remarks>
     /// <para>
@@ -26,17 +26,25 @@ public static class SubjectDetection
     /// it in this sense, so the window wins and the menu is kept as a Popup overhang. In a browser screenshot with no
     /// dialog, the Subject is the web page below the Browser bar.
     /// </para>
+    /// <para>
+    /// When no Subject is found, the image is already cropped when its own edges are the sides of its Subject: the best
+    /// window is the whole image within the corner margin, or each of the image's four corners is cut off, as a rounded
+    /// corner or a sliver of page left along the sides shows. A featureless image, or a page that reaches the image's
+    /// corners, is nothing found.
+    /// </para>
     /// </remarks>
     /// <exception cref="OperationCanceledException"><paramref name="cancellation"/> was cancelled.</exception>
-    public static Subject? Find(RgbaImage image, CancellationToken cancellation = default)
+    public static Finding Find(RgbaImage image, CancellationToken cancellation = default)
     {
         ArgumentNullException.ThrowIfNull(image);
         var edges = new EdgeMap(image, RectangleMethod.MinimumRun, cancellation);
         var rectangles = RectangleMethod.FindRectangles(edges, cancellation);
         var window = ChooseWindow(image, edges, rectangles, cancellation);
-        if (window is not { } found || IsWholeImage(found, image))
-            return BrowserBar.FindPage(image, cancellation) is { } page ? new Subject(page) : null;
-        return new Subject(found) { Popups = RectangleMethod.Popups(image, edges, rectangles, found) };
+        if (window is { } found && !IsWholeImage(found, image))
+            return Finding.Of(new Subject(found) { Popups = RectangleMethod.Popups(image, edges, rectangles, found) });
+        if (BrowserBar.FindPage(image, cancellation) is { } page)
+            return Finding.Of(new Subject(page));
+        return window is not null || HasCutCorners(image) ? Finding.AlreadyCropped : Finding.NothingFound;
     }
 
     /// <summary>
@@ -123,6 +131,24 @@ public static class SubjectDetection
             return false;
         int[] gaps = [body.X - window.X, body.Y - window.Y, window.Right - body.Right, window.Bottom - body.Bottom];
         return gaps.Count(gap => gap <= CornerMargin) >= 2 && gaps.Any(gap => gap > CornerMargin);
+    }
+
+    /// <summary>
+    /// Whether all four corners of <paramref name="image"/> are cut off: each corner pixel differs by at least an edge's
+    /// step from the pixel just past the corner margin diagonally inside it, as where a rounded corner or a sliver of
+    /// page left along the sides shows outside a Subject cropped to its edges.
+    /// </summary>
+    private static bool HasCutCorners(RgbaImage image)
+    {
+        const int inset = CornerMargin + 1;
+        if (image.Width <= 2 * inset || image.Height <= 2 * inset)
+            return false;
+        var (right, bottom) = (image.Width - 1, image.Height - 1);
+        return IsCut(0, 0, inset, inset) && IsCut(right, 0, right - inset, inset)
+            && IsCut(0, bottom, inset, bottom - inset) && IsCut(right, bottom, right - inset, bottom - inset);
+
+        bool IsCut(int x, int y, int insideX, int insideY) =>
+            image[x, y].DifferenceTo(image[insideX, insideY]) >= EdgeMap.EdgeStep;
     }
 
     private static bool IsWholeImage(PixelRect window, RgbaImage image) =>

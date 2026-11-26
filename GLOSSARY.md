@@ -18,6 +18,10 @@ _Avoid_: Browser chrome, toolbar, header
 The part of a menu or popup that extends past the border of the window it belongs to.
 _Avoid_: Overflow, spill
 
+**Already cropped**:
+What detection finds in a screenshot that is already cropped to its **Subject**: the image's own edges are the Subject's sides, as its cut-off rounded corners or a sliver of page left along the sides show. It is not the same as **No Subject found**: **Auto crop** and a **Batch** give such an image its finishing with no crop.
+_Avoid_: Uncroppable, nothing to crop
+
 **Classic crop**:
 A crop to exactly the rectangle the user draws.
 _Avoid_: Manual crop, common crop
@@ -70,11 +74,11 @@ The save rule where the **Result** takes the **Original**'s name and the Origina
 _Avoid_: Overwrite mode, in-place mode
 
 **Batch**:
-Applying **Auto crop** and the current finishing settings, as one pending **Step**, to every listed image that needs it, each **Result** reviewable before saving. A Batch skips images that already have Steps, images already processed (they already have a **Shadow**'s transparent padding) and listed **Results**, and writes nothing to disk.
+Applying **Auto crop** and the current finishing settings, as one pending **Step**, to every listed image that needs it, each **Result** reviewable before saving. A Batch skips images that already have Steps, images already processed (they already have a **Shadow**'s transparent padding) and listed **Results**, and writes nothing to disk. An **Already cropped** image gets the finishing only, with no crop, and is counted apart.
 _Avoid_: Bulk process, run all
 
 **No Subject found**:
-The mark a **Batch** leaves on an image in which it found no **Subject**: the image gets no Step and stays marked until it gets Steps, by hand or from a later Batch.
+The mark a **Batch** leaves on an image in which it found no **Subject** and which is not **Already cropped**: the image gets no Step and stays marked until it gets Steps, by hand or from a later Batch.
 _Avoid_: Miss, failed, unprocessed
 
 ### Bulgarian names
@@ -86,6 +90,7 @@ The Bulgarian interface uses exactly these names for the terms above.
 | **Classic crop** | Класическо изрязване |
 | **Auto crop** | Автоматично изрязване |
 | **Auto crop in region** | Автоматично изрязване в област |
+| **Already cropped** | Вече изрязано |
 | **Clean edges** | Изчистване на ръбовете |
 | Frame lines | Рамкови линии |
 | Rounded corners | Заоблени ъгли |

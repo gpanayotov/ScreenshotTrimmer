@@ -47,7 +47,7 @@ public class ReviewingTests
 
         Assert.Equal(reviewed, workspace.Steps(Entry(workspace, "a-dialog.png")));
         Assert.False(Entry(workspace, "b-retaken.png").NoSubjectFound);
-        Assert.Equal(SubjectDetection.Find(retaken)!.ToCrop(), workspace.Steps(Entry(workspace, "b-retaken.png")).Crop);
+        Assert.Equal(SubjectDetection.Find(retaken).Subject!.ToCrop(), workspace.Steps(Entry(workspace, "b-retaken.png")).Crop);
         Assert.True(Entry(workspace, "c-blank.png").NoSubjectFound);
         Assert.Equal(1, summary.Processed);
         Assert.Equal(["c-blank.png"], summary.NoSubjectFound.Select(i => Path.GetFileName(i.Path)));
