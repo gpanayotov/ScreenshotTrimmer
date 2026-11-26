@@ -4,7 +4,7 @@ namespace ScreenshotTrimmer.Processing.Detection;
 
 /// <summary>
 /// The rectangle method, for screenshots with no modal backdrop: rectangles are assembled from the image's edges, and the
-/// window is the largest one that casts an elevation shadow.
+/// windows are the ones that cast an elevation shadow.
 /// </summary>
 /// <remarks>
 /// <para>

@@ -13,11 +13,19 @@ public static class SubjectDetection
     /// because the screenshot is already cropped to it.
     /// </summary>
     /// <remarks>
-    /// A light dialog over a page dimmed by a modal backdrop is found by the brightness method, which keeps its exact
-    /// edges. Anything else is found by the rectangle method: a dialog over an undimmed page, or a window over another
-    /// application or a wallpaper. Of several windows that cast a shadow, the largest is the Subject, so a window wins
-    /// over a menu open on top of it. In a browser screenshot with no dialog, the Subject is the web page below the
-    /// Browser bar.
+    /// <para>
+    /// Both methods run. The rectangle method finds the windows: rectangles that cast an elevation shadow. The brightness
+    /// method finds the bright area of a light dialog over a page dimmed by a modal backdrop, which keeps the dialog's
+    /// exact edges. Its dialog is the Subject only when it passes as a dialog over a dimmed page: a page lies around it on
+    /// all four sides, and its sides are edges or no window overlaps it partly. When it is the bright body of a window the
+    /// rectangle method found, under a dark title bar, that whole window is the Subject instead.
+    /// </para>
+    /// <para>
+    /// Otherwise the Subject is the topmost window: from the largest, the largest window lying wholly on top of it in
+    /// turn, so a dialog opened from another dialog wins over it. A menu that sticks out past its window is not on top of
+    /// it in this sense, so the window wins and the menu is kept as a Popup overhang. In a browser screenshot with no
+    /// dialog, the Subject is the web page below the Browser bar.
+    /// </para>
     /// </remarks>
     /// <exception cref="OperationCanceledException"><paramref name="cancellation"/> was cancelled.</exception>
     public static Subject? Find(RgbaImage image, CancellationToken cancellation = default)
@@ -59,13 +67,27 @@ public static class SubjectDetection
         var assembled = bright.Where(candidate => rectangles.Any(rectangle => RectangleMethod.Competes(rectangle, candidate)));
         if (assembled.Concat(bright).FirstOrDefault() is not { IsEmpty: false } dialog
             || !IsDimmedDialog(dialog, image, edges, rectangles, windows))
-            return windows.Count > 0 ? windows[0] : null;
+            return Topmost(windows);
         // A light window body under a dark title bar is bright too, with a wallpaper around it that is not: the window
         // the rectangle method finds around it, sharing its other sides, is the whole window.
         foreach (var window in windows)
             if (IsBodyOf(dialog, window))
                 return window;
         return dialog;
+    }
+
+    /// <summary>
+    /// The topmost of <paramref name="windows"/> (largest first): from the largest, the largest window lying wholly on top
+    /// of it in turn, as a dialog opened from another dialog does; <c>null</c> when there are none.
+    /// </summary>
+    private static PixelRect? Topmost(IReadOnlyList<PixelRect> windows)
+    {
+        if (windows.Count == 0)
+            return null;
+        var topmost = windows[0];
+        while (windows.FirstOrDefault(window => window != topmost && topmost.Contains(window)) is { IsEmpty: false } inner)
+            topmost = inner;
+        return topmost;
     }
 
     /// <summary>
