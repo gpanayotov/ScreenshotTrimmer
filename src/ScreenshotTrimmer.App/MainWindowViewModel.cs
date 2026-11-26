@@ -32,7 +32,8 @@ public sealed partial class MainWindowViewModel : Observable, IDisposable
     private ViewerBackground _background;
     private string? _openFolder;
     private string? _lastFolder;
-    private PixelRect? _crop;
+    private Crop? _crop;
+    private PixelRect? _shownCrop;
     private bool _shownHasShadowPadding;
     private readonly HashSet<string> _saving = new(FileNames.Comparer);
     private bool _savingAll;
@@ -53,6 +54,7 @@ public sealed partial class MainWindowViewModel : Observable, IDisposable
         ToggleShowResultsCommand = new RelayCommand(() => ShowResults = !ShowResults);
         SaveCommand = new RelayCommand(Save, CanSave);
         SaveAllCommand = new RelayCommand(SaveAll, CanSaveAll);
+        ClearCropCommand = new RelayCommand(() => Crop = null);
         ChooseBackgroundCommand = new RelayCommand<object>(choice =>
         {
             if (choice is ViewerBackground background)
@@ -89,11 +91,11 @@ public sealed partial class MainWindowViewModel : Observable, IDisposable
     }
 
     /// <summary>
-    /// The selected image's crop in image pixels, or <c>null</c> for none, as its Steps hold it. Setting it, as the
-    /// viewer does at the end of each drawing drag, records one Step; an image's first Step also takes its finishing
-    /// from the remembered settings.
+    /// The selected image's crop, or <c>null</c> for none, as its Steps hold it. Setting it, as the viewer does at the
+    /// end of each drag and on each nudge, records one Step; an image's first Step also takes its finishing from the
+    /// remembered settings.
     /// </summary>
-    public PixelRect? Crop
+    public Crop? Crop
     {
         get => _crop;
         set
@@ -105,7 +107,7 @@ public sealed partial class MainWindowViewModel : Observable, IDisposable
                 var hasShadowPadding = _shownHasShadowPadding;
                 IfStillListed(image, listed => _workspace.SetSteps(listed, FirstStep.Apply(
                     _workspace.Steps(listed), Settings, hasShadowPadding,
-                    steps => steps with { Crop = value is { } rectangle ? Processing.Rendering.Crop.Classic(rectangle) : null })));
+                    steps => steps with { Crop = value })));
             }
             // The workspace's change has set the crop it recorded; when nothing was recorded, the viewer goes back to
             // the current one.
@@ -152,6 +154,23 @@ public sealed partial class MainWindowViewModel : Observable, IDisposable
         get => _background;
         set => Set(ref _background, value);
     }
+
+    /// <summary>The crop rectangle the viewer shows, in image pixels, as the viewer reports it, live during a drag.</summary>
+    public PixelRect? ShownCrop
+    {
+        get => _shownCrop;
+        set
+        {
+            if (Set(ref _shownCrop, value))
+                Raise(nameof(StatusCrop));
+        }
+    }
+
+    /// <summary>The crop rectangle's size and position for the status bar, formatted for the current language.</summary>
+    public string? StatusCrop =>
+        Image is not null && ShownCrop is { } crop
+            ? Localizer.Instance.Format("CropSize", crop.Width, crop.Height, crop.X, crop.Y)
+            : null;
 
     /// <summary>The selected image's file name for the status bar.</summary>
     public string? StatusFileName => _shownPath is null ? null : Path.GetFileName(_shownPath);
@@ -206,6 +225,9 @@ public sealed partial class MainWindowViewModel : Observable, IDisposable
     /// as a notice. Enabled while the selected image has unsaved Steps and is not already being saved.
     /// </summary>
     public RelayCommand SaveCommand { get; }
+
+    /// <summary>Returns the selected image to the whole image, as one Step; nothing happens when it has no crop.</summary>
+    public ICommand ClearCropCommand { get; }
 
     /// <summary>
     /// Saves the Result of every image with unsaved Steps off the interface thread, then reports how many were saved
@@ -393,9 +415,9 @@ public sealed partial class MainWindowViewModel : Observable, IDisposable
     /// <summary>Shows the crop in <paramref name="image"/>'s Steps.</summary>
     private void ShowCrop(WorkspaceImage? image)
     {
-        PixelRect? crop = null;
+        Crop? crop = null;
         if (image is not null)
-            IfStillListed(image, listed => crop = _workspace.Steps(listed).Crop?.Window);
+            IfStillListed(image, listed => crop = _workspace.Steps(listed).Crop);
         Set(ref _crop, crop, nameof(Crop));
     }
 
@@ -557,6 +579,7 @@ public sealed partial class MainWindowViewModel : Observable, IDisposable
     {
         Raise(nameof(StatusImageSize));
         Raise(nameof(StatusZoom));
+        Raise(nameof(StatusCrop));
     }
 
     private void OnLanguageChanged(object? sender, PropertyChangedEventArgs e)

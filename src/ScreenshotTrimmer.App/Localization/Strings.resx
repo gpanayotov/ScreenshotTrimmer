@@ -49,6 +49,8 @@
   <data name="ManualRadiusTip" xml:space="preserve"><value>A corner radius in pixels for this image only; leave it empty to use the measured radius</value></data>
   <data name="PixelsUnit" xml:space="preserve"><value>px</value></data>
   <data name="ManualRadiusInvalid" xml:space="preserve"><value>The corner radius must be a number of pixels from 0 to {0}, or empty for the measured radius.</value></data>
+  <data name="CropSize" xml:space="preserve"><value>Crop: {0:N0} × {1:N0} px at {2:N0}, {3:N0}</value></data>
+  <data name="ClearCrop" xml:space="preserve"><value>_Clear crop</value></data>
   <data name="ThumbnailUnreadable" xml:space="preserve"><value>Cannot be read</value></data>
   <data name="ShowResults" xml:space="preserve"><value>Show _Results</value></data>
   <data name="HasResultBadge" xml:space="preserve"><value>Result</value></data>
