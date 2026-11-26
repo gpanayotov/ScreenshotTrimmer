@@ -56,6 +56,7 @@
   <data name="ShadowPaddingWarning" xml:space="preserve"><value>Оригиналът изглежда вече има поле за сянка, затова Сянката е изключена за него. Все пак можете да я включите.</value></data>
   <data name="CropSize" xml:space="preserve"><value>Изрязване: {0:N0} × {1:N0} пиксела в позиция {2:N0}, {3:N0}</value></data>
   <data name="ClearCrop" xml:space="preserve"><value>_Изчистване на изрязването</value></data>
+  <data name="LoupePosition" xml:space="preserve"><value>x {0:N0}   y {1:N0}</value></data>
   <data name="ThumbnailUnreadable" xml:space="preserve"><value>Не може да бъде прочетено</value></data>
   <data name="ShowResults" xml:space="preserve"><value>Показване на _Резултатите</value></data>
   <data name="HasResultBadge" xml:space="preserve"><value>Резултат</value></data>
