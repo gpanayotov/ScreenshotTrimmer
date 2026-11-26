@@ -46,6 +46,23 @@ public sealed record Viewport
     /// <summary>Where the image's top edge is drawn in the view.</summary>
     public double ImageTop => -OriginY * Zoom;
 
+    /// <summary>
+    /// Where a viewer draws the image's left edge: <see cref="ImageLeft"/> on a whole screen pixel, so every image
+    /// pixel is the same width at whole zooms. <see cref="ToImage"/> and <see cref="ToView"/> map through it.
+    /// </summary>
+    public double DrawnLeft => Math.Round(ImageLeft);
+
+    /// <summary>Where a viewer draws the image's top edge: <see cref="ImageTop"/> on a whole screen pixel.</summary>
+    public double DrawnTop => Math.Round(ImageTop);
+
+    /// <summary>The image point, in image pixels, drawn at the view point (<paramref name="viewX"/>, <paramref name="viewY"/>).</summary>
+    public (double X, double Y) ToImage(double viewX, double viewY) =>
+        ((viewX - DrawnLeft) / Zoom, (viewY - DrawnTop) / Zoom);
+
+    /// <summary>The view point the image point (<paramref name="imageX"/>, <paramref name="imageY"/>) is drawn at.</summary>
+    public (double X, double Y) ToView(double imageX, double imageY) =>
+        (DrawnLeft + imageX * Zoom, DrawnTop + imageY * Zoom);
+
     public double ShownWidth => ImageWidth * Zoom;
 
     public double ShownHeight => ImageHeight * Zoom;
