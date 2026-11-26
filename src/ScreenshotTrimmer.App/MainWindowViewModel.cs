@@ -27,7 +27,8 @@ public sealed partial class MainWindowViewModel : Observable, IDisposable
     private Bitmap? _image;
     private Message? _viewerMessage;
     private int _loadNumber;
-    private string? _shownPath;
+    /// <summary>The image shown, or being loaded to be shown.</summary>
+    private WorkspaceImage? _shown;
     private double _zoom;
     private ViewerBackground _background;
     private string? _openFolder;
@@ -38,11 +39,16 @@ public sealed partial class MainWindowViewModel : Observable, IDisposable
     private readonly HashSet<string> _saving = new(FileNames.Comparer);
     private bool _savingAll;
 
-    public MainWindowViewModel(Workspace workspace, IPathPicker picker, IQuestions questions, SettingsSession settings)
+    public MainWindowViewModel(Workspace workspace, IPathPicker picker, IQuestions questions, IImageClipboard clipboard,
+                               SettingsSession settings)
     {
         _workspace = workspace;
+        _picker = picker;
         _questions = questions;
+        _clipboard = clipboard;
         _settings = settings;
+        PasteImageCommand = new RelayCommand(PasteImage);
+        CopyResultCommand = new RelayCommand(CopyResult);
         OpenFilesCommand = new RelayCommand(() => OpenPicked(() => picker.PickFilesAsync(_lastFolder)));
         OpenFolderCommand = new RelayCommand(() => OpenPicked(() => picker.PickFolderAsync(_lastFolder)));
         _workspace.Changed += OnWorkspaceChanged;
@@ -71,7 +77,7 @@ public sealed partial class MainWindowViewModel : Observable, IDisposable
         get => _selectedEntry;
         set
         {
-            if (value is not null && !SamePath(value.Image.Path, _workspace.Selected?.Path))
+            if (value is not null && !SamePath(value.Image.Key, _workspace.Selected?.Key))
                 IfStillListed(value.Image, _workspace.Select);
             else
                 Set(ref _selectedEntry, value);
@@ -103,7 +109,7 @@ public sealed partial class MainWindowViewModel : Observable, IDisposable
         {
             if (value == _crop)
                 return;
-            if (_workspace.Selected is { } image && Image is not null && SamePath(image.Path, _shownPath))
+            if (_workspace.Selected is { } image && Image is not null && SamePath(image.Key, _shown?.Key))
             {
                 var hasShadowPadding = _shownHasShadowPadding;
                 IfStillListed(image, listed => _workspace.SetSteps(listed, FirstStep.Apply(
@@ -174,7 +180,7 @@ public sealed partial class MainWindowViewModel : Observable, IDisposable
             : null;
 
     /// <summary>The selected image's file name for the status bar.</summary>
-    public string? StatusFileName => _shownPath is null ? null : Path.GetFileName(_shownPath);
+    public string? StatusFileName => _shown is null ? null : StripEntry.DisplayName(_shown);
 
     /// <summary>The shown image's size in pixels (the Original's or the Result's) for the status bar, formatted for the current language.</summary>
     public string? StatusImageSize =>
@@ -342,7 +348,7 @@ public sealed partial class MainWindowViewModel : Observable, IDisposable
     {
         try
         {
-            if (image.HasUnsavedSteps && !await _questions.AskToDiscardAsync(Path.GetFileName(image.Path)))
+            if (image.HasUnsavedSteps && !await _questions.AskToDiscardAsync(StripEntry.DisplayName(image)))
                 return;
             IfStillListed(image, _workspace.Remove);
         }
@@ -400,8 +406,8 @@ public sealed partial class MainWindowViewModel : Observable, IDisposable
             Raise(nameof(ShowsHint));
         }
 
-        var selected = Entries.FirstOrDefault(entry => SamePath(entry.Image.Path, change.Selected?.Path));
-        if (!SamePath(change.Selected?.Path, _shownPath))
+        var selected = Entries.FirstOrDefault(entry => SamePath(entry.Image.Key, change.Selected?.Key));
+        if (!SamePath(change.Selected?.Key, _shown?.Key))
             LoadImage(change.Selected);
         Set(ref _selectedEntry, selected, nameof(SelectedEntry));
         ShowCrop(change.Selected);
@@ -429,7 +435,7 @@ public sealed partial class MainWindowViewModel : Observable, IDisposable
         }
         Entries.Clear();
         foreach (var image in images)
-            Entries.Add(new StripEntry(image, _thumbnails));
+            Entries.Add(new StripEntry(image, _thumbnails, _workspace.LoadOriginal));
     }
 
     /// <summary>Shows the crop in <paramref name="image"/>'s Steps.</summary>
@@ -442,7 +448,7 @@ public sealed partial class MainWindowViewModel : Observable, IDisposable
     }
 
     private bool CanSave() =>
-        _workspace.Selected is { HasUnsavedSteps: true } selected && !_saving.Contains(selected.Path) && !_savingAll;
+        _workspace.Selected is { HasUnsavedSteps: true } selected && !_saving.Contains(selected.Key) && !_savingAll;
 
     private bool CanSaveAll() => !_savingAll && _saving.Count == 0 && _workspace.Images.Any(image => image.HasUnsavedSteps);
 
@@ -452,16 +458,27 @@ public sealed partial class MainWindowViewModel : Observable, IDisposable
         SaveAllCommand.NotifyCanExecuteChanged();
     }
 
-    /// <summary>Saves the selected image's Result off the interface thread and reports how it went as a notice.</summary>
+    /// <summary>
+    /// Saves the selected image's Result off the interface thread and reports how it went as a notice. A Pasted image
+    /// not saved yet asks where to save it first.
+    /// </summary>
     private async void Save()
     {
-        if (_workspace.Selected is not { } image || !_saving.Add(image.Path))
+        if (_workspace.Selected is not { } image || !_saving.Add(image.Key))
             return;
         NotifySaveCommands();
         try
         {
-            var report = await Task.Run(() => _workspace.Save(image));
-            _notices.Add(new Message("Saved", string.Join(", ", report.Written)));
+            if (image.IsPasted)
+            {
+                if (await SavePastedAsync(image) is { } written)
+                    _notices.Add(new Message("Saved", written));
+            }
+            else
+            {
+                var report = await Task.Run(() => _workspace.Save(image));
+                _notices.Add(new Message("Saved", string.Join(", ", report.Written)));
+            }
         }
         catch (ArgumentException)
         {
@@ -474,7 +491,7 @@ public sealed partial class MainWindowViewModel : Observable, IDisposable
         }
         finally
         {
-            _saving.Remove(image.Path);
+            _saving.Remove(image.Key);
             NotifySaveCommands();
         }
         RaiseNotices();
@@ -484,9 +501,12 @@ public sealed partial class MainWindowViewModel : Observable, IDisposable
     private async void SaveAll() => await SaveAllAsync();
 
     /// <summary>
-    /// Saves every image with unsaved Steps off the interface thread and reports how it went as notices.
+    /// Saves every image with unsaved Steps off the interface thread and reports how it went as notices. Each Pasted
+    /// image not saved yet asks where to save it in turn, and the user may skip one, which leaves it unsaved.
     /// </summary>
-    /// <returns>Whether every one saved; <c>false</c> too when a save is already running.</returns>
+    /// <returns>
+    /// Whether every one saved; <c>false</c> too when a save is already running or a Pasted image was skipped.
+    /// </returns>
     private async Task<bool> SaveAllAsync()
     {
         if (_savingAll)
@@ -497,11 +517,30 @@ public sealed partial class MainWindowViewModel : Observable, IDisposable
         try
         {
             var outcomes = await Task.Run(_workspace.SaveAll);
-            var failures = outcomes.Where(outcome => outcome.Failure is not null).ToList();
-            _notices.Add(new Message("SavedAll", outcomes.Count - failures.Count, outcomes.Count));
-            foreach (var failure in failures)
-                _notices.Add(SaveFailedNotice(failure.Image, failure.Failure!));
-            savedAll = failures.Count == 0;
+            var saved = outcomes.Count(outcome => outcome.Report is not null);
+            var failures = outcomes
+                .Where(outcome => outcome.Failure is not null)
+                .Select(outcome => SaveFailedNotice(outcome.Image, outcome.Failure!))
+                .ToList();
+            foreach (var pasted in outcomes.Where(outcome => outcome.NeedsLocation))
+            {
+                try
+                {
+                    if (await SavePastedAsync(pasted.Image) is not null)
+                        saved++;
+                }
+                catch (ArgumentException)
+                {
+                    // Removed from the list while the user was choosing where to save an earlier one.
+                }
+                catch (Exception e)
+                {
+                    failures.Add(SaveFailedNotice(pasted.Image, e));
+                }
+            }
+            _notices.Add(new Message("SavedAll", saved, outcomes.Count));
+            _notices.AddRange(failures);
+            savedAll = saved == outcomes.Count;
         }
         catch (Exception e)
         {
@@ -518,7 +557,7 @@ public sealed partial class MainWindowViewModel : Observable, IDisposable
 
     /// <summary>Why saving <paramref name="image"/>'s Result failed, as a notice.</summary>
     private static Message SaveFailedNotice(WorkspaceImage image, Exception failure) =>
-        new("SaveFailed", Path.GetFileName(image.Path),
+        new("SaveFailed", StripEntry.DisplayName(image),
             failure is SaveFailedException saveFailure ? new SaveFailure(saveFailure) : failure.Message);
 
     /// <summary>
@@ -542,13 +581,12 @@ public sealed partial class MainWindowViewModel : Observable, IDisposable
     private async void LoadImage(WorkspaceImage? image)
     {
         var load = ++_loadNumber;
-        var path = image?.Path;
-        _shownPath = path;
+        _shown = image;
         Raise(nameof(StatusFileName));
         Image = null;
         ForgetResult();
         SetViewerMessage(null);
-        if (image is null || path is null)
+        if (image is null)
             return;
 
         Bitmap? bitmap = null;
@@ -571,7 +609,7 @@ public sealed partial class MainWindowViewModel : Observable, IDisposable
         catch (Exception)
         {
             // Unreadable, not an image, or anything unforeseen while decoding: the viewer says so instead.
-            failure = new Message("ImageUnreadable", Path.GetFileName(path));
+            failure = new Message("ImageUnreadable", StripEntry.DisplayName(image));
         }
 
         if (load != _loadNumber)
@@ -618,6 +656,7 @@ public sealed partial class MainWindowViewModel : Observable, IDisposable
         RaiseFinishing();
         ManualRadiusText = FormatRadius(_cleanEdges.ManualRadius);
         Raise(nameof(ViewerMessage));
+        Raise(nameof(StatusFileName));
         Raise(nameof(Title));
     }
 

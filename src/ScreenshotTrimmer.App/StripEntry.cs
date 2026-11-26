@@ -1,7 +1,9 @@
 using Avalonia.Media.Imaging;
 using ScreenshotTrimmer.App.Imaging;
+using ScreenshotTrimmer.App.Localization;
 using ScreenshotTrimmer.App.Mvvm;
 using ScreenshotTrimmer.Processing.Files;
+using ScreenshotTrimmer.Processing.Imaging;
 using ScreenshotTrimmer.Processing.Workspaces;
 
 namespace ScreenshotTrimmer.App;
@@ -10,7 +12,9 @@ namespace ScreenshotTrimmer.App;
 /// One image in the strip. Its thumbnail is loaded the first time the strip shows the entry, so only entries
 /// scrolled into view are decoded, and let go when the strip stops showing it.
 /// </summary>
-public sealed class StripEntry(WorkspaceImage image, ThumbnailCache thumbnails) : Observable
+/// <param name="loadPasted">Gives a Pasted image's pixels, which its thumbnail is made from since it has no file.</param>
+public sealed class StripEntry(WorkspaceImage image, ThumbnailCache thumbnails, Func<WorkspaceImage, RgbaImage> loadPasted)
+    : Observable
 {
     private ThumbnailCache.Lease? _thumbnail;
     private bool _isUnreadable;
@@ -19,7 +23,13 @@ public sealed class StripEntry(WorkspaceImage image, ThumbnailCache thumbnails) 
 
     public WorkspaceImage Image { get; private set; } = image;
 
-    public string Name => Path.GetFileName(Image.Path);
+    public string Name => DisplayName(Image);
+
+    /// <summary>What the user calls <paramref name="image"/>: its file's name, or "Pasted image 1" until it is saved.</summary>
+    public static string DisplayName(WorkspaceImage image) =>
+        image.PastedNumber is { } number
+            ? Localizer.Instance.Format("PastedImageName", number)
+            : Path.GetFileName(image.Path!);
 
     /// <summary>Whether this image's Result exists beside it, shown as the "has result" badge.</summary>
     public bool HasResult => Image.HasResult;
@@ -31,11 +41,11 @@ public sealed class StripEntry(WorkspaceImage image, ThumbnailCache thumbnails) 
     public double Opacity => Image.IsResult ? 0.6 : 1.0;
 
     /// <summary>
-    /// Whether <paramref name="image"/> is this entry's file with the same content, so the entry can show it by
+    /// Whether <paramref name="image"/> is this entry's image with the same content, so the entry can show it by
     /// <see cref="Update"/> and keep its thumbnail.
     /// </summary>
     public bool Shows(WorkspaceImage image) =>
-        FileNames.Same(image.Path, Image.Path) && image.ContentVersion == Image.ContentVersion;
+        FileNames.Same(image.Key, Image.Key) && image.ContentVersion == Image.ContentVersion;
 
     /// <summary>Shows the markers and badges of <paramref name="image"/>, which this entry <see cref="Shows"/>.</summary>
     public void Update(WorkspaceImage image)
@@ -59,7 +69,7 @@ public sealed class StripEntry(WorkspaceImage image, ThumbnailCache thumbnails) 
             if (_thumbnail is null && !_isUnreadable && _loading is null && !_unloading)
             {
                 // A cached thumbnail is shown at once, without a placeholder in between.
-                _thumbnail = thumbnails.TryRent(Image.Path, Image.ContentVersion);
+                _thumbnail = thumbnails.TryRent(Image.Key, Image.ContentVersion);
                 if (_thumbnail is null)
                     Load();
             }
@@ -94,7 +104,12 @@ public sealed class StripEntry(WorkspaceImage image, ThumbnailCache thumbnails) 
         var loading = _loading = new CancellationTokenSource();
         try
         {
-            var thumbnail = await thumbnails.RentAsync(Image.Path, Image.ContentVersion, loading.Token);
+            var image = Image;
+            var thumbnail = image.Path is { } path
+                ? await thumbnails.RentAsync(path, image.ContentVersion, loading.Token)
+                : await thumbnails.RentAsync(image.Key, image.ContentVersion,
+                    () => ThumbnailDecoding.FromPixels(loadPasted(image), (int)ThumbnailCache.Width, (int)ThumbnailCache.Height),
+                    loading.Token);
             if (_loading == loading)
                 SetThumbnail(thumbnail);
             else

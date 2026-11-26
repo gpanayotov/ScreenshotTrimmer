@@ -31,7 +31,7 @@ public sealed partial class Workspace
         lock (_lock)
         {
             ObjectDisposedException.ThrowIf(_disposed, this);
-            key = KeyOf(Images[RequireListed(image)]);
+            key = Images[RequireListed(image)].Key;
             pastedPixels = PastedPixels(key);
             backupSave = _backupSaves.GetValueOrDefault(key);
         }
@@ -95,7 +95,7 @@ public sealed partial class Workspace
                 _steps[savedPath] = state with { Saved = steps };
             // The new files are listed now rather than when the folder watcher notices them, so the badge or the
             // renamed entry shows at once.
-            var selected = Selected is { } current && FileNames.Same(KeyOf(current), path) ? savedPath : Selected is null ? null : KeyOf(Selected);
+            var selected = Selected is { } current && FileNames.Same(current.Key, path) ? savedPath : Selected is null ? null : Selected.Key;
             Relist(_ => (selected is null ? null : Find(selected)) ?? Images.FirstOrDefault());
         });
         return report;

@@ -107,4 +107,15 @@
   <data name="DiscardAnswer" xml:space="preserve"><value>Discard</value></data>
   <data name="DiscardQuestion" xml:space="preserve"><value>{0} has unsaved changes. Remove it from the list and discard them?</value></data>
   <data name="UnsavedDropped" xml:space="preserve"><value>These images were deleted or moved away on disk, and their unsaved changes were discarded: {0}</value></data>
+  <data name="EditMenu" xml:space="preserve"><value>_Edit</value></data>
+  <data name="PasteImage" xml:space="preserve"><value>_Paste image</value></data>
+  <data name="CopyResult" xml:space="preserve"><value>_Copy Result</value></data>
+  <data name="PastedImageName" xml:space="preserve"><value>Pasted image {0}</value></data>
+  <data name="ClipboardHasNoImage" xml:space="preserve"><value>The clipboard holds no image.</value></data>
+  <data name="ResultCopied" xml:space="preserve"><value>Copied the Result of {0}.</value></data>
+  <data name="SavePastedTitle" xml:space="preserve"><value>Save the Result of {0}</value></data>
+  <data name="PngFilter" xml:space="preserve"><value>PNG images</value></data>
+  <data name="OverwriteTitle" xml:space="preserve"><value>Replace file</value></data>
+  <data name="OverwriteQuestion" xml:space="preserve"><value>{0} already exists. Replace it?</value></data>
+  <data name="ReplaceAnswer" xml:space="preserve"><value>Replace</value></data>
 </root>

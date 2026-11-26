@@ -16,7 +16,10 @@ public sealed partial class Workspace
     /// </summary>
     private readonly List<SavedPasted> _savedPasted = [];
 
-    /// <summary>The number the last Pasted image was given in this list.</summary>
+    /// <summary>
+    /// The number the last Pasted image was given. It keeps counting when a new list is opened, so a number never
+    /// names two different Pasted images and callers may key what they keep about an entry by its Key.
+    /// </summary>
     private int _pastedCount;
 
     /// <summary>
@@ -83,17 +86,11 @@ public sealed partial class Workspace
             _savedPasted.Add(new SavedPasted(savedPath, pasted.Pixels));
             _backupSaves.Remove(savedPath);
             _removed.Remove(savedPath);
-            var selected = Selected is { } current && current.PastedNumber == pasted.Number ? savedPath : Selected is null ? null : KeyOf(Selected);
+            var selected = Selected is { } current && current.PastedNumber == pasted.Number ? savedPath : Selected is null ? null : Selected.Key;
             Relist(_ => (selected is null ? null : Find(selected)) ?? Images.FirstOrDefault());
         });
         return report;
     }
-
-    /// <summary>
-    /// What identifies <paramref name="image"/> within the list: its path, or for a Pasted image not saved yet a key
-    /// that no path can equal.
-    /// </summary>
-    private static string KeyOf(WorkspaceImage image) => image.Path ?? PastedImage.KeyFor(image.PastedNumber!.Value);
 
     /// <summary>The pixels a Pasted image with the key <paramref name="key"/> renders from, saved or not; <c>null</c> for other images.</summary>
     private RgbaImage? PastedPixels(string key) =>
@@ -124,7 +121,7 @@ public sealed partial class Workspace
     private void DropPasted(WorkspaceImage image)
     {
         _pasted.RemoveAll(pasted => pasted.Number == image.PastedNumber);
-        _steps.Remove(KeyOf(image));
+        _steps.Remove(image.Key);
     }
 
     /// <summary>Drops every Pasted image, saved or not, as a new list is opened; call under the lock.</summary>
@@ -132,15 +129,11 @@ public sealed partial class Workspace
     {
         _pasted.Clear();
         _savedPasted.Clear();
-        _pastedCount = 0;
     }
 
     private sealed record PastedImage(int Number, RgbaImage Pixels)
     {
-        /// <summary>A key with a NUL character, which no file path holds.</summary>
-        public static string KeyFor(int number) => $"\0pasted {number}";
-
-        public string Key => KeyFor(Number);
+        public string Key => Entry.Key;
 
         public WorkspaceImage Entry => new() { PastedNumber = Number, HasUnsavedSteps = true };
     }

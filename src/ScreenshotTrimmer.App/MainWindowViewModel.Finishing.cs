@@ -20,7 +20,7 @@ public sealed partial class MainWindowViewModel
     private (RenderReport Report, Steps Steps)? _report;
     private bool _showsResult;
     private CleanEdges _cleanEdges = CleanEdges.Shown(Steps.None, new UserSettings());
-    private string? _finishingPath;
+    private string? _finishingKey;
     private string _manualRadiusText = "";
 
     /// <summary>The render the Result view should show: the newest wins over any still in progress.</summary>
@@ -143,16 +143,16 @@ public sealed partial class MainWindowViewModel
             IfStillListed(image, listed => steps = _workspace.Steps(listed));
 
         var shown = CleanEdges.Shown(steps, Settings);
-        var samePath = SamePath(image?.Path, _finishingPath);
-        _finishingPath = image?.Path;
-        if (shown != _cleanEdges || !samePath)
+        var sameImage = SamePath(image?.Key, _finishingKey);
+        _finishingKey = image?.Key;
+        if (shown != _cleanEdges || !sameImage)
         {
             _cleanEdges = shown;
             ManualRadiusText = FormatRadius(shown.ManualRadius);
             RaiseFinishing();
         }
 
-        if (image is not null && _original is { } original && SamePath(image.Path, _shownPath))
+        if (image is not null && _original is { } original && SamePath(image.Key, _shown?.Key))
             Render(new RenderRequest(original, steps));
     }
 
@@ -167,7 +167,7 @@ public sealed partial class MainWindowViewModel
             _notices.Add(new Message("SettingsNotSaved", _settings.FilePath, failure));
             RaiseNotices();
         }
-        if (_workspace.Selected is { } image && _original is not null && SamePath(image.Path, _shownPath))
+        if (_workspace.Selected is { } image && _original is not null && SamePath(image.Key, _shown?.Key))
         {
             var hasShadowPadding = _shownHasShadowPadding;
             IfStillListed(image, listed => _workspace.SetSteps(listed,

@@ -6,6 +6,7 @@ using Avalonia.Input;
 using Avalonia.Interactivity;
 using Avalonia.Platform.Storage;
 using ScreenshotTrimmer.App.Controls;
+using ScreenshotTrimmer.App.Imaging;
 using ScreenshotTrimmer.App.Localization;
 using ScreenshotTrimmer.App.Mvvm;
 using ScreenshotTrimmer.Processing.Settings;
@@ -65,7 +66,7 @@ public partial class MainWindow : Window, IPathPicker, IQuestions
     /// </summary>
     public void Attach(Workspace workspace, SettingsSession settings)
     {
-        _viewModel = new MainWindowViewModel(workspace, this, this, settings);
+        _viewModel = new MainWindowViewModel(workspace, this, this, new ImageClipboard(() => Clipboard), settings);
         _viewModel.PropertyChanged += OnViewModelPropertyChanged;
         DataContext = _viewModel;
         Closing += OnClosing;
@@ -110,6 +111,15 @@ public partial class MainWindow : Window, IPathPicker, IQuestions
             Localizer.Instance.Format("DiscardQuestion", name),
             [
                 (Localizer.Instance["DiscardAnswer"], true),
+                (Localizer.Instance["Cancel"], false),
+            ]).AskAsync(this);
+
+    public Task<bool> AskToOverwriteAsync(string path) =>
+        new QuestionWindow<bool>(
+            Localizer.Instance["OverwriteTitle"],
+            Localizer.Instance.Format("OverwriteQuestion", path),
+            [
+                (Localizer.Instance["ReplaceAnswer"], true),
                 (Localizer.Instance["Cancel"], false),
             ]).AskAsync(this);
 
@@ -165,6 +175,23 @@ public partial class MainWindow : Window, IPathPicker, IQuestions
             SuggestedStartLocation = await FolderAsync(startFolder),
         });
         return LocalPaths(folders);
+    }
+
+    public async Task<string?> PickSaveFileAsync(string? startFolder, string suggestedName, string name)
+    {
+        var file = await StorageProvider.SaveFilePickerAsync(new FilePickerSaveOptions
+        {
+            Title = Localizer.Instance.Format("SavePastedTitle", name),
+            SuggestedStartLocation = await FolderAsync(startFolder),
+            SuggestedFileName = suggestedName,
+            DefaultExtension = "png",
+            ShowOverwritePrompt = false,
+            FileTypeChoices =
+            [
+                new FilePickerFileType(Localizer.Instance["PngFilter"]) { Patterns = ["*.png"], MimeTypes = ["image/png"] },
+            ],
+        });
+        return file?.TryGetLocalPath();
     }
 
     private async Task<IStorageFolder?> FolderAsync(string? path) =>

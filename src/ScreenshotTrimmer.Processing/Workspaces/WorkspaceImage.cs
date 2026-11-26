@@ -15,6 +15,12 @@ public sealed record WorkspaceImage
     /// <summary>Whether this is a Pasted image that has not been saved yet, so it has no file.</summary>
     public bool IsPasted => PastedNumber is not null;
 
+    /// <summary>
+    /// What identifies the entry in its list, compared with <c>FileNames.Same</c>: its <see cref="Path"/>, or for a
+    /// Pasted image not saved yet a key that no path can equal, since it holds a NUL character.
+    /// </summary>
+    public string Key => Path ?? $"\0pasted {PastedNumber}";
+
     /// <summary>Whether this image is the Suffix-mode Result of another listed image.</summary>
     public bool IsResult { get; init; }
 

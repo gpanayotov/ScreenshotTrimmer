@@ -6,7 +6,7 @@ namespace ScreenshotTrimmer.Processing.Workspaces;
 // Each image's pending Steps and the Steps at its last successful save.
 public sealed partial class Workspace
 {
-    /// <summary>The images with Steps, by <see cref="KeyOf">key</see>; an image missing here has <c>Steps.None</c> and was never saved.</summary>
+    /// <summary>The images with Steps, by <see cref="WorkspaceImage.Key">key</see>; an image missing here has <c>Steps.None</c> and was never saved.</summary>
     private readonly Dictionary<string, ImageSteps> _steps = new(FileNames.Comparer);
 
     /// <summary>
@@ -30,7 +30,7 @@ public sealed partial class Workspace
         {
             ObjectDisposedException.ThrowIf(_disposed, this);
             RequireListed(image);
-            return StepsOf(KeyOf(image)).Current;
+            return StepsOf(image.Key).Current;
         }
     }
 
@@ -46,10 +46,10 @@ public sealed partial class Workspace
         Update(() =>
         {
             RequireListed(image);
-            var state = StepsOf(KeyOf(image));
+            var state = StepsOf(image.Key);
             if (state.Current == steps)
                 return;
-            _steps[KeyOf(image)] = state with { Current = steps };
+            _steps[image.Key] = state with { Current = steps };
             RefreshUnsavedMarkers();
         });
     }
@@ -65,12 +65,12 @@ public sealed partial class Workspace
     private void RefreshUnsavedMarkers()
     {
         var images = Images
-            .Select(image => image with { HasUnsavedSteps = image.IsPasted || HasUnsavedSteps(KeyOf(image)) })
+            .Select(image => image with { HasUnsavedSteps = image.IsPasted || HasUnsavedSteps(image.Key) })
             .ToList();
         if (images.SequenceEqual(Images))
             return;
         Images = images;
-        Selected = Selected is null ? null : Find(KeyOf(Selected));
+        Selected = Selected is null ? null : Find(Selected.Key);
         QueueChange();
     }
 

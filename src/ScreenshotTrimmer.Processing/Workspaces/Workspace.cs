@@ -110,7 +110,7 @@ public sealed partial class Workspace : IDisposable
                 return;
             _showResults = value;
             var selected = Selected;
-            Relist(_ => (selected is null ? null : Find(KeyOf(selected)))
+            Relist(_ => (selected is null ? null : Find(selected.Key))
                 ?? (selected is { IsResult: true } ? OriginalOf(selected) : null)
                 ?? Images.FirstOrDefault());
         });
@@ -131,7 +131,7 @@ public sealed partial class Workspace : IDisposable
                 return;
             var selectedIndex = SelectedIndex;
             var selected = Selected;
-            Relist(_ => (selected is null ? null : Find(KeyOf(selected)))
+            Relist(_ => (selected is null ? null : Find(selected.Key))
                 ?? (Images.Count == 0 ? null : Images[Math.Clamp(selectedIndex, 0, Images.Count - 1)]));
         });
     }
@@ -146,7 +146,7 @@ public sealed partial class Workspace : IDisposable
         Update(() =>
         {
             RequireListed(image);
-            var before = Images.Select(KeyOf).ToList();
+            var before = Images.Select(image => image.Key).ToList();
             var selectedIndex = SelectedIndex;
             if (image.Path is null)
                 DropPasted(image);
@@ -292,7 +292,7 @@ public sealed partial class Workspace : IDisposable
         }
         Selected = selectedIndex < 0
             ? Images.FirstOrDefault()
-            : SurvivorNear(old.Select(image => image.Path is null ? KeyOf(image) : renamed(image.Path)).ToList(), selectedIndex);
+            : SurvivorNear(old.Select(image => image.Path is null ? image.Key : renamed(image.Path)).ToList(), selectedIndex);
         var newlyUnavailable = _homeFolders
             .Where(folder => unavailable.Contains(folder) && !_unavailableFolders.Contains(folder))
             .ToList();
@@ -330,8 +330,8 @@ public sealed partial class Workspace : IDisposable
     private static string StemOf(string path) =>
         Path.Combine(Path.GetDirectoryName(path)!, Path.GetFileNameWithoutExtension(path));
 
-    /// <summary>The listed entry whose <see cref="KeyOf">key</see> is <paramref name="key"/> (a file's path), or <c>null</c>.</summary>
-    private WorkspaceImage? Find(string key) => Images.FirstOrDefault(image => FileNames.Same(KeyOf(image), key));
+    /// <summary>The listed entry whose <see cref="WorkspaceImage.Key">key</see> is <paramref name="key"/> (a file's path), or <c>null</c>.</summary>
+    private WorkspaceImage? Find(string key) => Images.FirstOrDefault(image => FileNames.Same(image.Key, key));
 
     private int SelectedIndex => Selected is null ? -1 : IndexOf(Selected);
 
@@ -339,7 +339,7 @@ public sealed partial class Workspace : IDisposable
     {
         for (var i = 0; i < Images.Count; i++)
         {
-            if (FileNames.Same(KeyOf(Images[i]), KeyOf(image)))
+            if (FileNames.Same(Images[i].Key, image.Key))
                 return i;
         }
         return -1;
