@@ -44,4 +44,31 @@ public class FinishingTests
         Assert.Same(Steps.None, workspace.Steps(Entry(workspace, "c.png")));
         Assert.Equal([true, true, false], workspace.Images.Select(i => i.HasUnsavedSteps));
     }
+
+    [Fact]
+    public void A_shadow_slider_drag_previews_each_value_and_records_one_step_at_release()
+    {
+        using var folder = new TempFolder();
+        Touch(folder, "a.png");
+        var remembered = new UserSettings { FrameLines = false, RoundedCorners = false, Shadow = true };
+        using var workspace = new Workspace(remembered);
+        workspace.Open([folder.Path]);
+        var image = Entry(workspace, "a.png");
+        var changes = 0;
+        workspace.Changed += (_, _) => changes++;
+
+        // While dragging, each value is only previewed from the image's current Steps.
+        var previews = new[] { 1.5, 2.0, 2.5 }
+            .Select(size => FirstStep.Apply(workspace.Steps(image), remembered, originalHasShadowPadding: false,
+                new ShadowControls(On: true, Size: size, Opacity: 0.35).Change))
+            .ToList();
+        Assert.Equal(0, changes);
+        Assert.Same(Steps.None, workspace.Steps(image));
+
+        // The release records the last value as one Step.
+        workspace.SetSteps(image, previews[^1]);
+
+        Assert.Equal(1, changes);
+        Assert.Equal(new Steps { Shadow = new Shadow { Size = 2.5, Opacity = 0.35 } }, workspace.Steps(Entry(workspace, "a.png")));
+    }
 }
