@@ -65,7 +65,8 @@ public sealed partial class Workspace : IDisposable
     /// <summary>
     /// Replaces the list with the images for <paramref name="paths"/>: one file lists its whole folder with that file
     /// selected; a folder or several paths list their images with the first selected. Removed entries are listed
-    /// again, Pasted images leave the list, and every image starts with no Steps. Paths that exist neither as a file nor as a folder are skipped and returned, so the caller can tell the
+    /// again, Pasted images leave the list, and every image starts with no Steps. A running Batch is cancelled and waited
+    /// for first. Paths that exist neither as a file nor as a folder are skipped and returned, so the caller can tell the
     /// user.
     /// </summary>
     public IReadOnlyList<string> Open(IReadOnlyList<string> paths)
@@ -76,7 +77,7 @@ public sealed partial class Workspace : IDisposable
         var missing = fullPaths.Where(path => !File.Exists(path) && !Directory.Exists(path)).ToList();
         var existing = fullPaths.Except(missing).ToList();
 
-        Update(() =>
+        UpdateWithNoBatch(() =>
         {
             _openedPaths = existing;
             _openedOneFile = existing is [var only] && File.Exists(only);
@@ -90,6 +91,7 @@ public sealed partial class Workspace : IDisposable
             _removed = new HashSet<string>(FileNames.Comparer);
             _steps.Clear();
             _backupSaves.Clear();
+            _noSubjectFound.Clear();
             ForgetPasted();
             _folderWatch.Reset();
             Relist(listing => listing.Selected is { } opened ? Find(opened.Path) : Images.FirstOrDefault());
@@ -118,17 +120,19 @@ public sealed partial class Workspace : IDisposable
     }
 
     /// <summary>
-    /// Lists the opened paths again with <paramref name="settings"/>' save mode and Result suffix, which decide which
-    /// files are Results. The selection stays where the selected file is still listed; otherwise it passes to the
-    /// entry now in its place.
+    /// Makes <paramref name="settings"/> the settings in use: saves and the next Batch use them. When their save mode or
+    /// suffixes changed, which decide which files are Results, the opened paths are listed again: the selection stays
+    /// where the selected file is still listed; otherwise it passes to the entry now in its place. A change of the
+    /// finishing alone lists nothing again and announces nothing.
     /// </summary>
     public void ApplySettings(UserSettings settings)
     {
         ArgumentNullException.ThrowIfNull(settings);
         Update(() =>
         {
+            var listingChanged = SaveOptionsFor(settings) != SaveOptionsFor(_settings);
             _settings = settings;
-            if (_openedPaths.Count == 0)
+            if (_openedPaths.Count == 0 || !listingChanged)
                 return;
             var selectedIndex = SelectedIndex;
             var selected = Selected;
@@ -149,6 +153,7 @@ public sealed partial class Workspace : IDisposable
             RequireListed(image);
             var before = Images.Select(image => image.Key).ToList();
             var selectedIndex = SelectedIndex;
+            _noSubjectFound.Remove(image.Key);
             if (image.Path is { } path)
                 _removed.Add(path);
             else
@@ -170,16 +175,59 @@ public sealed partial class Workspace : IDisposable
     /// <summary>Selects the previous image; does nothing on the first one.</summary>
     public void Previous() => Update(() => SelectAt(SelectedIndex - 1));
 
-    /// <summary>Stops watching the disk. Every later update throws <see cref="ObjectDisposedException"/>.</summary>
+    /// <summary>
+    /// Selects the first image after the selected one that is <paramref name="matching"/>, such as the next image with
+    /// No Subject found; does nothing when none follows. With nothing selected, it looks from the start of the list.
+    /// </summary>
+    public void Next(Func<WorkspaceImage, bool> matching)
+    {
+        ArgumentNullException.ThrowIfNull(matching);
+        Update(() => SelectFirst(After(SelectedIndex), matching));
+    }
+
+    /// <summary>
+    /// Selects the last image before the selected one that is <paramref name="matching"/>; does nothing when none comes
+    /// before it.
+    /// </summary>
+    public void Previous(Func<WorkspaceImage, bool> matching)
+    {
+        ArgumentNullException.ThrowIfNull(matching);
+        Update(() => SelectFirst(Before(SelectedIndex), matching));
+    }
+
+    /// <summary>
+    /// Keeps the selection when it is <paramref name="matching"/>; otherwise selects the next image that is, or the
+    /// previous one when none follows, as a filter showing only those images does. Does nothing when none is.
+    /// </summary>
+    public void SelectNearest(Func<WorkspaceImage, bool> matching)
+    {
+        ArgumentNullException.ThrowIfNull(matching);
+        Update(() =>
+        {
+            var selected = SelectedIndex;
+            // From the selection itself onwards, or from the start when nothing is selected.
+            SelectFirst(After(Math.Max(selected, 0) - 1).Concat(Before(selected)), matching);
+        });
+    }
+
+    /// <summary>
+    /// Stops watching the disk, and cancels a running Batch and waits for it to stop. Every later update throws
+    /// <see cref="ObjectDisposedException"/>.
+    /// </summary>
     public void Dispose()
     {
+        BatchRun? running;
         lock (_lock)
         {
             if (_disposed)
                 return;
             _disposed = true;
             _folderWatch.Dispose();
+            running = _batch;
+            running?.Cancel();
         }
+        if (running is not null)
+            StopBatch(running);
     }
 
     /// <summary>
@@ -234,6 +282,7 @@ public sealed partial class Workspace : IDisposable
                     Key = key, IsResult = file.IsResult, HasResult = file.HasResult,
                     ContentVersion = ContentVersion.Of(file.Path),
                     HasUnsavedSteps = HasUnsavedSteps(key),
+                    NoSubjectFound = _noSubjectFound.Contains(key),
                 };
             })
             .Concat(PastedEntries())
@@ -271,6 +320,7 @@ public sealed partial class Workspace : IDisposable
         _removed = _removed.Select(renamed).ToHashSet(FileNames.Comparer);
         FollowRenamesOfSavedPasted(renamed);
         FollowRenamesWithSteps(renamed);
+        FollowRenamesOfNoSubjectFound(renamed);
         FollowRenamesOfBackupSaves(renamed);
         if (_openedOneFile && _openedPaths is [var file] && !File.Exists(file))
         {
@@ -369,6 +419,25 @@ public sealed partial class Workspace : IDisposable
         if (index < 0)
             throw new ArgumentException("The image is not listed in this workspace.", nameof(image));
         return index;
+    }
+
+    /// <summary>The indexes after <paramref name="index"/>, nearest first.</summary>
+    private IEnumerable<int> After(int index) => Enumerable.Range(index + 1, Math.Max(0, Images.Count - index - 1));
+
+    /// <summary>The indexes before <paramref name="index"/>, nearest first.</summary>
+    private IEnumerable<int> Before(int index) => Enumerable.Range(0, Math.Max(0, index)).Reverse();
+
+    /// <summary>Selects the image at the first of <paramref name="indexes"/> that is <paramref name="matching"/>, if any.</summary>
+    private void SelectFirst(IEnumerable<int> indexes, Func<WorkspaceImage, bool> matching)
+    {
+        foreach (var i in indexes)
+        {
+            if (matching(Images[i]))
+            {
+                SelectAt(i);
+                return;
+            }
+        }
     }
 
     /// <summary>Selects the image at <paramref name="index"/>; an index outside the list, or the selection itself, changes nothing.</summary>

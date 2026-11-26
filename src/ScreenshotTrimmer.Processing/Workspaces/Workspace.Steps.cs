@@ -45,17 +45,28 @@ public sealed partial class Workspace
         Update(() =>
         {
             RequireListed(image);
-            var state = StepsOf(image.Key);
-            if (state.Current == steps)
-                return;
-            var merging = mergeKey is not null && Equals(mergeKey, state.MergeKey) && !state.Earlier.IsEmpty;
-            var earlier = merging ? state.Earlier : state.Earlier.Push(state.Current);
-            _steps[image.Key] = earlier.Peek() == steps
-                // A run that came back to where it started has nothing left to undo.
-                ? state with { Current = steps, Earlier = earlier.Pop(), Later = [], MergeKey = null }
-                : state with { Current = steps, Earlier = earlier, Later = [], MergeKey = mergeKey };
-            AnnounceSteps();
+            RecordSteps(image.Key, steps, mergeKey);
         });
+    }
+
+    /// <summary>
+    /// <see cref="SetSteps"/> for the listed image with the key <paramref name="key"/>, recording whether the new Steps
+    /// are <paramref name="fromBatch"/>; call under the lock.
+    /// </summary>
+    private void RecordSteps(ImageKey key, Steps steps, object? mergeKey, bool fromBatch = false)
+    {
+        var state = StepsOf(key);
+        if (state.Current == steps)
+            return;
+        // Steps fix what a Batch could not, so the image no longer needs reviewing as a miss.
+        if (steps != Rendering.Steps.None)
+            _noSubjectFound.Remove(key);
+        var merging = mergeKey is not null && Equals(mergeKey, state.MergeKey) && !state.Earlier.IsEmpty;
+        var earlier = merging ? state.Earlier : state.Earlier.Push(state.Current);
+        ChangeCurrent(key, earlier.Peek() == steps
+            // A run that came back to where it started has nothing left to undo.
+            ? state with { Current = steps, Earlier = earlier.Pop(), Later = [], MergeKey = null }
+            : state with { Current = steps, Earlier = earlier, Later = [], MergeKey = mergeKey }, fromBatch);
     }
 
     /// <summary>
@@ -72,12 +83,11 @@ public sealed partial class Workspace
             var state = StepsOf(image.Key);
             if (state.Earlier.IsEmpty)
                 return;
-            _steps[image.Key] = state with
+            ChangeCurrent(image.Key, state with
             {
                 Current = state.Earlier.Peek(), Earlier = state.Earlier.Pop(), Later = state.Later.Push(state.Current),
                 MergeKey = null,
-            };
-            AnnounceSteps();
+            });
         });
     }
 
@@ -95,12 +105,11 @@ public sealed partial class Workspace
             var state = StepsOf(image.Key);
             if (state.Later.IsEmpty)
                 return;
-            _steps[image.Key] = state with
+            ChangeCurrent(image.Key, state with
             {
                 Current = state.Later.Peek(), Earlier = state.Earlier.Push(state.Current), Later = state.Later.Pop(),
                 MergeKey = null,
-            };
-            AnnounceSteps();
+            });
         });
     }
 
@@ -110,6 +119,13 @@ public sealed partial class Workspace
     /// </summary>
     /// <exception cref="ArgumentException"><paramref name="image"/> is not listed.</exception>
     public void Reset(WorkspaceImage image) => SetSteps(image, Rendering.Steps.None);
+
+    /// <summary>
+    /// Whether <paramref name="image"/>'s current Steps are the ones a Batch gave it, unchanged since, so the Result is
+    /// what there is to review.
+    /// </summary>
+    /// <exception cref="ArgumentException"><paramref name="image"/> is not listed.</exception>
+    public bool HasBatchSteps(WorkspaceImage image) => Read(image).FromBatch;
 
     /// <summary>Whether <paramref name="image"/> has Steps to <see cref="Undo"/>.</summary>
     /// <exception cref="ArgumentException"><paramref name="image"/> is not listed.</exception>
@@ -130,6 +146,16 @@ public sealed partial class Workspace
         }
     }
 
+    /// <summary>
+    /// Stores <paramref name="state"/>, whose current Steps just changed, as the image's and announces the change; the
+    /// new Steps are a Batch's only when <paramref name="fromBatch"/>. Call under the lock.
+    /// </summary>
+    private void ChangeCurrent(ImageKey key, ImageSteps state, bool fromBatch = false)
+    {
+        _steps[key] = state with { FromBatch = fromBatch };
+        AnnounceSteps();
+    }
+
     private ImageSteps StepsOf(ImageKey key) => _steps.GetValueOrDefault(key) ?? ImageSteps.New;
 
     private bool HasUnsavedSteps(ImageKey key) => StepsOf(key) is var state && state.Current != state.Saved;
@@ -137,19 +163,24 @@ public sealed partial class Workspace
     /// <summary>Announces a change of Steps, with the unsaved markers brought up to date; call under the lock.</summary>
     private void AnnounceSteps()
     {
-        if (!RefreshUnsavedMarkers())
+        if (!RefreshMarkers())
             QueueChange();
     }
 
     /// <summary>
-    /// Brings every listed entry's <see cref="WorkspaceImage.HasUnsavedSteps"/> up to date and queues a change when one
-    /// changed; call under the lock.
+    /// Brings every listed entry's <see cref="WorkspaceImage.HasUnsavedSteps"/> and
+    /// <see cref="WorkspaceImage.NoSubjectFound"/> markers up to date and queues a change when one changed; call under
+    /// the lock.
     /// </summary>
     /// <returns>Whether a marker changed, and so a change was queued.</returns>
-    private bool RefreshUnsavedMarkers()
+    private bool RefreshMarkers()
     {
         var images = Images
-            .Select(image => image with { HasUnsavedSteps = image.IsPasted || HasUnsavedSteps(image.Key) })
+            .Select(image => image with
+            {
+                HasUnsavedSteps = image.IsPasted || HasUnsavedSteps(image.Key),
+                NoSubjectFound = _noSubjectFound.Contains(image.Key),
+            })
             .ToList();
         if (images.SequenceEqual(Images))
             return false;
@@ -173,7 +204,7 @@ public sealed partial class Workspace
     }
 
     /// <summary>
-    /// Discards the Steps and Backup-mode saves of the files in <paramref name="before"/> that are no longer listed, so
+    /// Discards the Steps, Backup-mode saves and No Subject found flags of the files in <paramref name="before"/> that are no longer listed, so
     /// a file that comes back under the same name starts afresh; call under the lock after re-listing.
     /// </summary>
     /// <returns>The paths of the dropped images that had unsaved Steps, in strip order.</returns>
@@ -185,6 +216,7 @@ public sealed partial class Workspace
         {
             _steps.Remove(key);
             _backupSaves.Remove(key);
+            _noSubjectFound.Remove(key);
         }
         return unsaved;
     }
@@ -198,5 +230,8 @@ public sealed partial class Workspace
         Steps Current, Steps Saved, ImmutableStack<Steps> Earlier, ImmutableStack<Steps> Later, object? MergeKey)
     {
         public static ImageSteps New { get; } = new(Rendering.Steps.None, Rendering.Steps.None, [], [], null);
+
+        /// <summary>Whether <see cref="Current"/> are the Steps a Batch recorded; any later change of Steps clears it.</summary>
+        public bool FromBatch { get; init; }
     }
 }

@@ -37,6 +37,9 @@ public sealed class StripEntry(WorkspaceImage image, ThumbnailCache thumbnails, 
     /// <summary>Whether this image has Steps that are not saved, shown as the unsaved marker.</summary>
     public bool HasUnsavedSteps => Image.HasUnsavedSteps;
 
+    /// <summary>Whether a Batch found no Subject in this image, shown as the "No subject found" marker.</summary>
+    public bool NoSubjectFound => Image.NoSubjectFound;
+
     /// <summary>Listed Results, shown only when the user asks for them, are dimmed so the Originals stand out.</summary>
     public double Opacity => Image.IsResult ? 0.6 : 1.0;
 
@@ -61,6 +64,7 @@ public sealed class StripEntry(WorkspaceImage image, ThumbnailCache thumbnails, 
             Raise(nameof(Name));
         Raise(nameof(HasResult));
         Raise(nameof(HasUnsavedSteps));
+        Raise(nameof(NoSubjectFound));
         Raise(nameof(Opacity));
     }
 

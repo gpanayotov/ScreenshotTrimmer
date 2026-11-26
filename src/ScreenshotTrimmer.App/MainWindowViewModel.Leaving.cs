@@ -14,19 +14,25 @@ public sealed partial class MainWindowViewModel
     /// <summary>Whether any listed image has unsaved Steps, so leaving would ask first.</summary>
     public bool HasUnsavedWork => _workspace.HasUnsavedWork;
 
+    /// <summary>Whether leaving must wait for <see cref="ConfirmLeavingAsync"/>: some work is unsaved or a Batch runs.</summary>
+    public bool MustConfirmLeaving => _workspace.HasUnsavedWork || IsBatchRunning;
+
     /// <summary>
-    /// Whether leaving may go ahead: nothing is unsaved, or the user chose to discard it, or chose to save all and
-    /// every image saved. Otherwise the user stays, and any save failures are shown as notices.
+    /// Whether leaving may go ahead. A running Batch is cancelled and waited for first, without blocking the window,
+    /// so the Steps it applies before it stops are part of the question. Then leaving goes ahead when nothing is
+    /// unsaved, or the user chose to discard it, or chose to save all and every image saved. Otherwise the user stays,
+    /// and any save failures are shown as notices.
     /// </summary>
     public async Task<bool> ConfirmLeavingAsync()
     {
-        if (!_workspace.HasUnsavedWork)
-            return true;
         if (_askingToLeave)
             return false;
         _askingToLeave = true;
         try
         {
+            await StopBatchAsync();
+            if (!_workspace.HasUnsavedWork)
+                return true;
             return await _questions.AskToLeaveAsync() switch
             {
                 LeaveAnswer.Discard => true,

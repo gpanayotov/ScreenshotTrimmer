@@ -141,4 +141,26 @@
   <data name="OverwriteTitle" xml:space="preserve"><value>Replace file</value></data>
   <data name="OverwriteQuestion" xml:space="preserve"><value>{0} already exists. Replace it?</value></data>
   <data name="ReplaceAnswer" xml:space="preserve"><value>Replace</value></data>
+  <data name="BatchMenu" xml:space="preserve"><value>_Batch</value></data>
+  <data name="ToolbarBatch" xml:space="preserve"><value>Batch</value></data>
+  <data name="ToolbarBatchTip" xml:space="preserve"><value>Auto crop every listed image that needs it with the current Clean edges and Shadow settings, for review before saving (Ctrl+B)</value></data>
+  <data name="BatchProgress" xml:space="preserve"><value>Batch: {0} of {1}</value></data>
+  <data name="BatchDone" xml:space="preserve"><value>Batch finished: {0} processed, {1} with no subject found, {2} could not be read. Nothing is saved until you save.</value></data>
+  <data name="BatchCancelled" xml:space="preserve"><value>Batch cancelled: {0} processed, {1} with no subject found, {2} could not be read before it stopped. The processed images keep their Steps; nothing is saved until you save.</value></data>
+  <data name="BatchSkipped" xml:space="preserve"><value>Skipped: {0} already edited, {1} already processed, {2} Results, {3} gone from the list.</value></data>
+  <data name="BatchFailedIn" xml:space="preserve"><value>Could not read: {0}</value></data>
+  <data name="CancelBatchTip" xml:space="preserve"><value>Stop the Batch; the images it has processed keep their Steps</value></data>
+  <data name="BatchNoSubjectFoundIn" xml:space="preserve"><value>No subject found in: {0}</value></data>
+  <data name="NoSubjectFoundTip" xml:space="preserve"><value>The Batch found no subject in this image</value></data>
+  <data name="NextNoSubjectFound" xml:space="preserve"><value>Next with no _subject found</value></data>
+  <data name="PreviousNoSubjectFound" xml:space="preserve"><value>Previous with no subject _found</value></data>
+  <data name="NextUnsaved" xml:space="preserve"><value>Next _unsaved</value></data>
+  <data name="PreviousUnsaved" xml:space="preserve"><value>Previous unsa_ved</value></data>
+  <data name="ShowOnlyNoSubjectFound" xml:space="preserve"><value>Only images with _no subject found</value></data>
+  <data name="ShowNoSubjectFound" xml:space="preserve"><value>Show</value></data>
+  <data name="ShowNoSubjectFoundTip" xml:space="preserve"><value>Show only the images with no subject found in the strip</value></data>
+  <data name="BatchNothingToProcessTip" xml:space="preserve"><value>Nothing to process: every listed image is already edited ({0}), already processed ({1}) or a Result ({2})</value></data>
+  <data name="BatchStartTitle" xml:space="preserve"><value>Batch</value></data>
+  <data name="BatchStartQuestion" xml:space="preserve"><value>The Batch will process {0} images and skip {1} already edited, {2} already processed and {3} Results. Nothing is saved until you save. Start it?</value></data>
+  <data name="BatchStartAnswer" xml:space="preserve"><value>Start</value></data>
 </root>
