@@ -7,9 +7,21 @@ namespace ScreenshotTrimmer.Processing.Tests.Samples;
 
 /// <summary>
 /// The answer the maintainer approved for one sample: the <see cref="Subject"/> detection should find in it, or
-/// <c>null</c> for "none", and the fingerprint of the file it was approved for.
+/// <c>null</c> for "none" or "already cropped", and the fingerprint of the file it was approved for.
 /// </summary>
-internal sealed record ApprovedAnswer(string Fingerprint, Subject? Subject);
+internal sealed record ApprovedAnswer(string Fingerprint, Subject? Subject)
+{
+    /// <summary>The sample is already cropped to its Subject, which is not the same answer as "none".</summary>
+    public bool AlreadyCropped { get; init; }
+
+    /// <summary>How many pixels each edge of the window and popups may be off and still pass, where an edge is ambiguous.</summary>
+    public int Tolerance { get; init; }
+
+    /// <summary>The sample is a dark-theme screenshot, counted in the dark totals rather than the light ones.</summary>
+    public bool Dark { get; init; }
+
+    public static ApprovedAnswer AlreadyCroppedAnswer(string fingerprint) => new(fingerprint, null) { AlreadyCropped = true };
+}
 
 /// <summary>
 /// Reads and writes the approved-answers file of the local samples check. One line per sample, tab separated:
@@ -19,6 +31,9 @@ internal sealed record ApprovedAnswer(string Fingerprint, Subject? Subject);
 internal static class ApprovedAnswers
 {
     private const string None = "none";
+    private const string AlreadyCropped = "already-cropped";
+    private const string ToleranceFlag = "tolerance";
+    private const string DarkFlag = "dark";
 
     public static Dictionary<string, ApprovedAnswer> Parse(string text)
     {
@@ -30,9 +45,9 @@ internal static class ApprovedAnswers
             if (line.Length == 0 || line.StartsWith('#'))
                 continue;
             var fields = line.Split('\t');
-            if (fields.Length != 3 || TryParseSubject(fields[2], out var subject) is false)
+            if (fields.Length != 3 || TryParseAnswer(fields[1], fields[2], out var answer) is false)
                 throw new FormatException($"Approved answers, line {i + 1}: expected \"name<TAB>fingerprint<TAB>answer\", got \"{line}\".");
-            answers[fields[0]] = new ApprovedAnswer(fields[1], subject);
+            answers[fields[0]] = answer;
         }
         return answers;
     }
@@ -43,11 +58,22 @@ internal static class ApprovedAnswers
         text.Append("# Approved answers of the local samples check: file name, fingerprint, then \"none\" or the window\n");
         text.Append("# and popup rectangles (x,y,width,height). Regenerated from detection's output; approve by eye.\n");
         foreach (var (name, answer) in answers.OrderBy(a => a.Key, StringComparer.Ordinal))
-            text.Append(name).Append('\t').Append(answer.Fingerprint).Append('\t').Append(Describe(answer.Subject)).Append('\n');
+            text.Append(name).Append('\t').Append(answer.Fingerprint).Append('\t').Append(Describe(answer)).Append('\n');
         return text.ToString();
     }
 
-    /// <summary>The answer as it is written in the file, also used in reports.</summary>
+    /// <summary>The approved answer as it is written in the file, also used in reports.</summary>
+    public static string Describe(ApprovedAnswer answer)
+    {
+        var text = new StringBuilder(answer.AlreadyCropped ? AlreadyCropped : Describe(answer.Subject));
+        if (answer.Tolerance != 0)
+            text.Append(CultureInfo.InvariantCulture, $" {ToleranceFlag} {answer.Tolerance}");
+        if (answer.Dark)
+            text.Append(' ').Append(DarkFlag);
+        return text.ToString();
+    }
+
+    /// <summary>Detection's answer as it is written in the file, also used in reports.</summary>
     public static string Describe(Subject? subject)
     {
         if (subject is null)
@@ -60,6 +86,33 @@ internal static class ApprovedAnswers
 
     private static string Describe(PixelRect rect) =>
         string.Create(CultureInfo.InvariantCulture, $"{rect.X},{rect.Y},{rect.Width},{rect.Height}");
+
+    /// <summary>Reads the answer field: the answer itself, then an optional <c>tolerance N</c>, then an optional <c>dark</c>.</summary>
+    private static bool TryParseAnswer(string fingerprint, string text, out ApprovedAnswer answer)
+    {
+        answer = new ApprovedAnswer(fingerprint, null);
+        var words = text.Split(' ', StringSplitOptions.RemoveEmptyEntries).ToList();
+        var dark = words.Count > 0 && words[^1] == DarkFlag;
+        if (dark)
+            words.RemoveAt(words.Count - 1);
+        var tolerance = 0;
+        if (words.Count >= 2 && words[^2] == ToleranceFlag)
+        {
+            if (!int.TryParse(words[^1], NumberStyles.None, CultureInfo.InvariantCulture, out tolerance))
+                return false;
+            words.RemoveRange(words.Count - 2, 2);
+        }
+
+        var rest = string.Join(' ', words);
+        if (rest == AlreadyCropped)
+            answer = ApprovedAnswer.AlreadyCroppedAnswer(fingerprint);
+        else if (TryParseSubject(rest, out var subject))
+            answer = new ApprovedAnswer(fingerprint, subject);
+        else
+            return false;
+        answer = answer with { Tolerance = tolerance, Dark = dark };
+        return true;
+    }
 
     private static bool TryParseSubject(string text, out Subject? subject)
     {
