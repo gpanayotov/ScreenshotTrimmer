@@ -290,6 +290,7 @@ public sealed partial class MainWindowViewModel : Observable, IDisposable
     {
         Localizer.Instance.PropertyChanged -= OnLanguageChanged;
         _workspace.Changed -= OnWorkspaceChanged;
+        CancelDetection();
         // A load still running sees it is outdated and disposes its bitmap.
         _loadNumber++;
         Image = null;
@@ -495,6 +496,7 @@ public sealed partial class MainWindowViewModel : Observable, IDisposable
     private async void LoadImage(WorkspaceImage? image)
     {
         var load = ++_loadNumber;
+        CancelDetection();
         _shown = image;
         Raise(nameof(StatusFileName));
         Image = null;
