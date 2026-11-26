@@ -84,7 +84,8 @@
         <MenuItem Header="{loc:Tr RemoveFromList}" InputGesture="Delete" Command="{Binding RemoveSelectedCommand}" />
         <Separator />
         <MenuItem Header="{loc:Tr AutoCropMenu}" InputGesture="Ctrl+Shift+A" Command="{Binding AutoCropCommand}" />
-        <MenuItem Header="{loc:Tr BatchMenu}" InputGesture="Ctrl+B" Command="{Binding BatchCommand}" />
+        <MenuItem Header="{loc:Tr BatchMenu}" InputGesture="Ctrl+B" Command="{Binding BatchCommand}"
+                  ToolTip.Tip="{Binding BatchTip}" ToolTip.ShowOnDisabled="True" />
         <Separator />
         <!-- The crop tool: what a newly drawn rectangle does. -->
         <MenuItem Header="{loc:Tr ClassicCropTool}" ToggleType="Radio" GroupName="CropTool"
@@ -114,7 +115,7 @@
         <Separator Width="1" Height="20" Margin="6,0" Background="{DynamicResource SystemControlForegroundBaseLowBrush}" />
         <Button Content="{loc:Tr ToolbarAutoCrop}" ToolTip.Tip="{loc:Tr ToolbarAutoCropTip}"
                 Command="{Binding AutoCropCommand}" />
-        <Button Content="{loc:Tr ToolbarBatch}" ToolTip.Tip="{loc:Tr ToolbarBatchTip}"
+        <Button Content="{loc:Tr ToolbarBatch}" ToolTip.Tip="{Binding BatchTip}" ToolTip.ShowOnDisabled="True"
                 Command="{Binding BatchCommand}" />
         <RadioButton GroupName="ToolbarCropTool" Content="{loc:Tr ToolbarClassicCrop}"
                      ToolTip.Tip="{loc:Tr ToolbarClassicCropTip}"
