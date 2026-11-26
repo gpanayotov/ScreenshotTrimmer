@@ -16,6 +16,7 @@
     <KeyBinding Gesture="Ctrl+Shift+O" Command="{Binding OpenFolderCommand}" />
     <KeyBinding Gesture="Ctrl+S" Command="{Binding SaveCommand}" />
     <KeyBinding Gesture="Ctrl+Shift+S" Command="{Binding SaveAllCommand}" />
+    <KeyBinding Gesture="Ctrl+Shift+A" Command="{Binding AutoCropCommand}" />
     <!-- Like Delete, undo and redo reach these bindings only when the focused text box left them unhandled. -->
     <KeyBinding Gesture="Ctrl+Z" Command="{Binding UndoCommand}" />
     <KeyBinding Gesture="Ctrl+Y" Command="{Binding RedoCommand}" />
@@ -81,6 +82,7 @@
         <Separator />
         <MenuItem Header="{loc:Tr RemoveFromList}" InputGesture="Delete" Command="{Binding RemoveSelectedCommand}" />
         <Separator />
+        <MenuItem Header="{loc:Tr AutoCropMenu}" InputGesture="Ctrl+Shift+A" Command="{Binding AutoCropCommand}" />
         <MenuItem Header="{loc:Tr ClearCrop}" Command="{Binding ClearCropCommand}" />
       </MenuItem>
     </Menu>
@@ -98,6 +100,9 @@
                 Command="{Binding #Viewer.FitCommand}" />
         <Button Content="{loc:Tr ToolbarActualSize}" ToolTip.Tip="{loc:Tr ToolbarActualSizeTip}"
                 Command="{Binding #Viewer.ActualSizeCommand}" />
+        <Separator Width="1" Height="20" Margin="6,0" Background="{DynamicResource SystemControlForegroundBaseLowBrush}" />
+        <Button Content="{loc:Tr ToolbarAutoCrop}" ToolTip.Tip="{loc:Tr ToolbarAutoCropTip}"
+                Command="{Binding AutoCropCommand}" />
         <Separator Width="1" Height="20" Margin="6,0" Background="{DynamicResource SystemControlForegroundBaseLowBrush}" />
         <ToggleButton Content="{loc:Tr ToolbarShowResults}" ToolTip.Tip="{loc:Tr ToolbarShowResultsTip}"
                       IsChecked="{Binding ShowResults, Mode=TwoWay}" />
@@ -136,6 +141,11 @@
         <TextBlock Text="{Binding StatusImageSize}" />
         <TextBlock Text="{Binding StatusZoom}" />
         <TextBlock Text="{Binding StatusCrop}" />
+        <!-- Shown only when Auto crop takes more than a moment. -->
+        <StackPanel Orientation="Horizontal" Spacing="6" IsVisible="{Binding IsDetecting}">
+          <ProgressBar IsIndeterminate="True" Width="80" MinWidth="80" VerticalAlignment="Center" />
+          <TextBlock Text="{loc:Tr FindingSubject}" />
+        </StackPanel>
       </StackPanel>
     </Border>
 
