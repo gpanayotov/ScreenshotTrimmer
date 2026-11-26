@@ -11,6 +11,7 @@ using ScreenshotTrimmer.Processing.Files;
 using ScreenshotTrimmer.Processing.Imaging;
 using ScreenshotTrimmer.Processing.Rendering;
 using ScreenshotTrimmer.Processing.Settings;
+using ScreenshotTrimmer.Processing.Viewing;
 using ScreenshotTrimmer.Processing.Workspaces;
 
 namespace ScreenshotTrimmer.App;
@@ -61,7 +62,11 @@ public sealed partial class MainWindowViewModel : Observable, IDisposable
         ToggleShowResultsCommand = new RelayCommand(() => ShowResults = !ShowResults);
         SaveCommand = new RelayCommand(Save, CanSave);
         SaveAllCommand = new RelayCommand(SaveAll, CanSaveAll);
-        ClearCropCommand = new RelayCommand(() => Crop = null);
+        ClearCropCommand = new RelayCommand(() => RecordCrop(null, mergeKey: null));
+        UndoCommand = new RelayCommand(() => ChangeHistory(_workspace.Undo), () => CanChangeHistory(_workspace.CanUndo));
+        RedoCommand = new RelayCommand(() => ChangeHistory(_workspace.Redo), () => CanChangeHistory(_workspace.CanRedo));
+        ResetCommand = new RelayCommand(() => ChangeHistory(_workspace.Reset),
+            () => CanChangeHistory(image => _workspace.Steps(image) != Steps.None));
         ChooseBackgroundCommand = new RelayCommand<object>(choice =>
         {
             if (choice is ViewerBackground background)
@@ -99,28 +104,38 @@ public sealed partial class MainWindowViewModel : Observable, IDisposable
 
     /// <summary>
     /// The selected image's crop, or <c>null</c> for none, as its Steps hold it. Setting it, as the viewer does at the
-    /// end of each drag and on each nudge, records one Step; an image's first Step also takes its finishing from the
-    /// remembered settings.
+    /// end of each drag and on each nudge, records one Step; a run of nudges on the same handle
+    /// (<see cref="NudgedHandle"/>) is one Step. An image's first Step also takes its finishing from the remembered
+    /// settings.
     /// </summary>
     public Crop? Crop
     {
         get => _crop;
-        set
+        set => RecordCrop(value, NudgedHandle);
+    }
+
+    /// <summary>The handle the viewer nudged to make the crop it sets next, or <c>null</c> when a drag made it.</summary>
+    public CropHandle? NudgedHandle { get; set; }
+
+    /// <summary>
+    /// Records <paramref name="crop"/> as a Step of the selected image, merged with the previous Step when it has the same
+    /// <paramref name="mergeKey"/>, and shows the Original.
+    /// </summary>
+    private void RecordCrop(Crop? crop, object? mergeKey)
+    {
+        if (crop == _crop)
+            return;
+        if (_workspace.Selected is { } image && Image is not null && SamePath(image.Key, _shown?.Key))
         {
-            if (value == _crop)
-                return;
-            if (_workspace.Selected is { } image && Image is not null && SamePath(image.Key, _shown?.Key))
-            {
-                var hasShadowPadding = _shownHasShadowPadding;
-                IfStillListed(image, listed => _workspace.SetSteps(listed, FirstStep.Apply(
-                    _workspace.Steps(listed), Settings, hasShadowPadding,
-                    steps => steps with { Crop = value })));
-            }
-            // The workspace's change has set the crop it recorded; when nothing was recorded, the viewer goes back to
-            // the current one.
-            Raise();
-            ShowsResult = false;
+            var hasShadowPadding = _shownHasShadowPadding;
+            IfStillListed(image, listed => _workspace.SetSteps(listed, FirstStep.Apply(
+                _workspace.Steps(listed), Settings, hasShadowPadding,
+                steps => steps with { Crop = crop }), mergeKey));
         }
+        // The workspace's change has set the crop it recorded; when nothing was recorded, the viewer goes back to the
+        // current one.
+        Raise(nameof(Crop));
+        ShowsResult = false;
     }
 
     /// <summary>The decoded selected image, or <c>null</c> while it loads or when it cannot be read.</summary>
@@ -238,6 +253,15 @@ public sealed partial class MainWindowViewModel : Observable, IDisposable
 
     /// <summary>Returns the selected image to the whole image, as one Step; nothing happens when it has no crop.</summary>
     public ICommand ClearCropCommand { get; }
+
+    /// <summary>Undoes the selected image's last Step. Enabled while it has one to undo.</summary>
+    public RelayCommand UndoCommand { get; }
+
+    /// <summary>Redoes the selected image's last undone Step. Enabled while it has one to redo.</summary>
+    public RelayCommand RedoCommand { get; }
+
+    /// <summary>Removes all of the selected image's Steps as one undoable Step. Enabled while it has Steps.</summary>
+    public RelayCommand ResetCommand { get; }
 
     /// <summary>
     /// Saves the Result of every image with unsaved Steps off the interface thread, then reports how many were saved
@@ -413,6 +437,7 @@ public sealed partial class MainWindowViewModel : Observable, IDisposable
         ShowCrop(change.Selected);
         ShowFinishing(change.Selected);
         NotifySaveCommands();
+        NotifyHistoryCommands();
 
         if (change.UnavailableFolders.Count > 0)
             ReportUnavailable(change.UnavailableFolders);
@@ -451,6 +476,28 @@ public sealed partial class MainWindowViewModel : Observable, IDisposable
         _workspace.Selected is { HasUnsavedSteps: true } selected && !_saving.Contains(selected.Key) && !_savingAll;
 
     private bool CanSaveAll() => !_savingAll && _saving.Count == 0 && _workspace.Images.Any(image => image.HasUnsavedSteps);
+
+    /// <summary>Applies <paramref name="change"/> to the selected image's history, if it is still listed.</summary>
+    private void ChangeHistory(Action<WorkspaceImage> change)
+    {
+        if (_workspace.Selected is { } image)
+            IfStillListed(image, change);
+    }
+
+    private bool CanChangeHistory(Func<WorkspaceImage, bool> can)
+    {
+        var allowed = false;
+        if (_workspace.Selected is { } image)
+            IfStillListed(image, listed => allowed = can(listed));
+        return allowed;
+    }
+
+    private void NotifyHistoryCommands()
+    {
+        UndoCommand.NotifyCanExecuteChanged();
+        RedoCommand.NotifyCanExecuteChanged();
+        ResetCommand.NotifyCanExecuteChanged();
+    }
 
     private void NotifySaveCommands()
     {

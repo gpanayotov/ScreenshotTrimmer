@@ -41,8 +41,26 @@ public partial class MainWindow : Window, IPathPicker, IQuestions
         Viewer.KeyDown += OnViewerKeyDown;
         ManualRadiusBox.AddHandler(KeyDownEvent, OnManualRadiusKeyDown, RoutingStrategies.Tunnel);
         ManualRadiusBox.LostFocus += (_, _) => _viewModel?.ApplyManualRadiusCommand.Execute(null);
+        WatchShadowDrags(ShadowSizeSlider);
+        WatchShadowDrags(ShadowOpacitySlider);
         Strip.ContainerPrepared += OnStripContainerPrepared;
         Strip.ContainerClearing += OnStripContainerClearing;
+    }
+
+    /// <summary>
+    /// Tells the view model when a pointer drag on a Shadow slider starts and ends, whether it grabs the thumb or the
+    /// track, so the whole drag becomes one Step. Tunnel and handled events too, as the slider handles the pointer itself.
+    /// </summary>
+    private void WatchShadowDrags(Slider slider)
+    {
+        slider.AddHandler(PointerPressedEvent, (_, e) =>
+        {
+            if (e.GetCurrentPoint(slider).Properties.IsLeftButtonPressed)
+                _viewModel?.BeginShadowDrag();
+        }, RoutingStrategies.Tunnel, handledEventsToo: true);
+        slider.AddHandler(PointerReleasedEvent, (_, _) => _viewModel?.EndShadowDrag(),
+            RoutingStrategies.Tunnel, handledEventsToo: true);
+        slider.AddHandler(PointerCaptureLostEvent, (_, _) => _viewModel?.EndShadowDrag(), handledEventsToo: true);
     }
 
     /// <summary>The zoom shortcuts, with the numeric keypad's keys and Ctrl+Shift+= for Ctrl+Plus too.</summary>
@@ -278,6 +296,8 @@ public partial class MainWindow : Window, IPathPicker, IQuestions
             _viewModel.Zoom = Viewer.Zoom;
         else if (e.Property == ImageViewer.ShownCropProperty)
             _viewModel.ShownCrop = Viewer.ShownCrop;
+        else if (e.Property == ImageViewer.NudgedHandleProperty)
+            _viewModel.NudgedHandle = Viewer.NudgedHandle;
     }
 
     // The strip recycles its containers as it scrolls; remembering which entry each one shows tells an entry when it

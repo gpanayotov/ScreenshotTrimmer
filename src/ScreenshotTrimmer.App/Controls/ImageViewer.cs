@@ -32,15 +32,19 @@ public enum ViewerBackground
 /// on one of its handles or inside it, resizes or moves it. The edited crop is set as <see cref="Crop"/> when the
 /// button is released, so one drag is one change; Escape during a drag restores it as it was. The handle last dragged
 /// stays selected, and while the viewer has focus the arrow keys nudge it by one image pixel, each nudge setting
-/// <see cref="Crop"/>. The wheel zooms around the cursor.
+/// <see cref="Crop"/>. The Loupe shows the pixels around the held handle while dragging and nudging. The wheel zooms
+/// around the cursor.
 /// </remarks>
-public sealed class ImageViewer : Control
+public sealed partial class ImageViewer : Control
 {
     public static readonly StyledProperty<CropStep?> CropProperty =
         AvaloniaProperty.Register<ImageViewer, CropStep?>(nameof(Crop), defaultBindingMode: BindingMode.TwoWay);
 
     public static readonly DirectProperty<ImageViewer, ImageRect?> ShownCropProperty =
         AvaloniaProperty.RegisterDirect<ImageViewer, ImageRect?>(nameof(ShownCrop), viewer => viewer.ShownCrop);
+
+    public static readonly DirectProperty<ImageViewer, CropHandle?> NudgedHandleProperty =
+        AvaloniaProperty.RegisterDirect<ImageViewer, CropHandle?>(nameof(NudgedHandle), viewer => viewer.NudgedHandle);
 
     /// <summary>The side of a crop handle's square, in device-independent units, at any zoom.</summary>
     private const double HandleSize = 8;
@@ -99,6 +103,7 @@ public sealed class ImageViewer : Control
     private CropHandle _editedHandle;
     private CropHandle _selected;
     private ImageRect? _shownCrop;
+    private CropHandle? _nudgedHandle;
     private bool _isSpaceHeld;
     private double _zoom;
     private double _horizontalScroll;
@@ -160,6 +165,16 @@ public sealed class ImageViewer : Control
     {
         get => _shownCrop;
         private set => SetAndRaise(ShownCropProperty, ref _shownCrop, value);
+    }
+
+    /// <summary>
+    /// The handle the arrow keys nudged to make the last <see cref="Crop"/> the viewer set, or <c>null</c> when a drag
+    /// made it. It is set just before <see cref="Crop"/>, so a run of nudges on the same handle can be one Step.
+    /// </summary>
+    public CropHandle? NudgedHandle
+    {
+        get => _nudgedHandle;
+        private set => SetAndRaise(NudgedHandleProperty, ref _nudgedHandle, value);
     }
 
     /// <summary>Physical screen pixels per image pixel; 0 when there is no image.</summary>
@@ -264,6 +279,7 @@ public sealed class ImageViewer : Control
         if (change.Property == SourceProperty)
         {
             EndEdit();
+            HideNudgeLoupe();
             _selected = CropHandle.None;
             // A new image starts fitted; a bitmap of the same size replacing the shown one, such as the Result
             // rendered again or the Original and Result of an uncropped image, keeps the zoom and position.
@@ -279,6 +295,7 @@ public sealed class ImageViewer : Control
         {
             // A drag in progress ends as if Escape was pressed; the hidden crop cannot be edited.
             EndEdit();
+            HideNudgeLoupe();
         }
         else if (change.Property == BoundsProperty)
         {
@@ -320,6 +337,7 @@ public sealed class ImageViewer : Control
     {
         base.OnPointerPressed(e);
         var point = e.GetCurrentPoint(this).Properties;
+        HideNudgeLoupe();
         if (point.IsLeftButtonPressed && !IsSpaceHeld && _panFrom is null && _editFrom is null
             && EditableCrop() is { } start && _viewport is { } viewport)
         {
@@ -349,6 +367,8 @@ public sealed class ImageViewer : Control
         base.OnPointerMoved(e);
         if (_editFrom is not null)
         {
+            var pointer = e.GetPosition(this);
+            _editPointer = new ViewPoint(pointer.X, pointer.Y);
             (_edited, _editedHandle) = Edited(e);
             ShowCurrentCrop();
             return;
@@ -416,7 +436,8 @@ public sealed class ImageViewer : Control
         };
         if ((dx, dy) == (0, 0) || EditableCrop() is not { } crop)
             return;
-        SetCrop(crop.Nudge(_selected, dx, dy).Crop);
+        SetCrop(crop.Nudge(_selected, dx, dy).Crop, nudged: _selected);
+        ShowNudgeLoupe();
         e.Handled = true;
     }
 
@@ -450,6 +471,8 @@ public sealed class ImageViewer : Control
 
         if (IsCropShown && ShownCrop is { } rectangle)
             DrawCrop(context, viewport, destination, rectangle);
+        if (IsCropShown)
+            DrawLoupe(context, bitmap, viewport, ShownCrop);
     }
 
     /// <summary>Dims the image outside <paramref name="crop"/> and outlines it, on whole screen pixels.</summary>
@@ -521,11 +544,17 @@ public sealed class ImageViewer : Control
             : start.Drag(_editHandle, from, to, viewport, Scaling);
     }
 
-    /// <summary>Sets <see cref="Crop"/> to <paramref name="crop"/> when it differs, as one change.</summary>
-    private void SetCrop(CropStep? crop)
+    /// <summary>
+    /// Sets <see cref="Crop"/> to <paramref name="crop"/> when it differs, as one change, made by nudging
+    /// <paramref name="nudged"/> when it is given.
+    /// </summary>
+    private void SetCrop(CropStep? crop, CropHandle? nudged = null)
     {
         if (crop != Crop)
+        {
+            NudgedHandle = nudged;
             SetCurrentValue(CropProperty, crop);
+        }
         ShowCurrentCrop();
     }
 
@@ -543,6 +572,7 @@ public sealed class ImageViewer : Control
         _editFrom = null;
         _editStart = null;
         _edited = null;
+        _editPointer = null;
         Cursor = IsSpaceHeld ? new Cursor(StandardCursorType.Hand) : null;
         ShowCurrentCrop();
     }

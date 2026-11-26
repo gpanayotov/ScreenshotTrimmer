@@ -81,7 +81,7 @@ public sealed partial class Workspace
             var savedPath = report.Written[0];
             var state = StepsOf(pasted.Key);
             _steps.Remove(pasted.Key);
-            _steps[savedPath] = state with { Saved = steps };
+            _steps[savedPath] = state with { Saved = steps, MergeKey = null };
             _savedPasted.RemoveAll(saved => FileNames.Same(saved.Path, savedPath));
             _savedPasted.Add(new SavedPasted(savedPath, pasted.Pixels));
             _backupSaves.Remove(savedPath);

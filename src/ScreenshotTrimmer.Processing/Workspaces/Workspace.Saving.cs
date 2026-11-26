@@ -92,7 +92,7 @@ public sealed partial class Workspace
             }
             var state = StepsOf(savedPath);
             if (state.Current == steps)
-                _steps[savedPath] = state with { Saved = steps };
+                _steps[savedPath] = state with { Saved = steps, MergeKey = null };
             // The new files are listed now rather than when the folder watcher notices them, so the badge or the
             // renamed entry shows at once.
             var selected = Selected is { } current && FileNames.Same(current.Key, path) ? savedPath : Selected is null ? null : Selected.Key;

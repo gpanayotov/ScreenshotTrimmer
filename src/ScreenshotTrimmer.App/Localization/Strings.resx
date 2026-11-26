@@ -49,8 +49,18 @@
   <data name="ManualRadiusTip" xml:space="preserve"><value>A corner radius in pixels for this image only; leave it empty to use the measured radius</value></data>
   <data name="PixelsUnit" xml:space="preserve"><value>px</value></data>
   <data name="ManualRadiusInvalid" xml:space="preserve"><value>The corner radius must be a number of pixels from 0 to {0}, or empty for the measured radius.</value></data>
+  <data name="Shadow" xml:space="preserve"><value>Shadow</value></data>
+  <data name="ShadowOn" xml:space="preserve"><value>Add a Shadow</value></data>
+  <data name="ShadowSize" xml:space="preserve"><value>Size</value></data>
+  <data name="ShadowOpacity" xml:space="preserve"><value>Opacity</value></data>
+  <data name="ShadowPaddingWarning" xml:space="preserve"><value>The Original already seems to have shadow padding, so Shadow is left off for it. You can still turn it on.</value></data>
   <data name="CropSize" xml:space="preserve"><value>Crop: {0:N0} × {1:N0} px at {2:N0}, {3:N0}</value></data>
   <data name="ClearCrop" xml:space="preserve"><value>_Clear crop</value></data>
+  <data name="EditMenu" xml:space="preserve"><value>_Edit</value></data>
+  <data name="Undo" xml:space="preserve"><value>_Undo</value></data>
+  <data name="Redo" xml:space="preserve"><value>_Redo</value></data>
+  <data name="ResetSteps" xml:space="preserve"><value>Re_set</value></data>
+  <data name="LoupePosition" xml:space="preserve"><value>x {0:N0}   y {1:N0}</value></data>
   <data name="ThumbnailUnreadable" xml:space="preserve"><value>Cannot be read</value></data>
   <data name="ShowResults" xml:space="preserve"><value>Show _Results</value></data>
   <data name="HasResultBadge" xml:space="preserve"><value>Result</value></data>
@@ -107,7 +117,6 @@
   <data name="DiscardAnswer" xml:space="preserve"><value>Discard</value></data>
   <data name="DiscardQuestion" xml:space="preserve"><value>{0} has unsaved changes. Remove it from the list and discard them?</value></data>
   <data name="UnsavedDropped" xml:space="preserve"><value>These images were deleted or moved away on disk, and their unsaved changes were discarded: {0}</value></data>
-  <data name="EditMenu" xml:space="preserve"><value>_Edit</value></data>
   <data name="PasteImage" xml:space="preserve"><value>_Paste image</value></data>
   <data name="CopyResult" xml:space="preserve"><value>_Copy Result</value></data>
   <data name="PastedImageName" xml:space="preserve"><value>Pasted image {0}</value></data>

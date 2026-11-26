@@ -1,4 +1,5 @@
 using System.Windows.Input;
+using Avalonia.Threading;
 using Avalonia.Media.Imaging;
 using ScreenshotTrimmer.App.Imaging;
 using ScreenshotTrimmer.App.Localization;
@@ -22,6 +23,14 @@ public sealed partial class MainWindowViewModel
     private CleanEdges _cleanEdges = CleanEdges.Shown(Steps.None, new UserSettings());
     private string? _finishingKey;
     private string _manualRadiusText = "";
+    private ShadowControls _shadow = ShadowControls.Shown(Steps.None, new UserSettings(), false);
+
+    /// <summary>The Shadow a slider drag has reached so far, or null when no drag is under way.</summary>
+    private ShadowControls? _draggedShadow;
+    private bool _draggingShadow;
+
+    /// <summary>Waits for a pause in a slider drag before previewing it, so a fast drag does not render every value.</summary>
+    private DispatcherTimer? _shadowPreviewTimer;
 
     /// <summary>The render the Result view should show: the newest wins over any still in progress.</summary>
     private RenderRequest? _wantedRender;
@@ -95,6 +104,71 @@ public sealed partial class MainWindowViewModel
         }
     }
 
+    /// <summary>The smallest size the Shadow size slider offers; the library allows any size above 0.</summary>
+    public static double MinShadowSize => 0.1;
+
+    /// <summary>The largest size the Shadow size slider offers.</summary>
+    public static double MaxShadowSize => Shadow.MaxSize;
+
+    /// <summary>
+    /// The Shadow switch, showing the selected image's Steps, or the remembered setting while it has none (off for an
+    /// Original with shadow padding). Setting it changes the image's Steps (one Step) and the remembered setting.
+    /// </summary>
+    public bool ShadowOn
+    {
+        get => _shadow.On;
+        set
+        {
+            if (value != _shadow.On)
+                ChangeShadow(_shadow with { On = value });
+        }
+    }
+
+    /// <summary>
+    /// The Shadow size slider. During a drag (<see cref="BeginShadowDrag"/>) each value is only previewed; otherwise,
+    /// and at the drag's end, the value is one Step and the remembered size.
+    /// </summary>
+    public double ShadowSize
+    {
+        get => (_draggedShadow ?? _shadow).Size;
+        set => SlideShadow((_draggedShadow ?? _shadow) with { Size = Math.Clamp(value, MinShadowSize, MaxShadowSize) });
+    }
+
+    /// <summary>The Shadow opacity slider, changed like <see cref="ShadowSize"/>.</summary>
+    public double ShadowOpacity
+    {
+        get => (_draggedShadow ?? _shadow).Opacity;
+        set => SlideShadow((_draggedShadow ?? _shadow) with { Opacity = Math.Clamp(value, 0, 1) });
+    }
+
+    /// <summary>Whether the shown Result's render found that the Original already has shadow padding.</summary>
+    public bool ShowsShadowPaddingWarning => _report?.Report.OriginalHasShadowPadding == true;
+
+    /// <summary>
+    /// Starts a Shadow slider drag: until <see cref="EndShadowDrag"/>, slider values update the Result preview but
+    /// record nothing.
+    /// </summary>
+    public void BeginShadowDrag() => _draggingShadow = true;
+
+    /// <summary>Ends a Shadow slider drag, recording the value it reached as one Step.</summary>
+    public void EndShadowDrag()
+    {
+        if (!_draggingShadow)
+            return;
+        _draggingShadow = false;
+        _shadowPreviewTimer?.Stop();
+        var dragged = _draggedShadow;
+        _draggedShadow = null;
+        if (dragged is not null && dragged != _shadow)
+            ChangeShadow(dragged);
+        else
+        {
+            // Back to the recorded Shadow, in the sliders and in the Result.
+            RaiseFinishing();
+            ShowFinishing(_workspace.Selected);
+        }
+    }
+
     /// <summary>
     /// The manual radius field's text, in the interface language; empty means automatic. It is applied to the selected
     /// image only, by <see cref="ApplyManualRadiusCommand"/>, and never remembered.
@@ -143,11 +217,15 @@ public sealed partial class MainWindowViewModel
             IfStillListed(image, listed => steps = _workspace.Steps(listed));
 
         var shown = CleanEdges.Shown(steps, Settings);
+        var shadow = ShadowControls.Shown(steps, Settings, _shownHasShadowPadding);
         var sameImage = SamePath(image?.Key, _finishingKey);
         _finishingKey = image?.Key;
-        if (shown != _cleanEdges || !sameImage)
+        if (!sameImage)
+            _draggedShadow = null;
+        if (shown != _cleanEdges || shadow != _shadow || !sameImage)
         {
             _cleanEdges = shown;
+            _shadow = shadow;
             ManualRadiusText = FormatRadius(shown.ManualRadius);
             RaiseFinishing();
         }
@@ -175,6 +253,47 @@ public sealed partial class MainWindowViewModel
         }
         ShowsResult = true;
         ShowFinishing(_workspace.Selected);
+    }
+
+    private void ChangeShadow(ShadowControls shadow) => ChangeFinishing(shadow.Change, shadow.Remember(Settings));
+
+    /// <summary>A slider moved: previewed while a drag is under way, otherwise recorded at once (keyboard, wheel).</summary>
+    private void SlideShadow(ShadowControls shadow)
+    {
+        if (!_draggingShadow)
+        {
+            if (shadow != _shadow)
+                ChangeShadow(shadow);
+            return;
+        }
+        if (shadow == (_draggedShadow ?? _shadow))
+            return;
+        _draggedShadow = shadow;
+        Raise(nameof(ShadowSize));
+        Raise(nameof(ShadowOpacity));
+        if (_shadowPreviewTimer is null)
+        {
+            _shadowPreviewTimer = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(40) };
+            _shadowPreviewTimer.Tick += (_, _) =>
+            {
+                _shadowPreviewTimer.Stop();
+                PreviewShadow();
+            };
+        }
+        _shadowPreviewTimer.Stop();
+        _shadowPreviewTimer.Start();
+    }
+
+    /// <summary>Renders the Result with the Shadow the drag has reached, without recording a Step.</summary>
+    private void PreviewShadow()
+    {
+        if (_draggedShadow is not { } dragged || _workspace.Selected is not { } image
+            || _original is not { } original || !SamePath(image.Key, _shown?.Key))
+            return;
+        var steps = Steps.None;
+        IfStillListed(image, listed => steps = _workspace.Steps(listed));
+        ShowsResult = true;
+        Render(new RenderRequest(original, FirstStep.Apply(steps, Settings, _shownHasShadowPadding, dragged.Change)));
     }
 
     private void ApplyManualRadius()
@@ -256,6 +375,10 @@ public sealed partial class MainWindowViewModel
     {
         Raise(nameof(FrameLines));
         Raise(nameof(RoundedCorners));
+        Raise(nameof(ShadowOn));
+        Raise(nameof(ShadowSize));
+        Raise(nameof(ShadowOpacity));
+        Raise(nameof(ShowsShadowPaddingWarning));
         Raise(nameof(FrameLinesRemovedText));
         Raise(nameof(MeasuredRadiiText));
         Raise(nameof(ResultSizeText));
