@@ -1,4 +1,5 @@
 using ScreenshotTrimmer.Processing.Detection;
+using ScreenshotTrimmer.Processing.Files;
 using ScreenshotTrimmer.Processing.Imaging;
 using ScreenshotTrimmer.Processing.Rendering;
 using SkiaSharp;
@@ -13,29 +14,28 @@ namespace ScreenshotTrimmer.Processing.SelfChecking;
 public static class SelfCheck
 {
     /// <summary>Where the drawn screenshot's dialog lies, and so about where the Subject Auto crop finds must lie.</summary>
-    private static readonly PixelRect Dialog = new(100, 80, 400, 250);
+    private static readonly PixelRect Dialog = SyntheticScreenshot.DefaultDialog;
 
     /// <summary>Runs the check in a temporary folder, deleted afterwards, and returns its outcome; it never throws.</summary>
     public static SelfCheckResult Run()
     {
         var stage = "drawing the screenshot";
-        string? folder = null;
         try
         {
-            var screenshot = DrawScreenshot();
+            var screenshot = SyntheticScreenshot.DialogOverDimmedApplication();
 
             stage = "creating a temporary folder";
-            folder = Directory.CreateTempSubdirectory("ScreenshotTrimmer.SelfCheck-").FullName;
+            using var folder = new TemporaryFolder("ScreenshotTrimmer.SelfCheck-");
 
             stage = "encoding and decoding PNG";
-            var png = Path.Combine(folder, "screenshot.png");
+            var png = folder.File("screenshot.png");
             WriteFile(png, stream => PngEncoder.Write(screenshot, stream));
             var original = ImageFile.Load(png);
             if (!original.PixelsEqual(screenshot))
                 return Fail(stage, "the decoded PNG differs from the drawn screenshot.");
 
             stage = "encoding and decoding JPEG";
-            var jpeg = Path.Combine(folder, "screenshot.jpg");
+            var jpeg = folder.File("screenshot.jpg");
             WriteFile(jpeg, stream => WriteJpeg(screenshot, stream));
             var fromJpeg = ImageFile.Load(jpeg);
             if (fromJpeg.Width != screenshot.Width || fromJpeg.Height != screenshot.Height)
@@ -69,7 +69,7 @@ public static class SelfCheck
                 return Fail(stage, "the Result's corner is not transparent.");
 
             stage = "encoding and decoding the Result";
-            var saved = Path.Combine(folder, "result.png");
+            var saved = folder.File("result.png");
             WriteFile(saved, stream => PngEncoder.Write(result, stream));
             if (!ImageFile.Load(saved).PixelsEqual(result))
                 return Fail(stage, "the decoded Result differs from the rendered one.");
@@ -80,11 +80,6 @@ public static class SelfCheck
         {
             // The point of the check is to report any failure, native library loading included, as text.
             return Fail(stage, $"{e.GetType().Name}: {e.Message}{InnerMessage(e)}");
-        }
-        finally
-        {
-            if (folder is not null)
-                TryDelete(folder);
         }
     }
 
@@ -105,43 +100,9 @@ public static class SelfCheck
     private static string InnerMessage(Exception e) =>
         e.InnerException is { } inner ? $" ({inner.GetType().Name}: {inner.Message})" : "";
 
-    /// <summary>A light dialog with rounded corners, a title, text and a button, over a dimmed application page.</summary>
-    private static RgbaImage DrawScreenshot()
-    {
-        var info = new SKImageInfo(800, 500, SKColorType.Rgba8888, SKAlphaType.Unpremul);
-        using var bitmap = new SKBitmap(info);
-        using (var canvas = new SKCanvas(bitmap))
-        {
-            canvas.Clear(new SKColor(96, 98, 104));
-            Fill(canvas, new SKRect(0, 0, 800, 40), new SKColor(40, 52, 70));
-            for (var y = 70; y + 8 < 500; y += 22)
-                Fill(canvas, SKRect.Create(30, y, 400, 8), new SKColor(70, 72, 78));
-
-            using var dialog = new SKPaint { Color = new SKColor(250, 250, 250), IsAntialias = true };
-            canvas.DrawRoundRect(SKRect.Create(Dialog.X, Dialog.Y, Dialog.Width, Dialog.Height), 8, 8, dialog);
-            var ink = new SKColor(41, 41, 41);
-            Fill(canvas, SKRect.Create(Dialog.X + 20, Dialog.Y + 18, 160, 12), ink);
-            for (var y = Dialog.Y + 50; y + 40 < Dialog.Bottom - 50; y += 18)
-                Fill(canvas, SKRect.Create(Dialog.X + 20, y, Dialog.Width * 2 / 3, 7), ink);
-            Fill(canvas, SKRect.Create(Dialog.Right - 110, Dialog.Bottom - 44, 90, 28), new SKColor(41, 83, 250));
-        }
-
-        var image = new RgbaImage(info.Width, info.Height);
-        bitmap.GetPixelSpan().CopyTo(image.Bytes);
-        return image;
-    }
-
-    private static void Fill(SKCanvas canvas, SKRect rect, SKColor colour)
-    {
-        using var paint = new SKPaint { Color = colour };
-        canvas.DrawRect(rect, paint);
-    }
-
     private static void WriteJpeg(RgbaImage image, Stream destination)
     {
-        var info = new SKImageInfo(image.Width, image.Height, SKColorType.Rgba8888, SKAlphaType.Unpremul);
-        using var bitmap = new SKBitmap(info);
-        System.Runtime.InteropServices.Marshal.Copy(image.Bytes.ToArray(), 0, bitmap.GetPixels(), image.Bytes.Length);
+        using var bitmap = SyntheticScreenshot.ToBitmap(image);
         using var data = bitmap.Encode(SKEncodedImageFormat.Jpeg, 95)
             ?? throw new InvalidOperationException("SkiaSharp could not encode the image as JPEG.");
         data.SaveTo(destination);
@@ -151,13 +112,6 @@ public static class SelfCheck
     {
         using var file = File.Create(path);
         write(file);
-    }
-
-    private static void TryDelete(string folder)
-    {
-        try { Directory.Delete(folder, recursive: true); }
-        catch (IOException) { }
-        catch (UnauthorizedAccessException) { }
     }
 }
 
