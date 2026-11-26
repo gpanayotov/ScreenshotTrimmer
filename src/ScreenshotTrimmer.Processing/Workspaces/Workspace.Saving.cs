@@ -82,7 +82,7 @@ public sealed partial class Workspace
             }
             var state = StepsOf(savedPath);
             if (state.Current == steps)
-                _steps[savedPath] = state with { Saved = steps };
+                _steps[savedPath] = state with { Saved = steps, MergeKey = null };
             if (_openedPaths.Count == 0)
                 return;
             // The new files are listed now rather than when the folder watcher notices them, so the badge or the
