@@ -13,9 +13,6 @@ internal static class SamplesFolder
     public static string? Samples { get; } =
         RepositoryRoot is { } root && Directory.Exists(Path.Combine(root, "samples")) ? Path.Combine(root, "samples") : null;
 
-    /// <summary>The approved-answers file, kept in the samples folder so it is never committed either.</summary>
-    public static string ApprovedAnswersFile => Path.Combine(Samples!, "approved-answers.txt");
-
     /// <summary>The folder for the overview pictures and the report.</summary>
     public static string Overview => Path.Combine(RepositoryRoot!, "samples-overview");
 

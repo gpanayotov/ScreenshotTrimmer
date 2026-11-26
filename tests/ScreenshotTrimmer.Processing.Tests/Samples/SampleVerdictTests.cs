@@ -55,4 +55,37 @@ public class SampleVerdictTests
         Assert.Equal(SampleVerdict.Changed, SampleVerdicts.Judge(new ApprovedAnswer("aaaa", Dialog), "bbbb", Dialog));
         Assert.Equal(SampleVerdict.Changed, SampleVerdicts.Judge(new ApprovedAnswer("aaaa", Dialog), "bbbb", null));
     }
+
+    [Fact]
+    public void Within_the_tolerance_every_edge_of_the_window_and_popups_may_be_off_by_1px()
+    {
+        var approved = new ApprovedAnswer("aaaa", Dialog with { Popups = [new PixelRect(300, 40, 100, 80)] }) { Tolerance = 1 };
+        var off = new Subject(new PixelRect(11, 19, 298, 201)) { Popups = [new PixelRect(299, 41, 101, 80)] };
+
+        Assert.Equal(SampleVerdict.Pass, SampleVerdicts.Judge(approved, "aaaa", off));
+    }
+
+    [Fact]
+    public void Beyond_the_tolerance_an_edge_fails()
+    {
+        var approved = new ApprovedAnswer("aaaa", Dialog) { Tolerance = 1 };
+
+        Assert.Equal(SampleVerdict.Fail, SampleVerdicts.Judge(approved, "aaaa", new Subject(new PixelRect(12, 20, 298, 200))));
+        Assert.Equal(SampleVerdict.Fail, SampleVerdicts.Judge(approved, "aaaa", Dialog with { Popups = [new PixelRect(300, 40, 100, 80)] }));
+    }
+
+    [Fact]
+    public void Without_a_tolerance_an_edge_1px_off_fails()
+    {
+        Assert.Equal(SampleVerdict.Fail, SampleVerdicts.Judge(new ApprovedAnswer("aaaa", Dialog), "aaaa", new Subject(new PixelRect(10, 20, 301, 200))));
+    }
+
+    [Fact]
+    public void Already_cropped_passes_on_nothing_found_until_detection_can_tell_them_apart()
+    {
+        var approved = ApprovedAnswer.AlreadyCroppedAnswer("aaaa");
+
+        Assert.Equal(SampleVerdict.Pass, SampleVerdicts.Judge(approved, "aaaa", null));
+        Assert.Equal(SampleVerdict.Fail, SampleVerdicts.Judge(approved, "aaaa", Dialog));
+    }
 }
