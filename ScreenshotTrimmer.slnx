@@ -4,6 +4,7 @@
     <Project Path="src/ScreenshotTrimmer.Processing/ScreenshotTrimmer.Processing.csproj" />
   </Folder>
   <Folder Name="/tests/">
+    <Project Path="tests/ScreenshotTrimmer.App.Tests/ScreenshotTrimmer.App.Tests.csproj" />
     <Project Path="tests/ScreenshotTrimmer.Processing.Tests/ScreenshotTrimmer.Processing.Tests.csproj" />
   </Folder>
 </Solution>

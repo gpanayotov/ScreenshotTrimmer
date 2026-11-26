@@ -163,4 +163,10 @@
   <data name="BatchStartTitle" xml:space="preserve"><value>Пакетна обработка</value></data>
   <data name="BatchStartQuestion" xml:space="preserve"><value>Пакетната обработка ще обработи {0} изображения и ще пропусне {1} вече редактирани, {2} вече обработени и {3} Резултати. Нищо не се записва, докато не запишете. Да започне ли?</value></data>
   <data name="BatchStartAnswer" xml:space="preserve"><value>Начало</value></data>
+  <data name="HelpMenu" xml:space="preserve"><value>_Помощ</value></data>
+  <data name="AboutMenu" xml:space="preserve"><value>_За ScreenshotTrimmer</value></data>
+  <data name="AboutTitle" xml:space="preserve"><value>За {0}</value></data>
+  <data name="AboutVersion" xml:space="preserve"><value>Версия {0}</value></data>
+  <data name="AboutLicence" xml:space="preserve"><value>Свободен софтуер под лиценза MIT.</value></data>
+  <data name="AboutClose" xml:space="preserve"><value>Затваряне</value></data>
 </root>
