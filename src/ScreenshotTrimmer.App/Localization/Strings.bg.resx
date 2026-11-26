@@ -129,6 +129,13 @@
   <data name="ResultCopied" xml:space="preserve"><value>Резултатът от {0} е копиран.</value></data>
   <data name="NoSubjectFound" xml:space="preserve"><value>Не е намерен обект.</value></data>
   <data name="FindingSubject" xml:space="preserve"><value>Търсене на обекта…</value></data>
+  <data name="ClassicCropTool" xml:space="preserve"><value>_Класическо изрязване</value></data>
+  <data name="AutoCropInRegionTool" xml:space="preserve"><value>Автоматично изрязване в _област</value></data>
+  <data name="ToolbarClassicCrop" xml:space="preserve"><value>Класическо изрязване</value></data>
+  <data name="ToolbarClassicCropTip" xml:space="preserve"><value>Начертаният правоъгълник става изрязването</value></data>
+  <data name="ToolbarAutoCropInRegion" xml:space="preserve"><value>Автоматично изрязване в област</value></data>
+  <data name="ToolbarAutoCropInRegionTip" xml:space="preserve"><value>Изрязването прилепва към най-големия обект в начертания правоъгълник, например бутон, меню или карта</value></data>
+  <data name="NoSubjectInRegion" xml:space="preserve"><value>В областта не е намерен обект; начертаният правоъгълник е запазен като Класическо изрязване.</value></data>
   <data name="SavePastedTitle" xml:space="preserve"><value>Запис на Резултата от {0}</value></data>
   <data name="PngFilter" xml:space="preserve"><value>PNG изображения</value></data>
   <data name="OverwriteTitle" xml:space="preserve"><value>Замяна на файл</value></data>

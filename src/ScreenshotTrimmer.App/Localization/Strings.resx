@@ -129,6 +129,13 @@
   <data name="ResultCopied" xml:space="preserve"><value>Copied the Result of {0}.</value></data>
   <data name="NoSubjectFound" xml:space="preserve"><value>No subject found.</value></data>
   <data name="FindingSubject" xml:space="preserve"><value>Finding the subject…</value></data>
+  <data name="ClassicCropTool" xml:space="preserve"><value>_Classic crop</value></data>
+  <data name="AutoCropInRegionTool" xml:space="preserve"><value>Auto crop in _region</value></data>
+  <data name="ToolbarClassicCrop" xml:space="preserve"><value>Classic crop</value></data>
+  <data name="ToolbarClassicCropTip" xml:space="preserve"><value>A rectangle you draw becomes the crop</value></data>
+  <data name="ToolbarAutoCropInRegion" xml:space="preserve"><value>Auto crop in region</value></data>
+  <data name="ToolbarAutoCropInRegionTip" xml:space="preserve"><value>The crop snaps to the largest subject inside a rectangle you draw, such as a button, a menu or a card</value></data>
+  <data name="NoSubjectInRegion" xml:space="preserve"><value>No subject found in the region; the rectangle you drew is kept as a Classic crop.</value></data>
   <data name="SavePastedTitle" xml:space="preserve"><value>Save the Result of {0}</value></data>
   <data name="PngFilter" xml:space="preserve"><value>PNG images</value></data>
   <data name="OverwriteTitle" xml:space="preserve"><value>Replace file</value></data>

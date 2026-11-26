@@ -1,9 +1,13 @@
+using System.Windows.Input;
 using ScreenshotTrimmer.App.Mvvm;
 using ScreenshotTrimmer.Processing.Detection;
+using ScreenshotTrimmer.Processing.Imaging;
+using ScreenshotTrimmer.Processing.Rendering;
 
 namespace ScreenshotTrimmer.App;
 
-// Auto crop: finding the Subject of the selected image off the interface thread and recording it as its crop.
+// Auto crop and Auto crop in region: finding the Subject of the selected image off the interface thread and recording it
+// as its crop.
 public sealed partial class MainWindowViewModel
 {
     /// <summary>How long detection runs before the progress indication shows.</summary>
@@ -11,7 +15,9 @@ public sealed partial class MainWindowViewModel
 
     private CancellationTokenSource? _detection;
     private RelayCommand? _autoCropCommand;
+    private RelayCommand<object>? _chooseCropToolCommand;
     private bool _isDetecting;
+    private CropTool _cropTool;
 
     /// <summary>
     /// Finds the Subject of the selected image and records it as its crop, as one Step that replaces only the crop and
@@ -20,6 +26,27 @@ public sealed partial class MainWindowViewModel
     /// </summary>
     public RelayCommand AutoCropCommand => _autoCropCommand ??= new RelayCommand(AutoCrop);
 
+    /// <summary>
+    /// What a newly drawn rectangle does: becomes a Classic crop, or is a region for <see cref="AutoCropInRegion"/>.
+    /// Session-only; starts as Classic crop and is kept while moving between images.
+    /// </summary>
+    /// <remarks>
+    /// The menu's and toolbar's choices show it with <see cref="Mvvm.IsValueConverter"/>; the menu's set it with
+    /// <see cref="ChooseCropToolCommand"/>, since a menu item does not check itself when clicked.
+    /// </remarks>
+    public CropTool CropTool
+    {
+        get => _cropTool;
+        set => Set(ref _cropTool, value);
+    }
+
+    /// <summary>Sets <see cref="CropTool"/> to the <see cref="App.CropTool"/> given as the parameter.</summary>
+    public ICommand ChooseCropToolCommand => _chooseCropToolCommand ??= new RelayCommand<object>(choice =>
+    {
+        if (choice is CropTool tool)
+            CropTool = tool;
+    });
+
     /// <summary>Whether Auto crop has been running for more than a moment, so the window shows that it is working.</summary>
     public bool IsDetecting
     {
@@ -27,7 +54,41 @@ public sealed partial class MainWindowViewModel
         private set => Set(ref _isDetecting, value);
     }
 
-    private async void AutoCrop()
+    private void AutoCrop() =>
+        Detect(SubjectDetection.Find, subject =>
+        {
+            if (subject is null)
+                AddNotice("NoSubjectFound");
+            else
+                RecordFound(subject.ToCrop());
+        });
+
+    /// <summary>
+    /// Finds the largest Subject inside <paramref name="region"/> of the selected image, in image pixels, and records it
+    /// as its crop, as one Step that shows the Original, like Auto crop. When none is found, the region itself becomes a
+    /// Classic crop and a notice says so.
+    /// </summary>
+    public void AutoCropInRegion(PixelRect region) =>
+        Detect((image, token) => SubjectDetection.FindInRegion(image, region, token), subject =>
+        {
+            if (subject is null)
+                AddNotice("NoSubjectInRegion");
+            RecordFound(subject?.ToCrop() ?? Crop.Classic(region));
+        });
+
+    /// <summary>Records <paramref name="crop"/> as one Step and shows the Original with it.</summary>
+    private void RecordFound(Crop crop)
+    {
+        RecordCrop(crop, mergeKey: null);
+        // Also when the image already had this crop, so nothing was recorded.
+        ShowsResult = false;
+    }
+
+    /// <summary>
+    /// Runs <paramref name="find"/> on the selected image's Original off the interface thread, replacing any detection
+    /// that is running, then passes its answer to <paramref name="record"/> unless the selection has moved on.
+    /// </summary>
+    private async void Detect(Func<RgbaImage, CancellationToken, Subject?> find, Action<Subject?> record)
     {
         if (!ShowsSelected(out var image, out var original))
             return;
@@ -38,18 +99,11 @@ public sealed partial class MainWindowViewModel
         ShowProgressAfterDelay(detection);
         try
         {
-            var subject = await Task.Run(() => SubjectDetection.Find(original, token), token);
+            var subject = await Task.Run(() => find(original, token), token);
             // A late answer never lands on another image: moving away cancels it.
             if (token.IsCancellationRequested || !ShowsSelected(out var shown, out _) || shown.Key != image.Key)
                 return;
-            if (subject is null)
-                AddNotice("NoSubjectFound");
-            else
-            {
-                RecordCrop(subject.ToCrop(), mergeKey: null);
-                // Also when the image already had this crop, so nothing was recorded.
-                ShowsResult = false;
-            }
+            record(subject);
         }
         catch (OperationCanceledException)
         {

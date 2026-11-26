@@ -30,10 +30,12 @@ public enum ViewerBackground
 /// Panning uses the middle button, the left button while <see cref="IsSpaceHeld"/>, Shift with the wheel and the
 /// scroll properties. A plain left-drag draws the crop rectangle, shown with the image outside it dimmed, or, started
 /// on one of its handles or inside it, resizes or moves it. The edited crop is set as <see cref="Crop"/> when the
-/// button is released, so one drag is one change; Escape during a drag restores it as it was. The handle last dragged
+/// button is released, so one drag is one change; Escape during a drag restores it as it was. While
+/// <see cref="DrawsRegion"/> is on, a newly drawn rectangle is raised as <see cref="RegionDrawn"/> instead. The handle last dragged
 /// stays selected, and while the viewer has focus the arrow keys nudge it by one image pixel, each nudge setting
 /// <see cref="Crop"/>. The Loupe shows the pixels around the held handle while dragging and nudging. The wheel zooms
-/// around the cursor.
+/// around the cursor. The popup rectangles of a crop with a <b>Popup overhang</b> are outlined and left undimmed, until
+/// an edit turns it into a Classic crop.
 /// </remarks>
 public sealed partial class ImageViewer : Control
 {
@@ -58,6 +60,9 @@ public sealed partial class ImageViewer : Control
 
     public static readonly StyledProperty<bool> IsCropShownProperty =
         AvaloniaProperty.Register<ImageViewer, bool>(nameof(IsCropShown), defaultValue: true);
+
+    public static readonly StyledProperty<bool> DrawsRegionProperty =
+        AvaloniaProperty.Register<ImageViewer, bool>(nameof(DrawsRegion));
 
     public static readonly StyledProperty<ViewerBackground> BackgroundKindProperty =
         AvaloniaProperty.Register<ImageViewer, ViewerBackground>(nameof(BackgroundKind));
@@ -89,6 +94,7 @@ public sealed partial class ImageViewer : Control
     private static readonly IBrush DarkGrey = new ImmutableSolidColorBrush(Color.FromRgb(0x40, 0x40, 0x40));
     private static readonly IBrush CropDim = new ImmutableSolidColorBrush(Color.FromArgb(0x99, 0, 0, 0));
     private static readonly IPen CropOutline = new ImmutablePen(Brushes.White, 1);
+    private static readonly IPen PopupOutline = new ImmutablePen(Brushes.White, 1, new ImmutableDashStyle([4, 3], 0));
     private static readonly IPen CropOutlineShade = new ImmutablePen(new ImmutableSolidColorBrush(Color.FromArgb(0xCC, 0, 0, 0)), 3);
     private static readonly IBrush SelectedHandleFill = new ImmutableSolidColorBrush(Color.FromRgb(0x00, 0x78, 0xD4));
     private static readonly IPen HandleOutline = new ImmutablePen(new ImmutableSolidColorBrush(Color.FromArgb(0xCC, 0, 0, 0)), 1);
@@ -159,6 +165,22 @@ public sealed partial class ImageViewer : Control
         get => GetValue(IsCropShownProperty);
         set => SetValue(IsCropShownProperty, value);
     }
+
+    /// <summary>
+    /// Whether a newly drawn rectangle is a region raised as <see cref="RegionDrawn"/> rather than set as
+    /// <see cref="Crop"/>. Drawing it and adjusting an existing crop's handles work the same either way.
+    /// </summary>
+    public bool DrawsRegion
+    {
+        get => GetValue(DrawsRegionProperty);
+        set => SetValue(DrawsRegionProperty, value);
+    }
+
+    /// <summary>
+    /// Raised with the rectangle drawn, in image pixels, when a drag that draws a new rectangle ends while
+    /// <see cref="DrawsRegion"/> is on. <see cref="Crop"/> is left as it was.
+    /// </summary>
+    public event EventHandler<ImageRect>? RegionDrawn;
 
     /// <summary>The crop rectangle shown, in image pixels: the one a drag in progress has made so far, else the crop's.</summary>
     public ImageRect? ShownCrop
@@ -396,7 +418,10 @@ public sealed partial class ImageViewer : Control
             e.Pointer.Capture(null);
             // The handle dragged stays selected for the arrow keys; a newly drawn rectangle has none.
             _selected = drew || edited.Rectangle is null ? CropHandle.None : handle;
-            SetCrop(edited.Crop);
+            if (drew && DrawsRegion && edited.Rectangle is { } region)
+                RegionDrawn?.Invoke(this, region);
+            else
+                SetCrop(edited.Crop);
             ShowHoverCursor(e);
             return;
         }
@@ -470,28 +495,49 @@ public sealed partial class ImageViewer : Control
             context.DrawImage(bitmap, new Rect(0, 0, bitmap.PixelSize.Width, bitmap.PixelSize.Height), destination);
 
         if (IsCropShown && ShownCrop is { } rectangle)
-            DrawCrop(context, viewport, destination, rectangle);
+            DrawCrop(context, viewport, destination, rectangle, ShownPopups());
         if (IsCropShown)
             DrawLoupe(context, bitmap, viewport, ShownCrop);
     }
 
-    /// <summary>Dims the image outside <paramref name="crop"/> and outlines it, on whole screen pixels.</summary>
-    private void DrawCrop(DrawingContext context, Viewport viewport, Rect image, ImageRect crop)
-    {
-        var scaling = Scaling;
-        var (left, top) = viewport.ToView(crop.X, crop.Y);
-        var (right, bottom) = viewport.ToView(crop.Right, crop.Bottom);
-        var inside = new Rect(
-            new Point(Math.Round(left) / scaling, Math.Round(top) / scaling),
-            new Point(Math.Round(right) / scaling, Math.Round(bottom) / scaling));
+    /// <summary>
+    /// The popup rectangles of the crop shown: the crop's own, or, during a drag, those the edit has kept so far (none
+    /// once the rectangle changes, as an edited crop is a Classic crop).
+    /// </summary>
+    private IReadOnlyList<ImageRect> ShownPopups() =>
+        (_editFrom is not null ? _edited?.Crop : Crop)?.Popups ?? [];
 
-        context.FillRectangle(CropDim, new Rect(image.Left, image.Top, image.Width, inside.Top - image.Top));
-        context.FillRectangle(CropDim, new Rect(image.Left, inside.Bottom, image.Width, image.Bottom - inside.Bottom));
-        context.FillRectangle(CropDim, new Rect(image.Left, inside.Top, inside.Left - image.Left, inside.Height));
-        context.FillRectangle(CropDim, new Rect(inside.Right, inside.Top, image.Right - inside.Right, inside.Height));
+    /// <summary>
+    /// Dims the image outside <paramref name="crop"/> and its <paramref name="popups"/> and outlines them, on whole
+    /// screen pixels. Only the crop rectangle has handles.
+    /// </summary>
+    private void DrawCrop(DrawingContext context, Viewport viewport, Rect image, ImageRect crop, IReadOnlyList<ImageRect> popups)
+    {
+        var inside = OnScreen(viewport, crop);
+        var popupsInside = popups.Select(popup => OnScreen(viewport, popup).Intersect(image)).ToList();
+
+        if (popupsInside.Count == 0)
+        {
+            context.FillRectangle(CropDim, new Rect(image.Left, image.Top, image.Width, inside.Top - image.Top));
+            context.FillRectangle(CropDim, new Rect(image.Left, inside.Bottom, image.Width, image.Bottom - inside.Bottom));
+            context.FillRectangle(CropDim, new Rect(image.Left, inside.Top, inside.Left - image.Left, inside.Height));
+            context.FillRectangle(CropDim, new Rect(inside.Right, inside.Top, image.Right - inside.Right, inside.Height));
+        }
+        else
+        {
+            // The Popup overhang is kept with the window, so it is not dimmed.
+            Geometry kept = new RectangleGeometry(inside);
+            foreach (var popup in popupsInside)
+                kept = new CombinedGeometry(GeometryCombineMode.Union, kept, new RectangleGeometry(popup));
+            context.DrawGeometry(CropDim, null, new CombinedGeometry(GeometryCombineMode.Exclude, new RectangleGeometry(image), kept));
+        }
 
         // A light line with a dark edge either side shows on light and dark screenshots alike.
+        foreach (var popup in popupsInside)
+            context.DrawRectangle(null, CropOutlineShade, popup);
         context.DrawRectangle(null, CropOutlineShade, inside);
+        foreach (var popup in popupsInside)
+            context.DrawRectangle(null, PopupOutline, popup);
         context.DrawRectangle(null, CropOutline, inside);
 
         // Edge handles would crowd a rectangle small on screen; its corners are enough to grab.
@@ -504,6 +550,17 @@ public sealed partial class ImageViewer : Control
             var square = new Rect(at.X - HandleSize / 2, at.Y - HandleSize / 2, HandleSize, HandleSize);
             context.DrawRectangle(handle == selected ? SelectedHandleFill : Brushes.White, HandleOutline, square);
         }
+    }
+
+    /// <summary>Where the image rectangle <paramref name="rectangle"/> lies on screen, on whole screen pixels.</summary>
+    private Rect OnScreen(Viewport viewport, ImageRect rectangle)
+    {
+        var scaling = Scaling;
+        var (left, top) = viewport.ToView(rectangle.X, rectangle.Y);
+        var (right, bottom) = viewport.ToView(rectangle.Right, rectangle.Bottom);
+        return new Rect(
+            new Point(Math.Round(left) / scaling, Math.Round(top) / scaling),
+            new Point(Math.Round(right) / scaling, Math.Round(bottom) / scaling));
     }
 
     /// <summary>Where each corner and edge handle of the rectangle <paramref name="inside"/> is drawn.</summary>
