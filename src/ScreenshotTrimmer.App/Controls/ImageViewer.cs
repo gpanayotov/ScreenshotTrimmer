@@ -516,21 +516,11 @@ public sealed partial class ImageViewer : Control
         var inside = OnScreen(viewport, crop);
         var popupsInside = popups.Select(popup => OnScreen(viewport, popup).Intersect(image)).ToList();
 
-        if (popupsInside.Count == 0)
-        {
-            context.FillRectangle(CropDim, new Rect(image.Left, image.Top, image.Width, inside.Top - image.Top));
-            context.FillRectangle(CropDim, new Rect(image.Left, inside.Bottom, image.Width, image.Bottom - inside.Bottom));
-            context.FillRectangle(CropDim, new Rect(image.Left, inside.Top, inside.Left - image.Left, inside.Height));
-            context.FillRectangle(CropDim, new Rect(inside.Right, inside.Top, image.Right - inside.Right, inside.Height));
-        }
-        else
-        {
-            // The Popup overhang is kept with the window, so it is not dimmed.
-            Geometry kept = new RectangleGeometry(inside);
-            foreach (var popup in popupsInside)
-                kept = new CombinedGeometry(GeometryCombineMode.Union, kept, new RectangleGeometry(popup));
-            context.DrawGeometry(CropDim, null, new CombinedGeometry(GeometryCombineMode.Exclude, new RectangleGeometry(image), kept));
-        }
+        // The Popup overhang is kept with the window, so it is not dimmed.
+        Geometry kept = new RectangleGeometry(inside);
+        foreach (var popup in popupsInside)
+            kept = new CombinedGeometry(GeometryCombineMode.Union, kept, new RectangleGeometry(popup));
+        context.DrawGeometry(CropDim, null, new CombinedGeometry(GeometryCombineMode.Exclude, new RectangleGeometry(image), kept));
 
         // A light line with a dark edge either side shows on light and dark screenshots alike.
         foreach (var popup in popupsInside)

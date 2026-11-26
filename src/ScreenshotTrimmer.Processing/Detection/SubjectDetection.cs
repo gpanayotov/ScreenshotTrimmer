@@ -36,7 +36,7 @@ public static class SubjectDetection
     /// <c>null</c> when none is found. The part of the region outside the image is ignored.
     /// </summary>
     /// <remarks>
-    /// The element itself wins over a larger frame just around it, such as the one the edges of neighbouring controls
+    /// The Subject itself wins over a larger frame just around it, such as the one the edges of neighbouring controls
     /// form around a button. Nothing inside a region has to cast a shadow.
     /// </remarks>
     /// <exception cref="OperationCanceledException"><paramref name="cancellation"/> was cancelled.</exception>
@@ -82,10 +82,7 @@ public static class SubjectDetection
         && (RectangleMethod.IsOutlined(edges, window, rectangles) || !windows.Any(other => OverlapsPartly(window, other)));
 
     private static bool OverlapsPartly(PixelRect a, PixelRect b) =>
-        !a.Intersect(b).IsEmpty && !Contains(a, b) && !Contains(b, a);
-
-    private static bool Contains(PixelRect outer, PixelRect inner) =>
-        inner.X >= outer.X && inner.Y >= outer.Y && inner.Right <= outer.Right && inner.Bottom <= outer.Bottom;
+        !a.Intersect(b).IsEmpty && !a.Contains(b) && !b.Contains(a);
 
     /// <summary>
     /// Whether a page lies around <paramref name="window"/> on all four sides. A bright area that reaches the image's
@@ -100,7 +97,7 @@ public static class SubjectDetection
     /// </summary>
     private static bool IsBodyOf(PixelRect body, PixelRect window)
     {
-        if (!Contains(window, body))
+        if (!window.Contains(body))
             return false;
         int[] gaps = [body.X - window.X, body.Y - window.Y, window.Right - body.Right, window.Bottom - body.Bottom];
         return gaps.Count(gap => gap <= CornerMargin) >= 2 && gaps.Any(gap => gap > CornerMargin);

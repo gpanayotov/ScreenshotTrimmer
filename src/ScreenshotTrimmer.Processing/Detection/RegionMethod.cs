@@ -16,7 +16,7 @@ namespace ScreenshotTrimmer.Processing.Detection;
 /// <para>
 /// When the largest rectangle encloses a second one within <see cref="InnerGap"/> pixels on all four sides, separated
 /// from it by a plain strip, the inner one wins, and so on inward: the larger one is a frame formed by the edges of
-/// neighbouring controls around the element, or a plain margin around it.
+/// neighbouring controls around the Subject, or a plain margin around it.
 /// </para>
 /// </remarks>
 internal static class RegionMethod
@@ -40,7 +40,7 @@ internal static class RegionMethod
         var inside = RectangleMethod.FindRectangles(edges, cancellation)
             .Select(found => new PixelRect(
                 area.X + found.X / Scale, area.Y + found.Y / Scale, found.Width / Scale, found.Height / Scale))
-            .Where(rectangle => Contains(region, rectangle))
+            .Where(rectangle => region.Contains(rectangle))
             .OrderByDescending(rectangle => (long)rectangle.Width * rectangle.Height)
             .ThenBy(rectangle => rectangle.Y)
             .ThenBy(rectangle => rectangle.X)
@@ -55,13 +55,10 @@ internal static class RegionMethod
         return subject;
     }
 
-    private static bool Contains(PixelRect outer, PixelRect inner) =>
-        inner.X >= outer.X && inner.Y >= outer.Y && inner.Right <= outer.Right && inner.Bottom <= outer.Bottom;
-
     /// <summary>
     /// Whether <paramref name="inner"/> is a smaller rectangle inside <paramref name="outer"/>, at most
     /// <see cref="InnerGap"/> pixels from each of its sides. A side may be shared: where the corner margin bridges a
-    /// narrow gutter, a frame can take one side from a neighbour and the others from the element itself.
+    /// narrow gutter, a frame can take one side from a neighbour and the others from the Subject itself.
     /// </summary>
     private static bool IsFramed(PixelRect inner, PixelRect outer) =>
         inner != outer

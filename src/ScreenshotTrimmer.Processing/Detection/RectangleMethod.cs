@@ -49,7 +49,7 @@ internal static class RectangleMethod
     private const int DistanceStep = 4;
 
     /// <summary>The fewest sides on which the window must cast an elevation shadow.</summary>
-    private const int ShadowedSides = 2;
+    private const int MinimumShadowedSides = 2;
 
     /// <summary>The shortest run of edge pixels the rectangle method needs in an <see cref="EdgeMap"/>.</summary>
     public const int MinimumRun = MinimumSide - 2 * CornerMargin;
@@ -57,7 +57,7 @@ internal static class RectangleMethod
     /// <summary>The rectangles of <paramref name="rectangles"/> that cast an elevation shadow on at least two sides, largest first.</summary>
     public static IReadOnlyList<PixelRect> Windows(RgbaImage image, IReadOnlyList<PixelRect> rectangles) =>
         rectangles
-            .Where(rectangle => ElevationShadow.ShadowedSides(image, rectangle, CornerMargin) >= ShadowedSides)
+            .Where(rectangle => ElevationShadow.ShadowedSides(image, rectangle, CornerMargin) >= MinimumShadowedSides)
             .OrderByDescending(rectangle => (long)rectangle.Width * rectangle.Height)
             .ThenBy(rectangle => rectangle.Y)
             .ThenBy(rectangle => rectangle.X)
@@ -77,7 +77,7 @@ internal static class RectangleMethod
         var candidates = rectangles
             .Where(rectangle => Area(rectangle) < area
                 && Overhang(rectangle, window) >= MinimumOverhang
-                && ElevationShadow.ShadowedSides(image, rectangle, CornerMargin) >= ShadowedSides
+                && ElevationShadow.ShadowedSides(image, rectangle, CornerMargin) >= MinimumShadowedSides
                 && IsOutlined(edges, rectangle, onTop))
             .ToList();
         // Popups attach to the window directly, or through a popup already attached.
