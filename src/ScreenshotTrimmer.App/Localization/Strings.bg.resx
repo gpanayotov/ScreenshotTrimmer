@@ -128,6 +128,7 @@
   <data name="ClipboardHasNoImage" xml:space="preserve"><value>В клипборда няма изображение.</value></data>
   <data name="ResultCopied" xml:space="preserve"><value>Резултатът от {0} е копиран.</value></data>
   <data name="NoSubjectFound" xml:space="preserve"><value>Не е намерен обект.</value></data>
+  <data name="AlreadyCropped" xml:space="preserve"><value>Вече изрязано: изображението вече е изрязано до обекта си, затова не се изрязва отново.</value></data>
   <data name="FindingSubject" xml:space="preserve"><value>Търсене на обекта…</value></data>
   <data name="ClassicCropTool" xml:space="preserve"><value>_Класическо изрязване</value></data>
   <data name="AutoCropInRegionTool" xml:space="preserve"><value>Автоматично изрязване в _област</value></data>
@@ -145,8 +146,8 @@
   <data name="ToolbarBatch" xml:space="preserve"><value>Пакетна обработка</value></data>
   <data name="ToolbarBatchTip" xml:space="preserve"><value>Автоматично изрязване на всяко изображение от списъка, което има нужда, с текущите настройки за изчистване на ръбовете и сянка, за преглед преди записване (Ctrl+B)</value></data>
   <data name="BatchProgress" xml:space="preserve"><value>Пакетна обработка: {0} от {1}</value></data>
-  <data name="BatchDone" xml:space="preserve"><value>Пакетната обработка приключи: обработени {0}, без намерен обект {1}, неуспешно прочетени {2}. Нищо не е записано, докато не запишете.</value></data>
-  <data name="BatchCancelled" xml:space="preserve"><value>Пакетната обработка е отменена: обработени {0}, без намерен обект {1}, неуспешно прочетени {2} преди спирането. Обработените изображения запазват промените си; нищо не е записано, докато не запишете.</value></data>
+  <data name="BatchDone" xml:space="preserve"><value>Пакетната обработка приключи: обработени {0}, вече изрязани {1} (само Изчистване на ръбовете и Сянка), без намерен обект {2}, неуспешно прочетени {3}. Нищо не е записано, докато не запишете.</value></data>
+  <data name="BatchCancelled" xml:space="preserve"><value>Пакетната обработка е отменена: обработени {0}, вече изрязани {1} (само Изчистване на ръбовете и Сянка), без намерен обект {2}, неуспешно прочетени {3} преди спирането. Обработените изображения запазват промените си; нищо не е записано, докато не запишете.</value></data>
   <data name="BatchSkipped" xml:space="preserve"><value>Пропуснати: {0} вече редактирани, {1} вече обработени, {2} Резултати, {3} изчезнали от списъка.</value></data>
   <data name="BatchFailedIn" xml:space="preserve"><value>Не може да се прочете: {0}</value></data>
   <data name="CancelBatchTip" xml:space="preserve"><value>Спиране на пакетната обработка; обработените изображения запазват промените си</value></data>

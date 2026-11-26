@@ -106,7 +106,7 @@ public sealed partial class MainWindowViewModel
             // Opening another list or closing the window stops the Batch first (StopBatchAsync).
             var summary = await Task.Run(() => _workspace.RunBatch(progress, cancellation.Token));
             _notices.Add(new Message(summary.Cancelled ? "BatchCancelled" : "BatchDone",
-                summary.Processed, summary.NoSubjectFound.Count, summary.Failed.Count));
+                summary.Processed, summary.AlreadyCropped, summary.NoSubjectFound.Count, summary.Failed.Count));
             if (summary.Skipped is { Total: > 0 } skipped)
             {
                 _notices.Add(new Message("BatchSkipped",

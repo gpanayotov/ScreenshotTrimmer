@@ -94,6 +94,12 @@ internal static class Synthetic
     /// <summary>The dialog of <see cref="Dialog"/> dimmed by the backdrop of a dialog stacked on top.</summary>
     public static readonly Rgba DimmedDialog = new(125, 125, 125, 255);
 
+    /// <summary>The background of a dark-theme page, as behind a dark dialog.</summary>
+    public static readonly Rgba DarkPage = new(18, 19, 22, 255);
+
+    /// <summary>A dark-theme dialog's background, a little lighter than the <see cref="DarkPage"/> behind it.</summary>
+    public static readonly Rgba DarkDialog = new(40, 42, 47, 255);
+
     /// <summary>
     /// An application screenshot behind a modal backdrop: a <see cref="DimmedPage"/> with a darker header bar and rows of
     /// dimmed text, so the page is not one flat colour.

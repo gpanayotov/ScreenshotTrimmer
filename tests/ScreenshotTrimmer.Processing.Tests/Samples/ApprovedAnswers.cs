@@ -25,7 +25,8 @@ internal sealed record ApprovedAnswer(string Fingerprint, Subject? Subject)
 
 /// <summary>
 /// Reads and writes the approved-answers file of the local samples check. One line per sample, tab separated:
-/// file name, fingerprint, then <c>none</c> or <c>window x,y,w,h</c> followed by a <c>popup x,y,w,h</c> per popup.
+/// file name, fingerprint, then <c>none</c>, <c>already-cropped</c>, or <c>window x,y,w,h</c> followed by a
+/// <c>popup x,y,w,h</c> per popup.
 /// Blank lines and lines starting with <c>#</c> are ignored.
 /// </summary>
 internal static class ApprovedAnswers
@@ -55,8 +56,8 @@ internal static class ApprovedAnswers
     public static string Format(IReadOnlyDictionary<string, ApprovedAnswer> answers)
     {
         var text = new StringBuilder();
-        text.Append("# Approved answers of the local samples check: file name, fingerprint, then \"none\" or the window\n");
-        text.Append("# and popup rectangles (x,y,width,height). Regenerated from detection's output; approve by eye.\n");
+        text.Append("# Approved answers of the local samples check: file name, fingerprint, then \"none\", \"already-cropped\"\n");
+        text.Append("# or the window and popup rectangles (x,y,width,height). Regenerated from detection's output; approve by eye.\n");
         foreach (var (name, answer) in answers.OrderBy(a => a.Key, StringComparer.Ordinal))
             text.Append(name).Append('\t').Append(answer.Fingerprint).Append('\t').Append(Describe(answer)).Append('\n');
         return text.ToString();
@@ -74,7 +75,9 @@ internal static class ApprovedAnswers
     }
 
     /// <summary>Detection's answer as it is written in the file, also used in reports.</summary>
-    public static string Describe(Subject? subject)
+    public static string Describe(Finding found) => found.IsAlreadyCropped ? AlreadyCropped : Describe(found.Subject);
+
+    private static string Describe(Subject? subject)
     {
         if (subject is null)
             return None;

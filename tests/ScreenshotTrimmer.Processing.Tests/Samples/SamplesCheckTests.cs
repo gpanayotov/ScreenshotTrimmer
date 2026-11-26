@@ -28,6 +28,13 @@ public sealed class SamplesCheckTests : IDisposable
     private void AddFeaturelessSample(string name) =>
         EncodedImages.WritePng(Path.Combine(Samples, name), Synthetic.Plain(300, 200, Synthetic.LightPage));
 
+    private void AddAlreadyCroppedSample(string name)
+    {
+        var image = Synthetic.Plain(420, 300, Synthetic.DimmedPage);
+        Synthetic.DrawDialog(image, new PixelRect(0, 0, 420, 300), 8);
+        EncodedImages.WritePng(Path.Combine(Samples, name), image);
+    }
+
     private Dictionary<string, ApprovedAnswer> ReadAnswers() => ApprovedAnswers.Parse(File.ReadAllText(AnswersFile));
 
     private void WriteAnswers(Dictionary<string, ApprovedAnswer> answers) =>
@@ -57,6 +64,28 @@ public sealed class SamplesCheckTests : IDisposable
         Assert.Equal(new SampleTotals(Pass: 1, Fail: 1, New: 0, Changed: 0), result.Dark);
         Assert.Contains("Light: 3 samples: 1 pass, 1 fail, 1 new, 0 changed", result.Report);
         Assert.Contains("Dark: 2 samples: 1 pass, 1 fail, 0 new, 0 changed", result.Report);
+    }
+
+    [Fact]
+    public void An_already_cropped_sample_is_approved_as_already_cropped_and_passes_as_such_but_a_featureless_one_does_not()
+    {
+        AddAlreadyCroppedSample("cropped.png");
+        AddFeaturelessSample("empty.png");
+        Run(Approving.NewSamples);
+        var answers = ReadAnswers();
+        Assert.True(answers["cropped.png"].AlreadyCropped);
+        Assert.False(answers["empty.png"].AlreadyCropped);
+        WriteAnswers(new()
+        {
+            ["cropped.png"] = answers["cropped.png"],
+            ["empty.png"] = ApprovedAnswer.AlreadyCroppedAnswer(answers["empty.png"].Fingerprint),
+        });
+
+        var result = Run();
+
+        Assert.Equal(new SampleTotals(Pass: 1, Fail: 1, New: 0, Changed: 0), result.Light);
+        Assert.Contains("cropped.png: already-cropped", result.Report);
+        Assert.Contains("expected already-cropped\n        found    none", result.Report);
     }
 
     [Fact]

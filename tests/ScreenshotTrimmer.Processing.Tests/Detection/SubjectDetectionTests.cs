@@ -16,7 +16,7 @@ public class SubjectDetectionTests
         var dialog = new PixelRect(x, y, width, height);
         Synthetic.DrawDialog(image, dialog, radius);
 
-        var subject = SubjectDetection.Find(image);
+        var subject = SubjectDetection.Find(image).Subject;
 
         Assert.NotNull(subject);
         Assert.Equal(dialog, subject.Window);
@@ -32,27 +32,38 @@ public class SubjectDetectionTests
         var topmost = new PixelRect(311, 187, 283, 205);
         Synthetic.DrawDialog(image, topmost, 10);
 
-        var subject = SubjectDetection.Find(image);
+        var subject = SubjectDetection.Find(image).Subject;
 
         Assert.Equal(topmost, subject?.Window);
     }
 
-    [Fact]
-    public void Nothing_is_found_in_an_image_already_cropped_to_its_dialog()
+    [Theory]
+    [InlineData(8)]
+    [InlineData(3)]
+    public void An_image_already_cropped_to_its_light_dialog_is_found_already_cropped(float radius)
     {
         var image = Synthetic.Plain(420, 300, Synthetic.DimmedPage);
-        Synthetic.DrawDialog(image, new PixelRect(0, 0, 420, 300), 8);
+        Synthetic.DrawDialog(image, new PixelRect(0, 0, 420, 300), radius);
 
-        Assert.Null(SubjectDetection.Find(image));
+        Assert.Equal(Finding.AlreadyCropped, SubjectDetection.Find(image));
     }
 
     [Fact]
-    public void Nothing_is_found_in_an_image_already_cropped_with_a_sliver_of_page_left_along_an_edge()
+    public void An_image_already_cropped_to_its_dark_dialog_is_found_already_cropped()
+    {
+        var image = Synthetic.Plain(420, 300, Synthetic.DarkPage);
+        Synthetic.DrawDialog(image, new PixelRect(0, 0, 420, 300), 8, Synthetic.DarkDialog);
+
+        Assert.Equal(Finding.AlreadyCropped, SubjectDetection.Find(image));
+    }
+
+    [Fact]
+    public void An_image_already_cropped_with_a_sliver_of_page_left_along_its_edges_is_found_already_cropped()
     {
         var image = Synthetic.Plain(420, 300, Synthetic.DimmedPage);
         Synthetic.DrawDialog(image, new PixelRect(2, 0, 416, 299), 8);
 
-        Assert.Null(SubjectDetection.Find(image));
+        Assert.Equal(Finding.AlreadyCropped, SubjectDetection.Find(image));
     }
 
     [Theory]
@@ -63,13 +74,13 @@ public class SubjectDetectionTests
     {
         var image = Synthetic.Plain(640, 400, new Rgba(r, g, b, 255));
 
-        Assert.Null(SubjectDetection.Find(image));
+        Assert.Equal(Finding.NothingFound, SubjectDetection.Find(image));
     }
 
     [Fact]
     public void Nothing_is_found_in_a_dimmed_page_with_no_dialog()
     {
-        Assert.Null(SubjectDetection.Find(Synthetic.DimmedApplication(800, 500)));
+        Assert.Equal(Finding.NothingFound, SubjectDetection.Find(Synthetic.DimmedApplication(800, 500)));
     }
 
     [Fact]
@@ -78,8 +89,8 @@ public class SubjectDetectionTests
         var image = Synthetic.DimmedApplication(800, 500);
         Synthetic.DrawDialog(image, new PixelRect(151, 99, 377, 263), 10);
 
-        var first = SubjectDetection.Find(image);
-        var second = SubjectDetection.Find(image);
+        var first = SubjectDetection.Find(image).Subject;
+        var second = SubjectDetection.Find(image).Subject;
 
         Assert.NotNull(first);
         Assert.Equal(first, second);
@@ -100,7 +111,7 @@ public class SubjectDetectionTests
         var dialog = new PixelRect(151, 99, 377, 263);
         Synthetic.DrawDialog(image, dialog, 10);
 
-        var crop = SubjectDetection.Find(image)!.ToCrop();
+        var crop = SubjectDetection.Find(image).Subject!.ToCrop();
 
         Assert.Equal(Crop.Classic(dialog), crop);
     }

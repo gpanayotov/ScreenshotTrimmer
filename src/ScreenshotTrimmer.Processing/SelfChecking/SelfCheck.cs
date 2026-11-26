@@ -45,7 +45,7 @@ public static class SelfCheck
                 return Fail(stage, "the decoded JPEG's colours are far from the drawn screenshot's.");
 
             stage = "finding the Subject";
-            var subject = SubjectDetection.Find(original);
+            var subject = SubjectDetection.Find(original).Subject;
             if (subject is null)
                 return Fail(stage, "no Subject was found.");
             if (!Near(subject.Window, Dialog))
