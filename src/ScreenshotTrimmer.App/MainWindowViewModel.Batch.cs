@@ -10,11 +10,19 @@ public sealed partial class MainWindowViewModel
 {
     private RelayCommand? _batchCommand;
     private bool _isBatchRunning;
+    private bool _isStartingBatch;
     private BatchProgress _batchProgress;
 
+    // The plan of a Batch started now, made off the interface thread after each change to the list: null until the
+    // first is made. Planning again while one is being made is left to run once it ends.
+    private BatchPlan? _batchPlan;
+    private bool _isPlanningBatch;
+    private bool _batchPlanStale;
+
     /// <summary>
-    /// Runs a Batch over the listed images off the interface thread, showing its progress, then reports what it did as
-    /// a notice that stays until dismissed. Enabled while something is listed and no Batch is running.
+    /// Runs a Batch over the listed images off the interface thread, after one confirmation when it would skip some,
+    /// showing its progress, then reports what it did as a notice that stays until dismissed. Enabled while some listed
+    /// image needs processing and no Batch is running.
     /// </summary>
     public RelayCommand BatchCommand => _batchCommand ??= new RelayCommand(RunBatch, CanRunBatch);
 
@@ -39,7 +47,14 @@ public sealed partial class MainWindowViewModel
     /// <summary>The running Batch's progress as "n of m".</summary>
     public string BatchProgressText => Localizer.Instance.Format("BatchProgress", BatchDone, BatchTotal);
 
-    private bool CanRunBatch() => !IsBatchRunning && Entries.Count > 0;
+    /// <summary>The Batch command's tooltip: what it does, or why it is disabled when no listed image needs it.</summary>
+    public string BatchTip => !ShowsHint && _batchPlan is { Images.Count: 0 } plan
+        ? Localizer.Instance.Format("BatchNothingToProcessTip", plan.SkippedFor(BatchSkip.HasSteps),
+            plan.SkippedFor(BatchSkip.AlreadyProcessed), plan.SkippedFor(BatchSkip.Result))
+        : Localizer.Instance["ToolbarBatchTip"];
+
+    private bool CanRunBatch() =>
+        !IsBatchRunning && !_isStartingBatch && !ShowsHint && _batchPlan is not { Images.Count: 0 };
 
     private async void RunBatch()
     {
@@ -47,6 +62,25 @@ public sealed partial class MainWindowViewModel
             return;
         // The finishing settings are remembered without the workspace hearing of it; the Batch uses the current ones.
         _workspace.ApplySettings(Settings);
+        _isStartingBatch = true;
+        BatchCommand.NotifyCanExecuteChanged();
+        try
+        {
+            var plan = await Task.Run(_workspace.PlanBatch);
+            ShowBatchPlan(plan);
+            if (plan.Images.Count == 0 || (plan.Skipped.Count > 0 && !await _questions.AskToStartBatchAsync(plan)))
+                return;
+        }
+        catch (Exception e)
+        {
+            ReportFailure(e);
+            return;
+        }
+        finally
+        {
+            _isStartingBatch = false;
+            BatchCommand.NotifyCanExecuteChanged();
+        }
         IsBatchRunning = true;
         ShowBatchProgress(new BatchProgress(0, _workspace.Images.Count));
         var progress = new Progress<BatchProgress>(ShowBatchProgress);
@@ -72,6 +106,48 @@ public sealed partial class MainWindowViewModel
         {
             IsBatchRunning = false;
         }
+    }
+
+    /// <summary>Plans a Batch off the interface thread, so the command can disable itself and say why.</summary>
+    private async void PlanBatch()
+    {
+        if (_isPlanningBatch)
+        {
+            _batchPlanStale = true;
+            return;
+        }
+        _isPlanningBatch = true;
+        try
+        {
+            do
+            {
+                _batchPlanStale = false;
+                BatchPlan? plan;
+                try
+                {
+                    plan = await Task.Run(_workspace.PlanBatch);
+                }
+                catch (Exception)
+                {
+                    // The list changed under the plan, or the window is closing: leave the command enabled; starting
+                    // it plans again.
+                    plan = null;
+                }
+                ShowBatchPlan(plan);
+            }
+            while (_batchPlanStale);
+        }
+        finally
+        {
+            _isPlanningBatch = false;
+        }
+    }
+
+    private void ShowBatchPlan(BatchPlan? plan)
+    {
+        _batchPlan = plan;
+        BatchCommand.NotifyCanExecuteChanged();
+        Raise(nameof(BatchTip));
     }
 
     private void ShowBatchProgress(BatchProgress progress)

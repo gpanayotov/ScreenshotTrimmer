@@ -426,7 +426,7 @@ public sealed partial class MainWindowViewModel : Observable, IDisposable
         {
             _listedImages = change.Images;
             Raise(nameof(ShowsHint));
-            BatchCommand.NotifyCanExecuteChanged();
+            PlanBatch();
         }
 
         // Also when only the selection moved: the filter keeps the selected image in the strip.
@@ -592,6 +592,7 @@ public sealed partial class MainWindowViewModel : Observable, IDisposable
         Raise(nameof(StatusFileName));
         Raise(nameof(Title));
         Raise(nameof(BatchProgressText));
+        Raise(nameof(BatchTip));
     }
 
     /// <summary>A string from the resources with its arguments, formatted in the current language when shown.</summary>
