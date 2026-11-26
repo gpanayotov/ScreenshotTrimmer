@@ -28,6 +28,21 @@ public static class SubjectDetection
         return new Subject(found);
     }
 
+    /// <summary>
+    /// The largest Subject fully inside <paramref name="region"/>, such as a button, a menu, a card or a tile, or
+    /// <c>null</c> when none is found. The part of the region outside the image is ignored.
+    /// </summary>
+    /// <remarks>
+    /// The element itself wins over a larger frame just around it, such as the one the edges of neighbouring controls
+    /// form around a button. Nothing inside a region has to cast a shadow.
+    /// </remarks>
+    /// <exception cref="OperationCanceledException"><paramref name="cancellation"/> was cancelled.</exception>
+    public static Subject? FindInRegion(RgbaImage image, PixelRect region, CancellationToken cancellation = default)
+    {
+        ArgumentNullException.ThrowIfNull(image);
+        return RegionMethod.Find(image, region, cancellation) is { } found ? new Subject(found) : null;
+    }
+
     /// <summary>The pixels at each end of a side that may be lost to a rounded corner.</summary>
     private const int CornerMargin = RectangleMethod.CornerMargin;
 
