@@ -1,6 +1,7 @@
 using Avalonia;
 using Avalonia.Media.Imaging;
 using Avalonia.Platform;
+using ScreenshotTrimmer.Processing.Imaging;
 using SkiaSharp;
 
 namespace ScreenshotTrimmer.App.Imaging;
@@ -54,6 +55,28 @@ public static class ThumbnailDecoding
         finally
         {
             decoded.Dispose();
+        }
+    }
+
+    /// <summary>
+    /// A thumbnail of <paramref name="image"/>'s pixels, such as a Pasted image's, fitting within
+    /// <paramref name="maxWidth"/> by <paramref name="maxHeight"/> pixels and never enlarged. Safe to call off the
+    /// interface thread.
+    /// </summary>
+    public static unsafe Bitmap FromPixels(RgbaImage image, int maxWidth, int maxHeight)
+    {
+        var scale = Math.Min(1f, Math.Min((float)maxWidth / image.Width, (float)maxHeight / image.Height));
+        var width = Math.Max(1, (int)Math.Round(image.Width * scale));
+        var height = Math.Max(1, (int)Math.Round(image.Height * scale));
+        using var full = new SKBitmap();
+        fixed (byte* pixels = image.Bytes)
+        {
+            full.InstallPixels(new SKImageInfo(image.Width, image.Height, SKColorType.Rgba8888, SKAlphaType.Unpremul),
+                (nint)pixels, image.Width * 4);
+            using var resized = full.Resize(
+                    new SKImageInfo(width, height, SKColorType.Rgba8888, SKAlphaType.Premul), SKFilterQuality.Medium)
+                ?? throw new InvalidDataException("The image could not be resized.");
+            return ToBitmap(resized);
         }
     }
 

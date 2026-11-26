@@ -21,7 +21,7 @@ public sealed partial class MainWindowViewModel
     private (RenderReport Report, Steps Steps)? _report;
     private bool _showsResult;
     private CleanEdges _cleanEdges = CleanEdges.Shown(Steps.None, new UserSettings());
-    private string? _finishingPath;
+    private string? _finishingKey;
     private string _manualRadiusText = "";
     private ShadowControls _shadow = ShadowControls.Shown(Steps.None, new UserSettings(), false);
 
@@ -218,11 +218,11 @@ public sealed partial class MainWindowViewModel
 
         var shown = CleanEdges.Shown(steps, Settings);
         var shadow = ShadowControls.Shown(steps, Settings, _shownHasShadowPadding);
-        var samePath = SamePath(image?.Path, _finishingPath);
-        _finishingPath = image?.Path;
-        if (!samePath)
+        var sameImage = SamePath(image?.Key, _finishingKey);
+        _finishingKey = image?.Key;
+        if (!sameImage)
             _draggedShadow = null;
-        if (shown != _cleanEdges || shadow != _shadow || !samePath)
+        if (shown != _cleanEdges || shadow != _shadow || !sameImage)
         {
             _cleanEdges = shown;
             _shadow = shadow;
@@ -230,7 +230,7 @@ public sealed partial class MainWindowViewModel
             RaiseFinishing();
         }
 
-        if (image is not null && _original is { } original && SamePath(image.Path, _shownPath))
+        if (image is not null && _original is { } original && SamePath(image.Key, _shown?.Key))
             Render(new RenderRequest(original, steps));
     }
 
@@ -245,7 +245,7 @@ public sealed partial class MainWindowViewModel
             _notices.Add(new Message("SettingsNotSaved", _settings.FilePath, failure));
             RaiseNotices();
         }
-        if (_workspace.Selected is { } image && _original is not null && SamePath(image.Path, _shownPath))
+        if (_workspace.Selected is { } image && _original is not null && SamePath(image.Key, _shown?.Key))
         {
             var hasShadowPadding = _shownHasShadowPadding;
             IfStillListed(image, listed => _workspace.SetSteps(listed,
@@ -288,7 +288,7 @@ public sealed partial class MainWindowViewModel
     private void PreviewShadow()
     {
         if (_draggedShadow is not { } dragged || _workspace.Selected is not { } image
-            || _original is not { } original || !SamePath(image.Path, _shownPath))
+            || _original is not { } original || !SamePath(image.Key, _shown?.Key))
             return;
         var steps = Steps.None;
         IfStillListed(image, listed => steps = _workspace.Steps(listed));

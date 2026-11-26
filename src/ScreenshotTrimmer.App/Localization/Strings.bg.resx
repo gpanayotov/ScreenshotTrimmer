@@ -117,4 +117,14 @@
   <data name="DiscardAnswer" xml:space="preserve"><value>Отхвърляне</value></data>
   <data name="DiscardQuestion" xml:space="preserve"><value>{0} има незаписани промени. Да бъде ли премахнато от списъка, като промените се отхвърлят?</value></data>
   <data name="UnsavedDropped" xml:space="preserve"><value>Тези изображения бяха изтрити или преместени на диска и незаписаните им промени бяха отхвърлени: {0}</value></data>
+  <data name="PasteImage" xml:space="preserve"><value>_Поставяне на изображение</value></data>
+  <data name="CopyResult" xml:space="preserve"><value>_Копиране на Резултата</value></data>
+  <data name="PastedImageName" xml:space="preserve"><value>Поставено изображение {0}</value></data>
+  <data name="ClipboardHasNoImage" xml:space="preserve"><value>В клипборда няма изображение.</value></data>
+  <data name="ResultCopied" xml:space="preserve"><value>Резултатът от {0} е копиран.</value></data>
+  <data name="SavePastedTitle" xml:space="preserve"><value>Запис на Резултата от {0}</value></data>
+  <data name="PngFilter" xml:space="preserve"><value>PNG изображения</value></data>
+  <data name="OverwriteTitle" xml:space="preserve"><value>Замяна на файл</value></data>
+  <data name="OverwriteQuestion" xml:space="preserve"><value>{0} вече съществува. Да бъде ли заменен?</value></data>
+  <data name="ReplaceAnswer" xml:space="preserve"><value>Замяна</value></data>
 </root>

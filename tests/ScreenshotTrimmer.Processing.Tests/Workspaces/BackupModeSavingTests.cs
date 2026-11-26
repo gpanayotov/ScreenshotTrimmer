@@ -124,12 +124,12 @@ public class BackupModeSavingTests
         workspace.SetSteps(Entry(workspace, "shot.png"), Cropped);
         var unsaved = new List<string>();
         workspace.Changed += (_, change) => unsaved.AddRange(
-            change.Images.Where(i => i.HasUnsavedSteps).Select(i => Path.GetFileName(i.Path)));
+            change.Images.Where(i => i.HasUnsavedSteps).Select(i => Path.GetFileName(i.Path!)));
 
         workspace.Save(Entry(workspace, "shot.png"));
         await Task.Delay(TimeSpan.FromSeconds(1));
 
-        Assert.Equal(["other.png", "shot.png"], workspace.Images.Select(i => Path.GetFileName(i.Path)));
+        Assert.Equal(["other.png", "shot.png"], workspace.Images.Select(i => Path.GetFileName(i.Path!)));
         Assert.Equal(Cropped, workspace.Steps(Entry(workspace, "shot.png")));
         Assert.False(Entry(workspace, "shot.png").HasUnsavedSteps);
         Assert.Empty(unsaved);

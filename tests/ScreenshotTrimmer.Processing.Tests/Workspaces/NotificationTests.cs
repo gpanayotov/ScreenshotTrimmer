@@ -44,7 +44,7 @@ public class NotificationTests
         var announced = new List<string>();
         workspace.Changed += (_, change) =>
         {
-            announced.Add(Path.GetFileName(change.Selected!.Path));
+            announced.Add(Path.GetFileName(change.Selected!.Path!));
             if (announced.Count == 1)
                 workspace.Next();
         };

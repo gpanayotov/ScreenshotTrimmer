@@ -22,4 +22,8 @@ public interface IQuestions
     /// <summary>Asks whether to discard the unsaved Steps of the image named <paramref name="name"/> and remove it.</summary>
     /// <returns><c>true</c> to discard and remove; <c>false</c> to keep it.</returns>
     Task<bool> AskToDiscardAsync(string name);
+
+    /// <summary>Asks whether to replace the existing file at <paramref name="path"/>.</summary>
+    /// <returns><c>true</c> to replace it; <c>false</c> to leave it alone.</returns>
+    Task<bool> AskToOverwriteAsync(string path);
 }

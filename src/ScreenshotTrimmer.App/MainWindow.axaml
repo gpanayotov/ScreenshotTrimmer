@@ -20,6 +20,9 @@
     <KeyBinding Gesture="Ctrl+Z" Command="{Binding UndoCommand}" />
     <KeyBinding Gesture="Ctrl+Y" Command="{Binding RedoCommand}" />
     <KeyBinding Gesture="Ctrl+Shift+Z" Command="{Binding RedoCommand}" />
+    <!-- Text boxes handle their own Ctrl+C and Ctrl+V, so these only see the keys when no text box has focus. -->
+    <KeyBinding Gesture="Ctrl+V" Command="{Binding PasteImageCommand}" />
+    <KeyBinding Gesture="Ctrl+C" Command="{Binding CopyResultCommand}" />
     <!-- A key binding only sees a Delete that the focused control left unhandled, so text boxes keep theirs. -->
     <KeyBinding Gesture="Delete" Command="{Binding RemoveSelectedCommand}" />
   </Window.KeyBindings>
@@ -42,6 +45,9 @@
         <MenuItem Header="{loc:Tr Redo}" InputGesture="Ctrl+Y" Command="{Binding RedoCommand}" />
         <Separator />
         <MenuItem Header="{loc:Tr ResetSteps}" Command="{Binding ResetCommand}" />
+        <Separator />
+        <MenuItem Header="{loc:Tr PasteImage}" InputGesture="Ctrl+V" Command="{Binding PasteImageCommand}" />
+        <MenuItem Header="{loc:Tr CopyResult}" InputGesture="Ctrl+C" Command="{Binding CopyResultCommand}" />
       </MenuItem>
       <MenuItem Header="{loc:Tr ViewMenu}">
         <!-- A menu item does not check itself when clicked: its command changes the setting, and the binding shows it. -->

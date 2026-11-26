@@ -7,7 +7,7 @@ namespace ScreenshotTrimmer.Processing.Workspaces;
 // Each image's pending Steps, their undo history and the Steps at its last successful save.
 public sealed partial class Workspace
 {
-    /// <summary>The images with Steps, by path; an image missing here has <c>Steps.None</c> and was never saved.</summary>
+    /// <summary>The images with Steps, by <see cref="WorkspaceImage.Key">key</see>; an image missing here has <c>Steps.None</c> and was never saved.</summary>
     private readonly Dictionary<string, ImageSteps> _steps = new(FileNames.Comparer);
 
     /// <summary>
@@ -45,12 +45,12 @@ public sealed partial class Workspace
         Update(() =>
         {
             RequireListed(image);
-            var state = StepsOf(image.Path);
+            var state = StepsOf(image.Key);
             if (state.Current == steps)
                 return;
             var merging = mergeKey is not null && Equals(mergeKey, state.MergeKey) && !state.Earlier.IsEmpty;
             var earlier = merging ? state.Earlier : state.Earlier.Push(state.Current);
-            _steps[image.Path] = earlier.Peek() == steps
+            _steps[image.Key] = earlier.Peek() == steps
                 // A run that came back to where it started has nothing left to undo.
                 ? state with { Current = steps, Earlier = earlier.Pop(), Later = [], MergeKey = null }
                 : state with { Current = steps, Earlier = earlier, Later = [], MergeKey = mergeKey };
@@ -69,10 +69,10 @@ public sealed partial class Workspace
         Update(() =>
         {
             RequireListed(image);
-            var state = StepsOf(image.Path);
+            var state = StepsOf(image.Key);
             if (state.Earlier.IsEmpty)
                 return;
-            _steps[image.Path] = state with
+            _steps[image.Key] = state with
             {
                 Current = state.Earlier.Peek(), Earlier = state.Earlier.Pop(), Later = state.Later.Push(state.Current),
                 MergeKey = null,
@@ -92,10 +92,10 @@ public sealed partial class Workspace
         Update(() =>
         {
             RequireListed(image);
-            var state = StepsOf(image.Path);
+            var state = StepsOf(image.Key);
             if (state.Later.IsEmpty)
                 return;
-            _steps[image.Path] = state with
+            _steps[image.Key] = state with
             {
                 Current = state.Later.Peek(), Earlier = state.Earlier.Push(state.Current), Later = state.Later.Pop(),
                 MergeKey = null,
@@ -126,13 +126,13 @@ public sealed partial class Workspace
         {
             ObjectDisposedException.ThrowIf(_disposed, this);
             RequireListed(image);
-            return StepsOf(image.Path);
+            return StepsOf(image.Key);
         }
     }
 
     private ImageSteps StepsOf(string path) => _steps.GetValueOrDefault(path) ?? ImageSteps.New;
 
-    private bool HasUnsavedSteps(string path) => StepsOf(path) is var state && state.Current != state.Saved;
+    private bool HasUnsavedSteps(string key) => StepsOf(key) is var state && state.Current != state.Saved;
 
     /// <summary>Announces a change of Steps, with the unsaved markers brought up to date; call under the lock.</summary>
     private void AnnounceSteps()
@@ -148,11 +148,13 @@ public sealed partial class Workspace
     /// <returns>Whether a marker changed, and so a change was queued.</returns>
     private bool RefreshUnsavedMarkers()
     {
-        var images = Images.Select(image => image with { HasUnsavedSteps = HasUnsavedSteps(image.Path) }).ToList();
+        var images = Images
+            .Select(image => image with { HasUnsavedSteps = image.IsPasted || HasUnsavedSteps(image.Key) })
+            .ToList();
         if (images.SequenceEqual(Images))
             return false;
         Images = images;
-        Selected = Selected is null ? null : Find(Selected.Path);
+        Selected = Selected is null ? null : Find(Selected.Key);
         QueueChange();
         return true;
     }
@@ -171,16 +173,16 @@ public sealed partial class Workspace
     }
 
     /// <summary>
-    /// Discards the Steps of the images in <paramref name="before"/> that are no longer listed, so a file that comes
+    /// Discards the Steps of the files in <paramref name="before"/> that are no longer listed, so a file that comes
     /// back under the same name starts afresh; call under the lock after re-listing.
     /// </summary>
     /// <returns>The paths of the dropped images that had unsaved Steps, in strip order.</returns>
-    private List<string> DiscardStepsOfDropped(IReadOnlyList<WorkspaceImage> before)
+    private List<string> DiscardStepsOfDropped(IEnumerable<string> before)
     {
-        var gone = before.Where(image => Find(image.Path) is null).ToList();
-        var unsaved = gone.Where(image => HasUnsavedSteps(image.Path)).Select(image => image.Path).ToList();
-        foreach (var image in gone)
-            _steps.Remove(image.Path);
+        var gone = before.Where(path => Find(path) is null).ToList();
+        var unsaved = gone.Where(HasUnsavedSteps).ToList();
+        foreach (var path in gone)
+            _steps.Remove(path);
         return unsaved;
     }
 

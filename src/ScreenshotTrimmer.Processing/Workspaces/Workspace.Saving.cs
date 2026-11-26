@@ -17,7 +17,7 @@ public sealed partial class Workspace
     /// <remarks>
     /// Once a Backup-mode save has given the Result the Original's name, these come from the backup, or from the
     /// Original's pixels kept from before that save when an existing backup was left alone, so no effect is applied
-    /// twice.
+    /// twice. A Pasted image's come from memory, saved or not.
     /// </remarks>
     /// <exception cref="ArgumentException"><paramref name="image"/> is not listed.</exception>
     /// <exception cref="IOException">The file cannot be read.</exception>
@@ -25,15 +25,17 @@ public sealed partial class Workspace
     public RgbaImage LoadOriginal(WorkspaceImage image)
     {
         ArgumentNullException.ThrowIfNull(image);
-        string path;
+        string key;
+        RgbaImage? pastedPixels;
         BackupSave? backupSave;
         lock (_lock)
         {
             ObjectDisposedException.ThrowIf(_disposed, this);
-            path = Images[RequireListed(image)].Path;
-            backupSave = _backupSaves.GetValueOrDefault(path);
+            key = Images[RequireListed(image)].Key;
+            pastedPixels = PastedPixels(key);
+            backupSave = _backupSaves.GetValueOrDefault(key);
         }
-        return backupSave?.LoadOriginal() ?? ImageFile.Load(path);
+        return pastedPixels ?? backupSave?.LoadOriginal() ?? ImageFile.Load(key);
     }
 
     /// <summary>
@@ -44,10 +46,14 @@ public sealed partial class Workspace
     /// </summary>
     /// <remarks>
     /// When a Backup-mode save gives the Result a new name (<c>shot.jpg</c> becomes <c>shot.png</c>), the entry
-    /// follows it with its Steps. Saving again in Backup mode leaves the backup alone and overwrites the Result.
+    /// follows it with its Steps. Saving again in Backup mode leaves the backup alone and overwrites the Result. A saved
+    /// Pasted image overwrites its own file in either mode. A Pasted image not saved yet is saved with
+    /// <see cref="SavePasted"/> instead.
     /// </remarks>
     /// <exception cref="SaveFailedException">The Result could not be written; the Steps stay unsaved.</exception>
-    /// <exception cref="ArgumentException"><paramref name="image"/> is not listed.</exception>
+    /// <exception cref="ArgumentException">
+    /// <paramref name="image"/> is not listed, or is a Pasted image that has not been saved yet.
+    /// </exception>
     /// <exception cref="IOException">The Original cannot be read.</exception>
     /// <exception cref="InvalidDataException">The Original is not an image that can be decoded.</exception>
     public SaveReport Save(WorkspaceImage image)
@@ -56,25 +62,29 @@ public sealed partial class Workspace
         string path;
         Steps steps;
         SaveOptions options;
+        RgbaImage? pastedPixels;
         BackupSave? backupSave;
         lock (_lock)
         {
             ObjectDisposedException.ThrowIf(_disposed, this);
-            path = Images[RequireListed(image)].Path;
+            path = Images[RequireListed(image)].Path
+                ?? throw new ArgumentException("A Pasted image is saved with SavePasted until it has a file.", nameof(image));
             steps = StepsOf(path).Current;
             options = SaveOptionsFor(_settings);
+            pastedPixels = PastedPixels(path);
             backupSave = _backupSaves.GetValueOrDefault(path);
         }
 
-        var original = backupSave?.LoadOriginal() ?? ImageFile.Load(path);
+        var original = pastedPixels ?? backupSave?.LoadOriginal() ?? ImageFile.Load(path);
         var result = Renderer.Render(original, steps).Result;
-        var resaving = options.Mode == SaveMode.Backup && backupSave is not null;
-        var report = resaving ? ResultFiles.Replace(result, path) : SaveFollowingOwnRename(result, path, options);
+        // The file already holds this image's Result, so only that file is written.
+        var replacing = pastedPixels is not null || (options.Mode == SaveMode.Backup && backupSave is not null);
+        var report = replacing ? ResultFiles.Replace(result, path) : SaveFollowingOwnRename(result, path, options);
 
         Update(() =>
         {
             var savedPath = path;
-            if (options.Mode == SaveMode.Backup && !resaving)
+            if (options.Mode == SaveMode.Backup && !replacing)
             {
                 savedPath = report.Written[0];
                 FollowOwnRename(path, savedPath);
@@ -83,11 +93,9 @@ public sealed partial class Workspace
             var state = StepsOf(savedPath);
             if (state.Current == steps)
                 _steps[savedPath] = state with { Saved = steps, MergeKey = null };
-            if (_openedPaths.Count == 0)
-                return;
             // The new files are listed now rather than when the folder watcher notices them, so the badge or the
             // renamed entry shows at once.
-            var selected = Selected is { } current && FileNames.Same(current.Path, path) ? savedPath : Selected?.Path;
+            var selected = Selected is { } current && FileNames.Same(current.Key, path) ? savedPath : Selected is null ? null : Selected.Key;
             Relist(_ => (selected is null ? null : Find(selected)) ?? Images.FirstOrDefault());
         });
         return report;
@@ -95,9 +103,10 @@ public sealed partial class Workspace
 
     /// <summary>
     /// Saves every image with unsaved Steps, in strip order, as <see cref="Save"/> does, carrying on past the ones that
-    /// fail. An image that leaves the list before its turn is skipped.
+    /// fail. An image that leaves the list before its turn is skipped. A Pasted image not saved yet is not saved but
+    /// reported as needing a location, so the caller can ask for one and save it with <see cref="SavePasted"/>.
     /// </summary>
-    /// <returns>One outcome per image saved or failed, in strip order.</returns>
+    /// <returns>One outcome per image saved, failed or needing a location, in strip order.</returns>
     public IReadOnlyList<SaveOutcome> SaveAll()
     {
         List<WorkspaceImage> unsaved;
@@ -114,6 +123,11 @@ public sealed partial class Workspace
             {
                 if (IndexOf(image) < 0)
                     continue;
+            }
+            if (image.IsPasted)
+            {
+                outcomes.Add(new SaveOutcome { Image = image, NeedsLocation = true });
+                continue;
             }
             try
             {
