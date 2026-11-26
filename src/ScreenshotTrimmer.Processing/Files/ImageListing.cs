@@ -50,8 +50,9 @@ public static class ImageListing
 
         var images = paths
             .Select(path => new ListedImage { Path = path, IsResult = IsResult(path), HasResult = HasResult(path) })
-            // The file the user opened on its own is always shown, even when it is a hidden Result.
-            .Where(image => options.IncludeResults || !image.IsResult || image.Path == openedFile)
+            // The file the user opened on its own is always shown, even when it is a hidden Result, as are kept Results.
+            .Where(image => options.IncludeResults || !image.IsResult || image.Path == openedFile
+                            || options.KeptResults.Contains(image.Path))
             // Base name before extension, so `shot.png` sorts before `shot-trimmed.png` and `shot-2.png`.
             .OrderBy(image => Path.GetFileNameWithoutExtension(image.Path), NaturalComparer.Instance)
             .ThenBy(image => Path.GetExtension(image.Path), NaturalComparer.Instance)

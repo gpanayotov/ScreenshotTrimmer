@@ -166,4 +166,26 @@ public class BackupModeSavingTests
         Assert.True(ImageFile.Load(folder.File("shot.png")).PixelsEqual(Renderer.Render(original, Recropped).Result));
         Assert.False(Entry(workspace, "shot.png").HasUnsavedSteps);
     }
+
+    [Fact]
+    public async Task A_saved_entry_renamed_on_disk_still_renders_from_the_true_original()
+    {
+        using var folder = new TempFolder();
+        var original = ImageFile.Load(WriteOriginal(folder, "shot.png"));
+        using var workspace = new Workspace(Backup, TimeSpan.FromMilliseconds(150));
+        workspace.Open([folder.Path]);
+        workspace.SetSteps(Entry(workspace, "shot.png"), Cropped);
+        workspace.Save(Entry(workspace, "shot.png"));
+        // The watcher sees the save's own backup rename before the user's.
+        await Task.Delay(TimeSpan.FromSeconds(1));
+
+        File.Move(folder.File("shot.png"), folder.File("final.png"));
+        var deadline = DateTime.UtcNow + TimeSpan.FromSeconds(15);
+        while (!workspace.Images.Any(i => Path.GetFileName(i.Path) == "final.png") && DateTime.UtcNow < deadline)
+            await Task.Delay(50);
+
+        var renamed = Entry(workspace, "final.png");
+        Assert.Equal(Cropped, workspace.Steps(renamed));
+        Assert.True(workspace.LoadOriginal(renamed).PixelsEqual(original));
+    }
 }

@@ -436,6 +436,12 @@ public sealed partial class MainWindowViewModel : Observable, IDisposable
         var selected = Entries.FirstOrDefault(entry => entry.Image.Key == change.Selected?.Key);
         if (change.Selected?.Key != _shown?.Key)
             LoadImage(change.Selected);
+        else if (!string.Equals(change.Selected?.Path, _shown?.Path, StringComparison.Ordinal))
+        {
+            // The shown file was renamed with only its letter case changed: same image, new name.
+            _shown = change.Selected;
+            Raise(nameof(StatusFileName));
+        }
         Set(ref _selectedEntry, selected, nameof(SelectedEntry));
         ShowCrop(change.Selected);
         ShowFinishing(change.Selected);

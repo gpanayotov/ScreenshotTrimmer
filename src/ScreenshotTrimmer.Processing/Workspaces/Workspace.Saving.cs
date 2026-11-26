@@ -93,13 +93,18 @@ public sealed partial class Workspace
                 saved = ImageKey.OfFile(report.Written[0]);
                 _backupSaves[saved] = BackupSave.After(report, original);
             }
-            var state = StepsOf(saved);
-            if (state.Current == steps)
-                _steps[saved] = state with { Saved = steps, MergeKey = null };
+            // The file holds these Steps whether or not they changed meanwhile; a change ends a run of merged changes
+            // only when nothing changed since.
+            if (_steps.TryGetValue(saved, out var state))
+                _steps[saved] = state with { Saved = steps, MergeKey = state.Current == steps ? null : state.MergeKey };
             // The new files are listed now rather than when the folder watcher notices them, so the badge or the
-            // renamed entry shows at once.
-            var selected = Selected?.Key == key ? saved : Selected?.Key;
-            Relist(_ => (selected is null ? null : Find(selected)) ?? Images.FirstOrDefault());
+            // renamed entry shows at once. A hidden Result that was listed only for its unsaved Steps gives way to its
+            // Original.
+            var previous = Selected;
+            var selected = previous?.Key == key ? saved : previous?.Key;
+            Relist(_ => (selected is null ? null : Find(selected))
+                ?? (previous is { IsResult: true } ? OriginalOf(previous) : null)
+                ?? Images.FirstOrDefault());
         });
         return report;
     }
@@ -164,8 +169,20 @@ public sealed partial class Workspace
         }
         finally
         {
-            if (!moved)
-                _folderWatch.StopIgnoringRenameOf(path);
+            _folderWatch.EndIgnoringRenameOf(path, moved);
+        }
+    }
+
+    /// <summary>Moves the Backup-mode saves of files renamed on disk to their new paths; call under the lock.</summary>
+    private void FollowRenamesOfBackupSaves(Func<string, string> renamed)
+    {
+        foreach (var (from, backupSave) in _backupSaves.ToList())
+        {
+            var to = from.Renamed(renamed);
+            if (to == from)
+                continue;
+            _backupSaves.Remove(from);
+            _backupSaves[to] = backupSave;
         }
     }
 

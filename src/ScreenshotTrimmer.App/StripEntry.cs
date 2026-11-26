@@ -47,12 +47,18 @@ public sealed class StripEntry(WorkspaceImage image, ThumbnailCache thumbnails, 
     public bool Shows(WorkspaceImage image) =>
         image.Key == Image.Key && image.ContentVersion == Image.ContentVersion;
 
-    /// <summary>Shows the markers and badges of <paramref name="image"/>, which this entry <see cref="Shows"/>.</summary>
+    /// <summary>
+    /// Shows the name, markers and badges of <paramref name="image"/>, which this entry <see cref="Shows"/>; the name
+    /// changes when the file was renamed with only its letter case changed.
+    /// </summary>
     public void Update(WorkspaceImage image)
     {
-        if (image == Image)
+        var renamed = !string.Equals(image.Path, Image.Path, StringComparison.Ordinal);
+        if (image == Image && !renamed)
             return;
         Image = image;
+        if (renamed)
+            Raise(nameof(Name));
         Raise(nameof(HasResult));
         Raise(nameof(HasUnsavedSteps));
         Raise(nameof(Opacity));

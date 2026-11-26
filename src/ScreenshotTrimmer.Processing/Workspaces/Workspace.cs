@@ -99,7 +99,8 @@ public sealed partial class Workspace : IDisposable
 
     /// <summary>
     /// Whether Suffix-mode Results are listed in their sorted place instead of hidden. Session-only and off by default;
-    /// changing it keeps the selection, except that a selected Result being hidden gives way to its Original.
+    /// changing it keeps the selection, except that a selected Result being hidden gives way to its Original. A Result
+    /// with unsaved Steps is never hidden, so no unsaved work is out of sight.
     /// </summary>
     public bool ShowResults
     {
@@ -214,7 +215,11 @@ public sealed partial class Workspace : IDisposable
     /// </summary>
     private Listing List()
     {
-        var listing = ImageListing.List(_openedPaths, ListingOptionsFor(_settings, _showResults));
+        var listing = ImageListing.List(_openedPaths, ListingOptionsFor(_settings, _showResults) with
+        {
+            KeptResults = _steps.Keys.Where(HasUnsavedSteps).Select(key => key.Path).OfType<string>()
+                .ToHashSet(FileNames.Comparer),
+        });
         var files = listing.Images
             .Select(image => (image.Path, image.IsResult, image.HasResult))
             .Concat(SavedPastedPaths().Select(path => (Path: path, IsResult: false, HasResult: false)))
@@ -266,6 +271,7 @@ public sealed partial class Workspace : IDisposable
         _removed = _removed.Select(renamed).ToHashSet(FileNames.Comparer);
         FollowRenamesOfSavedPasted(renamed);
         FollowRenamesWithSteps(renamed);
+        FollowRenamesOfBackupSaves(renamed);
         if (_openedOneFile && _openedPaths is [var file] && !File.Exists(file))
         {
             // The file opened on its own is gone; the rest of its folder stays listed.

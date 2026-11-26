@@ -126,12 +126,18 @@ public sealed partial class MainWindowViewModel
 
     /// <summary>
     /// The Shadow size slider. During a drag (<see cref="BeginShadowDrag"/>) each value is only previewed; otherwise,
-    /// and at the drag's end, the value is one Step and the remembered size.
+    /// and at the drag's end, the value is one Step and the remembered size. A size below the slider's range (allowed
+    /// in the settings file) is shown at the slider's minimum and changes nothing until the slider moves.
     /// </summary>
     public double ShadowSize
     {
-        get => (_draggedShadow ?? _shadow).Size;
-        set => SlideShadow((_draggedShadow ?? _shadow) with { Size = Math.Clamp(value, MinShadowSize, MaxShadowSize) });
+        get => Math.Clamp((_draggedShadow ?? _shadow).Size, MinShadowSize, MaxShadowSize);
+        set
+        {
+            // The slider writing back the value it shows is not a change.
+            if (value != ShadowSize)
+                SlideShadow((_draggedShadow ?? _shadow) with { Size = Math.Clamp(value, MinShadowSize, MaxShadowSize) });
+        }
     }
 
     /// <summary>The Shadow opacity slider, changed like <see cref="ShadowSize"/>.</summary>

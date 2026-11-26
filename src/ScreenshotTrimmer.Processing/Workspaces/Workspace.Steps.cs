@@ -173,16 +173,19 @@ public sealed partial class Workspace
     }
 
     /// <summary>
-    /// Discards the Steps of the files in <paramref name="before"/> that are no longer listed, so a file that comes
-    /// back under the same name starts afresh; call under the lock after re-listing.
+    /// Discards the Steps and Backup-mode saves of the files in <paramref name="before"/> that are no longer listed, so
+    /// a file that comes back under the same name starts afresh; call under the lock after re-listing.
     /// </summary>
     /// <returns>The paths of the dropped images that had unsaved Steps, in strip order.</returns>
     private List<string> DiscardStepsOfDropped(IEnumerable<string> before)
     {
         var gone = before.Where(path => Find(path) is null).ToList();
         var unsaved = gone.Where(path => HasUnsavedSteps(ImageKey.OfFile(path))).ToList();
-        foreach (var path in gone)
-            _steps.Remove(ImageKey.OfFile(path));
+        foreach (var key in gone.Select(ImageKey.OfFile))
+        {
+            _steps.Remove(key);
+            _backupSaves.Remove(key);
+        }
         return unsaved;
     }
 

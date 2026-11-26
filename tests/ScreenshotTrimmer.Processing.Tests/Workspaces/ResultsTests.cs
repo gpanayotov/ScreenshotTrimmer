@@ -1,4 +1,5 @@
 using ScreenshotTrimmer.Processing.Files;
+using ScreenshotTrimmer.Processing.Rendering;
 using ScreenshotTrimmer.Processing.Settings;
 using ScreenshotTrimmer.Processing.Workspaces;
 
@@ -138,5 +139,38 @@ public class ResultsTests
 
         Assert.Equal(["a.png", "b.png", "c.png"], Names(workspace));
         Assert.Equal(folder.File("b.png"), workspace.Selected?.Path);
+    }
+
+    [Fact]
+    public void A_result_with_unsaved_steps_stays_listed_and_selected_when_results_are_hidden()
+    {
+        using var folder = new TempFolder();
+        Touch(folder, "a.png", "b.png", "b-trimmed.png", "c.png");
+        using var workspace = new Workspace(new UserSettings());
+        workspace.Open([folder.Path]);
+        workspace.ShowResults = true;
+        workspace.Select(Entry(workspace, "b-trimmed.png"));
+        workspace.SetSteps(Entry(workspace, "b-trimmed.png"), new Steps { FrameLines = true });
+
+        workspace.ShowResults = false;
+
+        Assert.Equal(["a.png", "b.png", "b-trimmed.png", "c.png"], Names(workspace));
+        Assert.Equal(folder.File("b-trimmed.png"), workspace.Selected?.Path);
+        Assert.True(workspace.HasUnsavedWork);
+    }
+
+    [Fact]
+    public void A_file_with_unsaved_steps_stays_listed_when_new_settings_make_it_a_result()
+    {
+        using var folder = new TempFolder();
+        Touch(folder, "a.png", "a-trimmed.png");
+        using var workspace = new Workspace(new UserSettings { SaveMode = SaveMode.Backup });
+        workspace.Open([folder.Path]);
+        workspace.SetSteps(Entry(workspace, "a-trimmed.png"), new Steps { FrameLines = true });
+
+        workspace.ApplySettings(new UserSettings { SaveMode = SaveMode.Suffix });
+
+        Assert.Equal(["a.png", "a-trimmed.png"], Names(workspace));
+        Assert.True(workspace.HasUnsavedWork);
     }
 }
