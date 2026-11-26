@@ -56,13 +56,9 @@ public sealed partial class MainWindowViewModel
         {
             if (!Set(ref _showOnlyNoSubjectFound, value))
                 return;
-            // A selected image the filter hides gives way to the first one it shows.
-            if (value && _workspace.Selected is { NoSubjectFound: false } && _listedImages?.Any(image => image.NoSubjectFound) == true)
-            {
-                _workspace.Next(image => image.NoSubjectFound);
-                if (_workspace.Selected is { NoSubjectFound: false })
-                    _workspace.Previous(image => image.NoSubjectFound);
-            }
+            // A selected image the filter hides gives way to the nearest one it shows.
+            if (value)
+                _workspace.SelectNearest(image => image.NoSubjectFound);
             ShowInStrip(_listedImages ?? [], _workspace.Selected);
             Set(ref _selectedEntry, Entries.FirstOrDefault(entry => entry.Image.Key == _workspace.Selected?.Key),
                 nameof(SelectedEntry));
@@ -84,10 +80,10 @@ public sealed partial class MainWindowViewModel
         !ShowOnlyNoSubjectFound || image.NoSubjectFound || image.Key == selected?.Key;
 
     /// <summary>Selects the next image the strip shows.</summary>
-    private void Next() => _workspace.Next(image => InStrip(image, null));
+    private void NextInStrip() => _workspace.Next(image => InStrip(image, null));
 
     /// <summary>Selects the previous image the strip shows.</summary>
-    private void Previous() => _workspace.Previous(image => InStrip(image, null));
+    private void PreviousInStrip() => _workspace.Previous(image => InStrip(image, null));
 
     /// <summary>
     /// Shows <paramref name="image"/>, just selected, in the Result view when its Steps came from a Batch, so it can be

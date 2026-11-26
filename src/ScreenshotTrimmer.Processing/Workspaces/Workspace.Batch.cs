@@ -22,20 +22,13 @@ public sealed partial class Workspace
     internal event Action? BatchStopRequested;
 
     /// <summary>
-    /// <see cref="RunBatch(IProgress{BatchProgress}?, CancellationToken, int)"/> on as many images at a time as there
-    /// are processor cores.
-    /// </summary>
-    public BatchSummary RunBatch(IProgress<BatchProgress>? progress, CancellationToken cancellation) =>
-        RunBatch(progress, cancellation, Environment.ProcessorCount);
-
-    /// <summary>
     /// Runs one Batch over the images listed when it starts and returns what it did. It starts from the plan
-    /// <see cref="PlanBatch"/> would give, then goes through the images that plan takes in strip order, up to
-    /// <paramref name="parallelism"/> at a time. Each image that <see cref="BatchSelection"/> takes gets the
-    /// Subject <see cref="SubjectDetection.Find"/> finds in its Original as one Step, built with the
-    /// <see cref="FirstStep"/> rule from the settings at the start, so it is unsaved and undoable like a hand Auto crop;
-    /// its Steps depend only on its pixels and those settings. An image with no Subject found gets no Step and is
-    /// marked <see cref="WorkspaceImage.NoSubjectFound"/>. Nothing is written to disk.
+    /// <see cref="PlanBatch"/> would give, then goes through the images that plan takes in strip order, as many at a
+    /// time as there are processor cores. Each image that <see cref="BatchSelection"/> takes gets the Subject
+    /// <see cref="SubjectDetection.Find"/> finds in its Original as one Step, built with the <see cref="FirstStep"/>
+    /// rule from the settings at the start, so it is unsaved and undoable like a hand Auto crop; its Steps depend only
+    /// on its pixels and those settings. An image with no Subject found gets no Step and is marked
+    /// <see cref="WorkspaceImage.NoSubjectFound"/>. Nothing is written to disk.
     /// </summary>
     /// <remarks>
     /// Loading and detection run outside the workspace's lock, so the list stays usable. An image is checked again
@@ -43,13 +36,21 @@ public sealed partial class Workspace
     /// <see cref="BatchSkip.Gone"/>, one that gained Steps as <see cref="BatchSkip.HasSteps"/>. An image that cannot be
     /// read counts as <see cref="BatchSummary.Failed"/> and the rest go on. <paramref name="progress"/> hears after
     /// each taken image done, on the thread that did it, out of the number the plan takes, which is the figure the
-    /// plan shows the user. Cancelling, or <see cref="Open"/> and <see cref="Dispose"/>, stop
+    /// plan shows the user. Cancelling, <see cref="StopBatchAsync"/>, <see cref="Open"/> and <see cref="Dispose"/> stop
     /// the Batch from starting more images and cancel detection in flight; the images already done keep their Steps
-    /// and the summary is <see cref="BatchSummary.Cancelled"/>. Since those two wait for the Batch, they must not be
-    /// called from <paramref name="progress"/> or a <see cref="Changed"/> handler on a Batch thread.
+    /// and the summary is <see cref="BatchSummary.Cancelled"/>. Since <see cref="Open"/> and <see cref="Dispose"/>
+    /// wait for the Batch, they must not be called from <paramref name="progress"/> or a <see cref="Changed"/> handler
+    /// on a Batch thread.
     /// </remarks>
     /// <exception cref="InvalidOperationException">Another Batch is running in this workspace.</exception>
-    public BatchSummary RunBatch(IProgress<BatchProgress>? progress, CancellationToken cancellation, int parallelism)
+    public BatchSummary RunBatch(IProgress<BatchProgress>? progress, CancellationToken cancellation) =>
+        RunBatch(progress, cancellation, Environment.ProcessorCount);
+
+    /// <summary>
+    /// <see cref="RunBatch(IProgress{BatchProgress}?, CancellationToken)"/> on at most <paramref name="parallelism"/>
+    /// images at a time, so a test can run one image at a time and act at a fixed point in the strip.
+    /// </summary>
+    internal BatchSummary RunBatch(IProgress<BatchProgress>? progress, CancellationToken cancellation, int parallelism)
     {
         ArgumentOutOfRangeException.ThrowIfLessThan(parallelism, 1);
         BatchRun run;
@@ -212,8 +213,7 @@ public sealed partial class Workspace
             else
             {
                 _noSubjectFound.Remove(key);
-                RecordSteps(key, steps, mergeKey: null);
-                _steps[key] = StepsOf(key) with { FromBatch = true };
+                RecordSteps(key, steps, mergeKey: null, fromBatch: true);
                 outcome = BatchOutcome.Processed;
             }
         }

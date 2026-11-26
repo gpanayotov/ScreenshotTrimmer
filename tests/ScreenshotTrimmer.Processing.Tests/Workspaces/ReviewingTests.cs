@@ -148,4 +148,25 @@ public class ReviewingTests
         workspace.Undo(processed);
         Assert.False(workspace.HasBatchSteps(processed));
     }
+
+    [Fact]
+    public void Selecting_the_nearest_match_keeps_a_matching_selection_and_otherwise_prefers_the_next_one()
+    {
+        using var folder = new TempFolder();
+        using var workspace = AfterBatch(folder);
+
+        workspace.Select(Entry(workspace, "c.png"));
+        workspace.SelectNearest(image => image.NoSubjectFound);
+        Assert.Equal("c.png", SelectedName(workspace));
+
+        workspace.Select(Entry(workspace, "d.png"));
+        workspace.SelectNearest(image => image.NoSubjectFound);
+        Assert.Equal("e.png", SelectedName(workspace));
+
+        workspace.SelectNearest(image => image.HasUnsavedSteps);
+        Assert.Equal("d.png", SelectedName(workspace));
+
+        workspace.SelectNearest(_ => false);
+        Assert.Equal("d.png", SelectedName(workspace));
+    }
 }

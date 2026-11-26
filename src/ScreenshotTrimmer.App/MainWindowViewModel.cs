@@ -53,8 +53,8 @@ public sealed partial class MainWindowViewModel : Observable, IDisposable
         OpenFolderCommand = new RelayCommand(() => OpenPicked(() => picker.PickFolderAsync(_lastFolder)));
         _workspace.Changed += OnWorkspaceChanged;
         Localizer.Instance.PropertyChanged += OnLanguageChanged;
-        NextCommand = new RelayCommand(Next);
-        PreviousCommand = new RelayCommand(Previous);
+        NextCommand = new RelayCommand(NextInStrip);
+        PreviousCommand = new RelayCommand(PreviousInStrip);
         RemoveSelectedCommand = new RelayCommand(RemoveSelected);
         RemoveEntryCommand = new RelayCommand<StripEntry>(Remove);
         DismissNoticesCommand = new RelayCommand(DismissNotices);

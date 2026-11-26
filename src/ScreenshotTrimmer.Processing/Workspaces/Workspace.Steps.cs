@@ -50,9 +50,10 @@ public sealed partial class Workspace
     }
 
     /// <summary>
-    /// <see cref="SetSteps"/> for the listed image with the key <paramref name="key"/>; call under the lock.
+    /// <see cref="SetSteps"/> for the listed image with the key <paramref name="key"/>, recording whether the new Steps
+    /// are <paramref name="fromBatch"/>; call under the lock.
     /// </summary>
-    private void RecordSteps(ImageKey key, Steps steps, object? mergeKey)
+    private void RecordSteps(ImageKey key, Steps steps, object? mergeKey, bool fromBatch = false)
     {
         var state = StepsOf(key);
         if (state.Current == steps)
@@ -62,11 +63,10 @@ public sealed partial class Workspace
             _noSubjectFound.Remove(key);
         var merging = mergeKey is not null && Equals(mergeKey, state.MergeKey) && !state.Earlier.IsEmpty;
         var earlier = merging ? state.Earlier : state.Earlier.Push(state.Current);
-        _steps[key] = earlier.Peek() == steps
+        ChangeCurrent(key, earlier.Peek() == steps
             // A run that came back to where it started has nothing left to undo.
-            ? state with { Current = steps, Earlier = earlier.Pop(), Later = [], MergeKey = null, FromBatch = false }
-            : state with { Current = steps, Earlier = earlier, Later = [], MergeKey = mergeKey, FromBatch = false };
-        AnnounceSteps();
+            ? state with { Current = steps, Earlier = earlier.Pop(), Later = [], MergeKey = null }
+            : state with { Current = steps, Earlier = earlier, Later = [], MergeKey = mergeKey }, fromBatch);
     }
 
     /// <summary>
@@ -83,12 +83,11 @@ public sealed partial class Workspace
             var state = StepsOf(image.Key);
             if (state.Earlier.IsEmpty)
                 return;
-            _steps[image.Key] = state with
+            ChangeCurrent(image.Key, state with
             {
                 Current = state.Earlier.Peek(), Earlier = state.Earlier.Pop(), Later = state.Later.Push(state.Current),
-                MergeKey = null, FromBatch = false,
-            };
-            AnnounceSteps();
+                MergeKey = null,
+            });
         });
     }
 
@@ -106,12 +105,11 @@ public sealed partial class Workspace
             var state = StepsOf(image.Key);
             if (state.Later.IsEmpty)
                 return;
-            _steps[image.Key] = state with
+            ChangeCurrent(image.Key, state with
             {
                 Current = state.Later.Peek(), Earlier = state.Earlier.Push(state.Current), Later = state.Later.Pop(),
-                MergeKey = null, FromBatch = false,
-            };
-            AnnounceSteps();
+                MergeKey = null,
+            });
         });
     }
 
@@ -146,6 +144,16 @@ public sealed partial class Workspace
             RequireListed(image);
             return StepsOf(image.Key);
         }
+    }
+
+    /// <summary>
+    /// Stores <paramref name="state"/>, whose current Steps just changed, as the image's and announces the change; the
+    /// new Steps are a Batch's only when <paramref name="fromBatch"/>. Call under the lock.
+    /// </summary>
+    private void ChangeCurrent(ImageKey key, ImageSteps state, bool fromBatch = false)
+    {
+        _steps[key] = state with { FromBatch = fromBatch };
+        AnnounceSteps();
     }
 
     private ImageSteps StepsOf(ImageKey key) => _steps.GetValueOrDefault(key) ?? ImageSteps.New;
