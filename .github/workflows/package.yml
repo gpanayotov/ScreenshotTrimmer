@@ -124,3 +124,35 @@ jobs:
           path: ${{ env.ZIP }}
           if-no-files-found: error
           retention-days: 7
+
+      # The AppImage wraps the same executable. build/appimage.sh fetches the pinned appimagetool and runtime and
+      # checks their SHA-256. It writes into the workspace root, beside the zip.
+      - name: AppImage
+        if: runner.os == 'Linux'
+        run: |
+          build/appdir.test.sh
+          build/appimage.sh publish/${{ matrix.executable }} "$VERSION" .
+          echo "APPIMAGE=ScreenshotTrimmer-$VERSION-x86_64.AppImage" >> "$GITHUB_ENV"
+
+      # The runner has no FUSE, so the AppImage unpacks itself and runs from there, as it would on a desktop without it.
+      - name: Smoke test (AppImage)
+        if: runner.os == 'Linux'
+        run: |
+          test -x "$APPIMAGE"
+          ./"$APPIMAGE" --appimage-extract-and-run --smoke-test | tee smoke-appimage.txt
+          grep -F "ScreenshotTrimmer $VERSION" smoke-appimage.txt
+
+      - name: Launch check (AppImage)
+        if: runner.os == 'Linux'
+        run: |
+          code=0
+          timeout 8 xvfb-run --auto-servernum ./"$APPIMAGE" --appimage-extract-and-run || code=$?
+          if [ "$code" -ne 124 ]; then echo "The AppImage exited with $code within 8 seconds."; exit 1; fi
+
+      - if: runner.os == 'Linux'
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ env.APPIMAGE }}
+          path: ${{ env.APPIMAGE }}
+          if-no-files-found: error
+          retention-days: 7
