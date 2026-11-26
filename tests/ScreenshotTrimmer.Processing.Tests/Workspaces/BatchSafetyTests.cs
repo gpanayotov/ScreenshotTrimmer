@@ -1,7 +1,8 @@
 using ScreenshotTrimmer.Processing.Imaging;
 using ScreenshotTrimmer.Processing.Rendering;
-using ScreenshotTrimmer.Processing.Settings;
 using ScreenshotTrimmer.Processing.Workspaces;
+
+using static ScreenshotTrimmer.Processing.Tests.Workspaces.BatchTesting;
 
 namespace ScreenshotTrimmer.Processing.Tests.Workspaces;
 
@@ -14,33 +15,14 @@ public class BatchSafetyTests
 {
     private static readonly TimeSpan Timeout = TimeSpan.FromSeconds(30);
 
-    private static readonly UserSettings Remembered = new()
-    {
-        FrameLines = true, RoundedCorners = false, ShadowOn = true, ShadowSize = 1.5, ShadowOpacity = 0.5,
-    };
-
     private static readonly Steps HandMade = new() { Crop = Crop.Classic(new PixelRect(10, 10, 50, 50)) };
-
-    /// <summary>A light dialog over a dimmed application page, as a modal dialog screenshot looks.</summary>
-    private static RgbaImage DimmedDialog(PixelRect dialog)
-    {
-        var image = Synthetic.DimmedApplication(800, 500);
-        Synthetic.DrawDialog(image, dialog, 8);
-        return image;
-    }
 
     /// <summary>Writes a dimmed dialog screenshot, each name with its dialog in a different place, for each of <paramref name="names"/>.</summary>
     private static void WriteDialogs(TempFolder folder, params string[] names)
     {
         for (var i = 0; i < names.Length; i++)
-            EncodedImages.WritePng(folder.File(names[i]), DimmedDialog(new PixelRect(60 + 30 * i, 40 + 15 * i, 300 + 10 * i, 220)));
+            EncodedImages.WritePng(folder.File(names[i]), Synthetic.DialogOverDimmedApplication(new PixelRect(60 + 30 * i, 40 + 15 * i, 300 + 10 * i, 220)));
     }
-
-    private static WorkspaceImage Entry(Workspace workspace, string name) =>
-        workspace.Images.Single(i => Path.GetFileName(i.Path) == name);
-
-    private static IEnumerable<string> Names(IEnumerable<WorkspaceImage> images) =>
-        images.Select(image => Path.GetFileName(image.Path)!);
 
     /// <summary>Each listed image's name with its Steps and whether no Subject was found in it.</summary>
     private static string[] Outcome(Workspace workspace) =>
@@ -295,9 +277,4 @@ public class BatchSafetyTests
         return (batch, release);
     }
 
-    /// <summary>An <see cref="IProgress{T}"/> that reports on the Batch's own thread, before it goes on.</summary>
-    private sealed class SynchronousProgress(Action<BatchProgress> report) : IProgress<BatchProgress>
-    {
-        public void Report(BatchProgress value) => report(value);
-    }
 }
