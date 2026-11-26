@@ -89,6 +89,7 @@ public sealed partial class Workspace : IDisposable
             _lastRelistFailed = false;
             _removed = new HashSet<string>(FileNames.Comparer);
             _steps.Clear();
+            _backupSaves.Clear();
             _folderWatch.Reset();
             Relist(listing => listing.Selected is { } opened ? Find(opened.Path) : Images.FirstOrDefault());
         });

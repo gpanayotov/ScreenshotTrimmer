@@ -15,6 +15,7 @@
     <KeyBinding Gesture="Ctrl+O" Command="{Binding OpenFilesCommand}" />
     <KeyBinding Gesture="Ctrl+Shift+O" Command="{Binding OpenFolderCommand}" />
     <KeyBinding Gesture="Ctrl+S" Command="{Binding SaveCommand}" />
+    <KeyBinding Gesture="Ctrl+Shift+S" Command="{Binding SaveAllCommand}" />
     <!-- A key binding only sees a Delete that the focused control left unhandled, so text boxes keep theirs. -->
     <KeyBinding Gesture="Delete" Command="{Binding RemoveSelectedCommand}" />
   </Window.KeyBindings>
@@ -26,6 +27,7 @@
         <MenuItem Header="{loc:Tr OpenFolder}" InputGesture="Ctrl+Shift+O" Command="{Binding OpenFolderCommand}" />
         <Separator />
         <MenuItem Header="{loc:Tr SaveMenu}" InputGesture="Ctrl+S" Command="{Binding SaveCommand}" />
+        <MenuItem Header="{loc:Tr SaveAllMenu}" InputGesture="Ctrl+Shift+S" Command="{Binding SaveAllCommand}" />
         <Separator />
         <MenuItem x:Name="SettingsItem" Header="{loc:Tr SettingsMenu}" InputGesture="Ctrl+OemComma" />
         <Separator />
