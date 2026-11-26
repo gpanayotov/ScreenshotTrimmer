@@ -29,8 +29,9 @@ public sealed partial class Workspace
         RunBatch(progress, cancellation, Environment.ProcessorCount);
 
     /// <summary>
-    /// Runs one Batch over the images listed when it starts and returns what it did. Images are started in strip order,
-    /// up to <paramref name="parallelism"/> at a time. Each image that <see cref="BatchSelection"/> takes gets the
+    /// Runs one Batch over the images listed when it starts and returns what it did. It starts from the plan
+    /// <see cref="PlanBatch"/> would give, then goes through the images that plan takes in strip order, up to
+    /// <paramref name="parallelism"/> at a time. Each image that <see cref="BatchSelection"/> takes gets the
     /// Subject <see cref="SubjectDetection.Find"/> finds in its Original as one Step, built with the
     /// <see cref="FirstStep"/> rule from the settings at the start, so it is unsaved and undoable like a hand Auto crop;
     /// its Steps depend only on its pixels and those settings. An image with no Subject found gets no Step and is
@@ -41,7 +42,8 @@ public sealed partial class Workspace
     /// before it is read and when its result is applied: one that left the list or the disk is skipped as
     /// <see cref="BatchSkip.Gone"/>, one that gained Steps as <see cref="BatchSkip.HasSteps"/>. An image that cannot be
     /// read counts as <see cref="BatchSummary.Failed"/> and the rest go on. <paramref name="progress"/> hears after
-    /// each image done, on the thread that did it. Cancelling, or <see cref="Open"/> and <see cref="Dispose"/>, stop
+    /// each taken image done, on the thread that did it, out of the number the plan takes, which is the figure the
+    /// plan shows the user. Cancelling, or <see cref="Open"/> and <see cref="Dispose"/>, stop
     /// the Batch from starting more images and cancel detection in flight; the images already done keep their Steps
     /// and the summary is <see cref="BatchSummary.Cancelled"/>. Since those two wait for the Batch, they must not be
     /// called from <paramref name="progress"/> or a <see cref="Changed"/> handler on a Batch thread.
@@ -51,16 +53,19 @@ public sealed partial class Workspace
     {
         ArgumentOutOfRangeException.ThrowIfLessThan(parallelism, 1);
         BatchRun run;
+        List<(WorkspaceImage Image, bool HasSteps)> listed;
         lock (_lock)
         {
             ObjectDisposedException.ThrowIf(_disposed, this);
             if (_batch is not null)
                 throw new InvalidOperationException("A Batch is already running in this workspace.");
-            run = new BatchRun(Images.Select(image => image.Key).ToList(), _settings, cancellation);
+            listed = ListedWithSteps();
+            run = new BatchRun(_settings, cancellation);
             _batch = run;
         }
         try
         {
+            run.Start(Plan(listed, parallelism, run.Cancellation));
             var next = -1;
             var done = 0;
             var progressLock = new Lock();
@@ -71,7 +76,7 @@ public sealed partial class Workspace
                 {
                     var outcome = ProcessForBatch(run, run.Keys[index]);
                     run.Outcomes[index] = outcome;
-                    if (outcome.Kind == BatchOutcomeKind.NotDone)
+                    if (outcome.Kind == BatchOutcomeKind.Stopped)
                         continue;
                     lock (progressLock)
                         progress?.Report(new BatchProgress(++done, run.Keys.Count));
@@ -146,7 +151,7 @@ public sealed partial class Workspace
         lock (_lock)
         {
             if (run.IsCancelled)
-                return BatchOutcome.NotDone;
+                return BatchOutcome.Stopped;
             image = Find(key);
             if (image is null)
                 return BatchOutcome.Skipped(BatchSkip.Gone);
@@ -160,7 +165,7 @@ public sealed partial class Workspace
             if (BatchSelection.SkipReason(image, hasSteps, () => original = load()) is { } reason)
                 return BatchOutcome.Skipped(reason);
         }
-        catch (Exception e) when (e is IOException or InvalidDataException or UnauthorizedAccessException)
+        catch (Exception e) when (IsUnreadable(e))
         {
             return key.Path is { } path && !File.Exists(path)
                 ? BatchOutcome.Skipped(BatchSkip.Gone)
@@ -174,7 +179,7 @@ public sealed partial class Workspace
         }
         catch (OperationCanceledException) when (run.IsCancelled)
         {
-            return BatchOutcome.NotDone;
+            return BatchOutcome.Stopped;
         }
         var steps = subject is null
             ? null
@@ -193,7 +198,7 @@ public sealed partial class Workspace
         lock (_lock)
         {
             if (run.IsCancelled)
-                return BatchOutcome.NotDone;
+                return BatchOutcome.Stopped;
             if (Find(key) is not { } image)
                 return BatchOutcome.Skipped(BatchSkip.Gone);
             if (HasAnySteps(key))
@@ -228,13 +233,13 @@ public sealed partial class Workspace
         _noSubjectFound.UnionWith(keys);
     }
 
-    private enum BatchOutcomeKind { NotDone, Processed, NoSubjectFound, Skipped, Failed }
+    private enum BatchOutcomeKind { Stopped, Processed, NoSubjectFound, Skipped, Failed }
 
     /// <summary>What a Batch did with one image; <see cref="Image"/> is set for no Subject found and failed.</summary>
     private readonly record struct BatchOutcome(BatchOutcomeKind Kind, BatchSkip Reason = default, WorkspaceImage? Image = null)
     {
         /// <summary>The Batch stopped before it finished this image.</summary>
-        public static BatchOutcome NotDone => new(BatchOutcomeKind.NotDone);
+        public static BatchOutcome Stopped => new(BatchOutcomeKind.Stopped);
 
         public static BatchOutcome Processed => new(BatchOutcomeKind.Processed);
 
@@ -245,28 +250,41 @@ public sealed partial class Workspace
         public static BatchOutcome Failed(WorkspaceImage image) => new(BatchOutcomeKind.Failed, Image: image);
     }
 
-    /// <summary>One running Batch: the images and settings it started with, its cancellation, and each image's outcome.</summary>
-    private sealed class BatchRun(IReadOnlyList<ImageKey> keys, UserSettings settings, CancellationToken cancellation)
+    /// <summary>
+    /// One running Batch: the settings it started with, its cancellation, the images its plan takes, what the plan
+    /// skipped, and each taken image's outcome.
+    /// </summary>
+    private sealed class BatchRun(UserSettings settings, CancellationToken cancellation)
     {
         private readonly CancellationTokenSource _stop = CancellationTokenSource.CreateLinkedTokenSource(cancellation);
         private readonly TaskCompletionSource _finished = new(TaskCreationOptions.RunContinuationsAsynchronously);
+        private BatchPlan _plan = new();
 
-        public IReadOnlyList<ImageKey> Keys { get; } = keys;
+        /// <summary>The images the plan takes, in strip order; empty until <see cref="Start"/>.</summary>
+        public IReadOnlyList<ImageKey> Keys { get; private set; } = [];
 
         public UserSettings Settings { get; } = settings;
 
-        /// <summary>Each image's outcome, by its index in <see cref="Keys"/>; each worker writes only its own images'.</summary>
-        public BatchOutcome[] Outcomes { get; } = new BatchOutcome[keys.Count];
+        /// <summary>Each taken image's outcome, by its index in <see cref="Keys"/>; each worker writes only its own images'.</summary>
+        public BatchOutcome[] Outcomes { get; private set; } = [];
 
         public CancellationToken Cancellation => _stop.Token;
 
         public bool IsCancelled => _stop.IsCancellationRequested;
 
-        /// <summary>Cancels the Batch; call under the workspace's lock, which keeps the run from finishing meanwhile.</summary>
-        public void Cancel() => _stop.Cancel();
-
         /// <summary>Completes once the run is no longer the workspace's running Batch.</summary>
         public Task Finished => _finished.Task;
+
+        /// <summary>Fixes the images the run goes through to those <paramref name="plan"/> takes.</summary>
+        public void Start(BatchPlan plan)
+        {
+            _plan = plan;
+            Keys = plan.Images.Select(image => image.Key).ToList();
+            Outcomes = new BatchOutcome[Keys.Count];
+        }
+
+        /// <summary>Cancels the Batch; call under the workspace's lock, which keeps the run from finishing meanwhile.</summary>
+        public void Cancel() => _stop.Cancel();
 
         public void WaitUntilFinished() => _finished.Task.Wait();
 
@@ -277,16 +295,17 @@ public sealed partial class Workspace
             _finished.SetResult();
         }
 
-        /// <summary>The summary of the outcomes, with the listed images in strip order.</summary>
+        /// <summary>The summary of the plan's skips and the outcomes, with the listed images in strip order.</summary>
         public BatchSummary Summary() => new()
         {
             Processed = Outcomes.Count(outcome => outcome.Kind == BatchOutcomeKind.Processed),
             NoSubjectFound = ImagesWith(BatchOutcomeKind.NoSubjectFound),
             Failed = ImagesWith(BatchOutcomeKind.Failed),
-            Skipped = Outcomes.Where(outcome => outcome.Kind == BatchOutcomeKind.Skipped)
-                .GroupBy(outcome => outcome.Reason)
-                .ToDictionary(group => group.Key, group => group.Count()),
-            Cancelled = Outcomes.Any(outcome => outcome.Kind == BatchOutcomeKind.NotDone),
+            Skipped = _plan.Skipped.Select(skip => (Reason: skip.Key, Count: skip.Value))
+                .Concat(Outcomes.Where(outcome => outcome.Kind == BatchOutcomeKind.Skipped).Select(outcome => (outcome.Reason, Count: 1)))
+                .GroupBy(skip => skip.Reason)
+                .ToDictionary(group => group.Key, group => group.Sum(skip => skip.Count)),
+            Cancelled = Outcomes.Any(outcome => outcome.Kind == BatchOutcomeKind.Stopped),
         };
 
         private List<WorkspaceImage> ImagesWith(BatchOutcomeKind kind) =>

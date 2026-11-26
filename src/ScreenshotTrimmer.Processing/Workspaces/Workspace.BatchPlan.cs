@@ -2,7 +2,7 @@ using ScreenshotTrimmer.Processing.Rendering;
 
 namespace ScreenshotTrimmer.Processing.Workspaces;
 
-// Planning a Batch: what one started now would process and skip, by the same rules as RunBatch.
+// Planning a Batch: what one started now would process and skip; RunBatch starts from the same plan.
 public sealed partial class Workspace
 {
     /// <summary>
@@ -22,19 +22,34 @@ public sealed partial class Workspace
         lock (_lock)
         {
             ObjectDisposedException.ThrowIf(_disposed, this);
-            images = Images.Select(image => (image, HasAnySteps(image.Key))).ToList();
+            images = ListedWithSteps();
         }
+        return Plan(images, Environment.ProcessorCount, CancellationToken.None);
+    }
 
-        var taken = new List<WorkspaceImage>();
-        var skipped = new Dictionary<BatchSkip, int>();
-        foreach (var (image, hasSteps) in images)
+    /// <summary>Each listed image with whether it has Steps, saved or not, in strip order; call under the lock.</summary>
+    private List<(WorkspaceImage Image, bool HasSteps)> ListedWithSteps() =>
+        Images.Select(image => (image, HasAnySteps(image.Key))).ToList();
+
+    /// <summary>
+    /// The plan for <paramref name="images"/>, checking up to <paramref name="parallelism"/> of them at a time; call
+    /// outside the lock. Once <paramref name="cancellation"/> is cancelled, the images not checked yet are taken
+    /// unchecked, for the Batch to find it was cancelled.
+    /// </summary>
+    private BatchPlan Plan(
+        IReadOnlyList<(WorkspaceImage Image, bool HasSteps)> images, int parallelism, CancellationToken cancellation)
+    {
+        var reasons = new BatchSkip?[images.Count];
+        Parallel.For(0, images.Count, new ParallelOptions { MaxDegreeOfParallelism = parallelism }, i =>
         {
-            if (SkipReasonForPlan(image, hasSteps) is { } reason)
-                skipped[reason] = skipped.GetValueOrDefault(reason) + 1;
-            else
-                taken.Add(image);
-        }
-        return new BatchPlan { Images = taken, Skipped = skipped };
+            if (!cancellation.IsCancellationRequested)
+                reasons[i] = SkipReasonForPlan(images[i].Image, images[i].HasSteps);
+        });
+        return new BatchPlan
+        {
+            Images = images.Where((_, i) => reasons[i] is null).Select(image => image.Image).ToList(),
+            Skipped = reasons.OfType<BatchSkip>().GroupBy(reason => reason).ToDictionary(group => group.Key, group => group.Count()),
+        };
     }
 
     /// <summary>
@@ -60,9 +75,18 @@ public sealed partial class Workspace
             }
             return reason;
         }
-        catch (Exception e) when (e is IOException or InvalidDataException or UnauthorizedAccessException)
+        catch (Exception e) when (IsUnreadable(e))
         {
             return null;
         }
+        catch (Exception e) when (e is ArgumentException or ObjectDisposedException)
+        {
+            // The image left the list, or the workspace closed, while it was checked: a Batch finds that out itself.
+            return null;
+        }
     }
+
+    /// <summary>Whether <paramref name="e"/> says an Original could not be read, rather than that something is wrong.</summary>
+    private static bool IsUnreadable(Exception e) =>
+        e is IOException or InvalidDataException or UnauthorizedAccessException;
 }

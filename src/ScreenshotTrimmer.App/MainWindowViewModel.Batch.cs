@@ -51,10 +51,10 @@ public sealed partial class MainWindowViewModel
     public RelayCommand CancelBatchCommand => _cancelBatchCommand ??= new RelayCommand(
         () => _batchCancellation?.Cancel(), () => IsBatchRunning);
 
-    /// <summary>How many listed images the running Batch has done.</summary>
+    /// <summary>How many of the images it processes the running Batch has done.</summary>
     public int BatchDone => _batchProgress.Done;
 
-    /// <summary>How many listed images the running Batch goes through.</summary>
+    /// <summary>How many images the running Batch processes; the images it skips from the start are not counted.</summary>
     public int BatchTotal => _batchProgress.Total;
 
     /// <summary>The running Batch's progress as "n of m".</summary>
@@ -75,9 +75,10 @@ public sealed partial class MainWindowViewModel
             return;
         _isStartingBatch = true;
         BatchCommand.NotifyCanExecuteChanged();
+        BatchPlan plan;
         try
         {
-            var plan = await Task.Run(_workspace.PlanBatch);
+            plan = await Task.Run(_workspace.PlanBatch);
             ShowBatchPlan(plan);
             if (plan.Images.Count == 0 || (plan.Skipped.Count > 0 && !await _questions.AskToStartBatchAsync(plan)))
                 return;
@@ -95,7 +96,8 @@ public sealed partial class MainWindowViewModel
         IsBatchRunning = true;
         var stopped = new TaskCompletionSource();
         _batchStopped = stopped;
-        ShowBatchProgress(new BatchProgress(0, _workspace.Images.Count));
+        // The Batch counts its progress out of the images its own plan takes, as the confirmation did.
+        ShowBatchProgress(new BatchProgress(0, plan.Images.Count));
         var progress = new Progress<BatchProgress>(ShowBatchProgress);
         using var cancellation = new CancellationTokenSource();
         _batchCancellation = cancellation;

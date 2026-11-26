@@ -22,5 +22,8 @@ public sealed record BatchSummary
     public int SkippedFor(BatchSkip reason) => Skipped.GetValueOrDefault(reason);
 }
 
-/// <summary>How far a running <b>Batch</b> has got: <paramref name="Done"/> of the <paramref name="Total"/> listed images.</summary>
+/// <summary>
+/// How far a running <b>Batch</b> has got: <paramref name="Done"/> of the <paramref name="Total"/> images it processes,
+/// which leaves out the images its plan skips.
+/// </summary>
 public readonly record struct BatchProgress(int Done, int Total);

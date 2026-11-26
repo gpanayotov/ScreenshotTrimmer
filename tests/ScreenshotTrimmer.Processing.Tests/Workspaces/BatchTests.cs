@@ -132,7 +132,7 @@ public class BatchTests
     }
 
     [Fact]
-    public void Progress_is_reported_after_each_listed_image()
+    public void Progress_is_reported_after_each_image_the_Batch_processes()
     {
         using var folder = new TempFolder();
         EncodedImages.WritePng(folder.File("a.png"), DimmedDialog(new PixelRect(100, 80, 400, 250)));
@@ -143,6 +143,28 @@ public class BatchTests
 
         workspace.RunBatch(new SynchronousProgress(reports.Add), CancellationToken.None);
 
+        Assert.Equal([new BatchProgress(1, 2), new BatchProgress(2, 2)], reports);
+    }
+
+    [Fact]
+    public void Progress_counts_only_the_images_the_Batch_processes_as_its_plan_does()
+    {
+        using var folder = new TempFolder();
+        var dialog = DimmedDialog(new PixelRect(100, 80, 400, 250));
+        EncodedImages.WritePng(folder.File("a.png"), dialog);
+        EncodedImages.WritePng(folder.File("b-edited.png"), dialog);
+        EncodedImages.WritePng(folder.File("c.png"), Synthetic.DimmedApplication(800, 500));
+        EncodedImages.WritePng(folder.File("d-processed.png"),
+            Renderer.Render(dialog, new Steps { Crop = Crop.Classic(new PixelRect(100, 80, 400, 250)), Shadow = new Shadow() }).Result);
+        using var workspace = new Workspace(Remembered);
+        workspace.Open([folder.Path]);
+        workspace.SetSteps(Entry(workspace, "b-edited.png"), new Steps { Crop = Crop.Classic(new PixelRect(10, 10, 50, 50)) });
+        var planned = workspace.PlanBatch().Images.Count;
+        var reports = new List<BatchProgress>();
+
+        workspace.RunBatch(new SynchronousProgress(reports.Add), CancellationToken.None);
+
+        Assert.Equal(2, planned);
         Assert.Equal([new BatchProgress(1, 2), new BatchProgress(2, 2)], reports);
     }
 
