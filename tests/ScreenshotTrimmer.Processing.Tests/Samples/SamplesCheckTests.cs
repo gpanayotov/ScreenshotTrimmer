@@ -58,4 +58,61 @@ public sealed class SamplesCheckTests : IDisposable
         Assert.Contains("Light: 3 samples: 1 pass, 1 fail, 1 new, 0 changed", result.Report);
         Assert.Contains("Dark: 2 samples: 1 pass, 1 fail, 0 new, 0 changed", result.Report);
     }
+
+    [Fact]
+    public void Regenerating_keeps_hand_set_answers_tolerances_and_dark_flags_and_fills_in_only_new_samples()
+    {
+        AddDialogSample("hand-entered.png");
+        AddFeaturelessSample("cropped.png");
+        AddDialogSample("flagged.png");
+        Run(Approving.NewSamples);
+        var answers = ReadAnswers();
+        var handEntered = answers["hand-entered.png"] with { Subject = new Subject(new PixelRect(1, 2, 3, 4)) };
+        var cropped = ApprovedAnswer.AlreadyCroppedAnswer(answers["cropped.png"].Fingerprint);
+        var flagged = answers["flagged.png"] with { Tolerance = 1, Dark = true };
+        WriteAnswers(new() { ["hand-entered.png"] = handEntered, ["cropped.png"] = cropped, ["flagged.png"] = flagged });
+        AddDialogSample("added.png");
+
+        Run(Approving.NewSamples);
+
+        var regenerated = ReadAnswers();
+        Assert.Equal(handEntered, regenerated["hand-entered.png"]);
+        Assert.Equal(cropped, regenerated["cropped.png"]);
+        Assert.Equal(flagged, regenerated["flagged.png"]);
+        Assert.Equal(new Subject(DialogBounds), regenerated["added.png"].Subject);
+        Assert.Equal(4, regenerated.Count);
+    }
+
+    [Fact]
+    public void Regenerating_everything_takes_detections_answers_and_keeps_only_the_dark_flags()
+    {
+        AddDialogSample("dialog.png");
+        AddFeaturelessSample("empty.png");
+        Run(Approving.NewSamples);
+        var answers = ReadAnswers();
+        WriteAnswers(new()
+        {
+            ["dialog.png"] = answers["dialog.png"] with { Subject = new Subject(new PixelRect(1, 2, 3, 4)), Tolerance = 1, Dark = true },
+            ["empty.png"] = ApprovedAnswer.AlreadyCroppedAnswer(answers["empty.png"].Fingerprint),
+            ["gone.png"] = new ApprovedAnswer("ffff", null),
+        });
+
+        Run(Approving.Everything);
+
+        var regenerated = ReadAnswers();
+        Assert.Equal(answers["dialog.png"] with { Dark = true }, regenerated["dialog.png"]);
+        Assert.Equal(answers["empty.png"], regenerated["empty.png"]);
+        Assert.Equal(2, regenerated.Count);
+    }
+
+    [Fact]
+    public void Without_approving_the_answers_file_is_left_as_it_is()
+    {
+        AddDialogSample("dialog.png");
+        File.WriteAllText(AnswersFile, "# hand-written\n");
+
+        Run();
+
+        Assert.Equal("# hand-written\n", File.ReadAllText(AnswersFile));
+    }
 }

@@ -87,6 +87,9 @@ internal static class SamplesCheck
     private static Dictionary<string, ApprovedAnswer> Regenerate(
         Dictionary<string, ApprovedAnswer> approved, List<Outcome> outcomes, Approving approving)
     {
+        if (approving == Approving.Everything)
+            return outcomes.ToDictionary(o => o.Name, o => new ApprovedAnswer(o.Fingerprint, o.Found) { Dark = o.Dark }, StringComparer.Ordinal);
+
         var answers = new Dictionary<string, ApprovedAnswer>(approved, StringComparer.Ordinal);
         foreach (var o in outcomes.Where(o => o.Approved is null))
             answers[o.Name] = new ApprovedAnswer(o.Fingerprint, o.Found);
