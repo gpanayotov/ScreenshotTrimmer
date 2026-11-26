@@ -83,6 +83,15 @@
         <MenuItem Header="{loc:Tr RemoveFromList}" InputGesture="Delete" Command="{Binding RemoveSelectedCommand}" />
         <Separator />
         <MenuItem Header="{loc:Tr AutoCropMenu}" InputGesture="Ctrl+Shift+A" Command="{Binding AutoCropCommand}" />
+        <Separator />
+        <!-- The crop tool: what a newly drawn rectangle does. -->
+        <MenuItem Header="{loc:Tr ClassicCropTool}" ToggleType="Radio" GroupName="CropTool"
+                  Command="{Binding ChooseCropToolCommand}" CommandParameter="{x:Static app:CropTool.Classic}"
+                  IsChecked="{Binding CropTool, Mode=OneWay, Converter={x:Static mvvm:IsValueConverter.Instance}, ConverterParameter={x:Static app:CropTool.Classic}}" />
+        <MenuItem Header="{loc:Tr AutoCropInRegionTool}" ToggleType="Radio" GroupName="CropTool"
+                  Command="{Binding ChooseCropToolCommand}" CommandParameter="{x:Static app:CropTool.AutoCropInRegion}"
+                  IsChecked="{Binding CropTool, Mode=OneWay, Converter={x:Static mvvm:IsValueConverter.Instance}, ConverterParameter={x:Static app:CropTool.AutoCropInRegion}}" />
+        <Separator />
         <MenuItem Header="{loc:Tr ClearCrop}" Command="{Binding ClearCropCommand}" />
       </MenuItem>
     </Menu>
@@ -103,6 +112,12 @@
         <Separator Width="1" Height="20" Margin="6,0" Background="{DynamicResource SystemControlForegroundBaseLowBrush}" />
         <Button Content="{loc:Tr ToolbarAutoCrop}" ToolTip.Tip="{loc:Tr ToolbarAutoCropTip}"
                 Command="{Binding AutoCropCommand}" />
+        <RadioButton GroupName="ToolbarCropTool" Content="{loc:Tr ToolbarClassicCrop}"
+                     ToolTip.Tip="{loc:Tr ToolbarClassicCropTip}"
+                     IsChecked="{Binding CropTool, Mode=TwoWay, Converter={x:Static mvvm:IsValueConverter.Instance}, ConverterParameter={x:Static app:CropTool.Classic}}" />
+        <RadioButton GroupName="ToolbarCropTool" Content="{loc:Tr ToolbarAutoCropInRegion}"
+                     ToolTip.Tip="{loc:Tr ToolbarAutoCropInRegionTip}"
+                     IsChecked="{Binding CropTool, Mode=TwoWay, Converter={x:Static mvvm:IsValueConverter.Instance}, ConverterParameter={x:Static app:CropTool.AutoCropInRegion}}" />
         <Separator Width="1" Height="20" Margin="6,0" Background="{DynamicResource SystemControlForegroundBaseLowBrush}" />
         <ToggleButton Content="{loc:Tr ToolbarShowResults}" ToolTip.Tip="{loc:Tr ToolbarShowResultsTip}"
                       IsChecked="{Binding ShowResults, Mode=TwoWay}" />
@@ -210,7 +225,8 @@
       <Panel Grid.Column="2">
         <Grid ColumnDefinitions="*,Auto" RowDefinitions="*,Auto">
           <controls:ImageViewer x:Name="Viewer" Source="{Binding ViewerImage}" BackgroundKind="{Binding Background}"
-                                Crop="{Binding Crop, Mode=TwoWay}" IsCropShown="{Binding !ShowsResult}" />
+                                Crop="{Binding Crop, Mode=TwoWay}" IsCropShown="{Binding !ShowsResult}"
+                                DrawsRegion="{Binding CropTool, Converter={x:Static mvvm:IsValueConverter.Instance}, ConverterParameter={x:Static app:CropTool.AutoCropInRegion}}" />
           <ScrollBar Grid.Column="1" Orientation="Vertical" Visibility="Auto" AllowAutoHide="False"
                      Maximum="{Binding #Viewer.VerticalScrollMax}" ViewportSize="{Binding #Viewer.ViewHeight}"
                      LargeChange="{Binding #Viewer.ViewHeight}" SmallChange="48"

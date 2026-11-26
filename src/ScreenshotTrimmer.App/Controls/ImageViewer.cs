@@ -30,7 +30,8 @@ public enum ViewerBackground
 /// Panning uses the middle button, the left button while <see cref="IsSpaceHeld"/>, Shift with the wheel and the
 /// scroll properties. A plain left-drag draws the crop rectangle, shown with the image outside it dimmed, or, started
 /// on one of its handles or inside it, resizes or moves it. The edited crop is set as <see cref="Crop"/> when the
-/// button is released, so one drag is one change; Escape during a drag restores it as it was. The handle last dragged
+/// button is released, so one drag is one change; Escape during a drag restores it as it was. While
+/// <see cref="DrawsRegion"/> is on, a newly drawn rectangle is raised as <see cref="RegionDrawn"/> instead. The handle last dragged
 /// stays selected, and while the viewer has focus the arrow keys nudge it by one image pixel, each nudge setting
 /// <see cref="Crop"/>. The Loupe shows the pixels around the held handle while dragging and nudging. The wheel zooms
 /// around the cursor. The popup rectangles of a crop with a <b>Popup overhang</b> are outlined and left undimmed, until
@@ -59,6 +60,9 @@ public sealed partial class ImageViewer : Control
 
     public static readonly StyledProperty<bool> IsCropShownProperty =
         AvaloniaProperty.Register<ImageViewer, bool>(nameof(IsCropShown), defaultValue: true);
+
+    public static readonly StyledProperty<bool> DrawsRegionProperty =
+        AvaloniaProperty.Register<ImageViewer, bool>(nameof(DrawsRegion));
 
     public static readonly StyledProperty<ViewerBackground> BackgroundKindProperty =
         AvaloniaProperty.Register<ImageViewer, ViewerBackground>(nameof(BackgroundKind));
@@ -161,6 +165,22 @@ public sealed partial class ImageViewer : Control
         get => GetValue(IsCropShownProperty);
         set => SetValue(IsCropShownProperty, value);
     }
+
+    /// <summary>
+    /// Whether a newly drawn rectangle is a region raised as <see cref="RegionDrawn"/> rather than set as
+    /// <see cref="Crop"/>. Drawing it and adjusting an existing crop's handles work the same either way.
+    /// </summary>
+    public bool DrawsRegion
+    {
+        get => GetValue(DrawsRegionProperty);
+        set => SetValue(DrawsRegionProperty, value);
+    }
+
+    /// <summary>
+    /// Raised with the rectangle drawn, in image pixels, when a drag that draws a new rectangle ends while
+    /// <see cref="DrawsRegion"/> is on. <see cref="Crop"/> is left as it was.
+    /// </summary>
+    public event EventHandler<ImageRect>? RegionDrawn;
 
     /// <summary>The crop rectangle shown, in image pixels: the one a drag in progress has made so far, else the crop's.</summary>
     public ImageRect? ShownCrop
@@ -398,7 +418,10 @@ public sealed partial class ImageViewer : Control
             e.Pointer.Capture(null);
             // The handle dragged stays selected for the arrow keys; a newly drawn rectangle has none.
             _selected = drew || edited.Rectangle is null ? CropHandle.None : handle;
-            SetCrop(edited.Crop);
+            if (drew && DrawsRegion && edited.Rectangle is { } region)
+                RegionDrawn?.Invoke(this, region);
+            else
+                SetCrop(edited.Crop);
             ShowHoverCursor(e);
             return;
         }
