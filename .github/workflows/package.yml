@@ -1,0 +1,124 @@
+name: Package
+
+# Builds the downloads and proves each one works on its own system. CI calls it on every push and pull request;
+# the release workflow calls it with the tag's version.
+on:
+  workflow_call:
+    inputs:
+      version:
+        description: The version to embed and name the files with, such as 1.2.3; empty for the commit's development version.
+        type: string
+        default: ''
+    outputs:
+      version:
+        description: The version the files were built with.
+        value: ${{ jobs.version.outputs.version }}
+
+jobs:
+  version:
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.version.outputs.version }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Test the version rule
+        run: build/version.test.sh
+      - name: Choose the version
+        id: version
+        env:
+          GIVEN: ${{ inputs.version }}
+        run: |
+          version="${GIVEN:-$(build/version.sh "$GITHUB_SHA")}"
+          echo "Version: $version"
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+
+  package:
+    needs: version
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - rid: win-x64
+            os: windows-latest
+            executable: ScreenshotTrimmer.exe
+          - rid: linux-x64
+            os: ubuntu-latest
+            executable: ScreenshotTrimmer
+    runs-on: ${{ matrix.os }}
+    env:
+      VERSION: ${{ needs.version.outputs.version }}
+      ZIP: ScreenshotTrimmer-${{ needs.version.outputs.version }}-${{ matrix.rid }}.zip
+    defaults:
+      run:
+        shell: bash # with pipefail, unlike the default shell
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 10.0.x
+
+      # Self-contained single file with the native libraries (SkiaSharp, HarfBuzz) inside, extracted on first run.
+      # No trimming and no native AOT: Avalonia's use of reflection makes them risky.
+      - name: Publish
+        run: >
+          dotnet publish src/ScreenshotTrimmer.App/ScreenshotTrimmer.App.csproj
+          --configuration Release --runtime ${{ matrix.rid }} --self-contained
+          -p:PublishSingleFile=true -p:IncludeNativeLibrariesForSelfExtract=true
+          -p:EnableCompressionInSingleFile=true -p:DebugType=none
+          -p:InformationalVersion="$VERSION" --output publish
+
+      - name: Zip (Windows)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: Compress-Archive -Path publish/${{ matrix.executable }}, LICENSE -DestinationPath $env:ZIP
+
+      - name: Zip (Linux)
+        if: runner.os == 'Linux'
+        run: |
+          cp LICENSE publish/
+          (cd publish && zip -X "../$ZIP" ${{ matrix.executable }} LICENSE)
+
+      # The checks below run the executable taken from the zip, as a user would.
+      - name: Smoke test (Windows)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          Expand-Archive -Path $env:ZIP -DestinationPath unzipped
+          $p = Start-Process -FilePath unzipped/${{ matrix.executable }} -ArgumentList '--smoke-test' `
+            -NoNewWindow -Wait -PassThru -RedirectStandardOutput smoke.txt
+          Get-Content smoke.txt
+          if ($p.ExitCode -ne 0) { throw "The smoke test exited with $($p.ExitCode)." }
+          if (-not (Select-String -Path smoke.txt -SimpleMatch "ScreenshotTrimmer $env:VERSION")) { throw "The smoke test did not print version $env:VERSION." }
+
+      - name: Smoke test (Linux)
+        if: runner.os == 'Linux'
+        run: |
+          unzip "$ZIP" -d unzipped
+          test -x unzipped/${{ matrix.executable }}
+          unzipped/${{ matrix.executable }} --smoke-test | tee smoke.txt
+          grep -F "ScreenshotTrimmer $VERSION" smoke.txt
+
+      - name: Launch check (Windows)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          $p = Start-Process -FilePath unzipped/${{ matrix.executable }} -PassThru
+          Start-Sleep -Seconds 8
+          if ($p.HasExited) { throw "The app exited with $($p.ExitCode) within 8 seconds." }
+          Stop-Process -Id $p.Id -Force
+
+      - name: Launch check (Linux)
+        if: runner.os == 'Linux'
+        run: |
+          command -v xvfb-run || { sudo apt-get update && sudo apt-get install -y xvfb; }
+          # timeout exits with 124 only when the app was still running when the time ran out.
+          code=0
+          timeout 8 xvfb-run --auto-servernum unzipped/${{ matrix.executable }} || code=$?
+          if [ "$code" -ne 124 ]; then echo "The app exited with $code within 8 seconds."; exit 1; fi
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ${{ env.ZIP }}
+          path: ${{ env.ZIP }}
+          if-no-files-found: error
+          retention-days: 7
