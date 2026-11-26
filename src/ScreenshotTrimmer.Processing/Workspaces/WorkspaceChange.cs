@@ -16,4 +16,10 @@ public sealed record WorkspaceChange
     /// the user can be told why their images left the list.
     /// </summary>
     public IReadOnlyList<string> UnavailableFolders { get; init; } = [];
+
+    /// <summary>
+    /// The paths of images with unsaved Steps that left the list with this update because their file was deleted or
+    /// moved away on disk. Their Steps are discarded, so the user can be told which work is gone and why.
+    /// </summary>
+    public IReadOnlyList<string> DroppedWithUnsavedSteps { get; init; } = [];
 }

@@ -100,4 +100,11 @@
   <data name="SaveFailureAccessDenied" xml:space="preserve"><value>there is no permission to write {0}.</value></data>
   <data name="SaveAllMenu" xml:space="preserve"><value>Save _all</value></data>
   <data name="SavedAll" xml:space="preserve"><value>Saved {0} of {1} Results.</value></data>
+  <data name="UnsavedTitle" xml:space="preserve"><value>• {0}</value></data>
+  <data name="LeaveTitle" xml:space="preserve"><value>Unsaved changes</value></data>
+  <data name="LeaveQuestion" xml:space="preserve"><value>Some images have unsaved changes. Save them before continuing?</value></data>
+  <data name="SaveAllAnswer" xml:space="preserve"><value>Save all</value></data>
+  <data name="DiscardAnswer" xml:space="preserve"><value>Discard</value></data>
+  <data name="DiscardQuestion" xml:space="preserve"><value>{0} has unsaved changes. Remove it from the list and discard them?</value></data>
+  <data name="UnsavedDropped" xml:space="preserve"><value>These images were deleted or moved away on disk, and their unsaved changes were discarded: {0}</value></data>
 </root>

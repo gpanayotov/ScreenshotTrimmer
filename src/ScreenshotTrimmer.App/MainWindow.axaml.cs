@@ -13,10 +13,11 @@ using ScreenshotTrimmer.Processing.Workspaces;
 
 namespace ScreenshotTrimmer.App;
 
-public partial class MainWindow : Window, IPathPicker
+public partial class MainWindow : Window, IPathPicker, IQuestions
 {
     private MainWindowViewModel? _viewModel;
     private readonly Dictionary<Control, StripEntry> _shownEntries = [];
+    private bool _mayClose;
 
     public MainWindow()
     {
@@ -64,11 +65,53 @@ public partial class MainWindow : Window, IPathPicker
     /// </summary>
     public void Attach(Workspace workspace, SettingsSession settings)
     {
-        _viewModel = new MainWindowViewModel(workspace, this, settings);
+        _viewModel = new MainWindowViewModel(workspace, this, this, settings);
         _viewModel.PropertyChanged += OnViewModelPropertyChanged;
         DataContext = _viewModel;
+        Closing += OnClosing;
         Closed += (_, _) => _viewModel.Dispose();
     }
+
+    /// <summary>
+    /// Keeps the window open while it asks about unsaved work, then closes it once the user has discarded the work or
+    /// saved all of it.
+    /// </summary>
+    private async void OnClosing(object? sender, WindowClosingEventArgs e)
+    {
+        if (_mayClose || _viewModel is null || !_viewModel.HasUnsavedWork)
+            return;
+        e.Cancel = true;
+        try
+        {
+            if (!await _viewModel.ConfirmLeavingAsync())
+                return;
+            _mayClose = true;
+            Close();
+        }
+        catch (Exception failure)
+        {
+            _viewModel.ReportFailure(failure);
+        }
+    }
+
+    public Task<LeaveAnswer> AskToLeaveAsync() =>
+        new QuestionWindow<LeaveAnswer>(
+            Localizer.Instance["LeaveTitle"],
+            Localizer.Instance["LeaveQuestion"],
+            [
+                (Localizer.Instance["SaveAllAnswer"], LeaveAnswer.SaveAll),
+                (Localizer.Instance["DiscardAnswer"], LeaveAnswer.Discard),
+                (Localizer.Instance["Cancel"], LeaveAnswer.Cancel),
+            ]).AskAsync(this);
+
+    public Task<bool> AskToDiscardAsync(string name) =>
+        new QuestionWindow<bool>(
+            Localizer.Instance["LeaveTitle"],
+            Localizer.Instance.Format("DiscardQuestion", name),
+            [
+                (Localizer.Instance["DiscardAnswer"], true),
+                (Localizer.Instance["Cancel"], false),
+            ]).AskAsync(this);
 
     /// <summary>Opens the paths given on the command line, relative to the current folder, like any other open.</summary>
     public void OpenCommandLine(IReadOnlyList<string> args)
@@ -141,7 +184,7 @@ public partial class MainWindow : Window, IPathPicker
         // Dropped folders come through as storage items too.
         var paths = LocalPaths(e.DataTransfer.TryGetFiles() ?? []);
         if (paths.Count > 0)
-            _viewModel?.Open(paths);
+            _viewModel?.OpenAfterAsking(paths);
         e.Handled = true;
     }
 
