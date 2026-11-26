@@ -24,7 +24,7 @@ public class RemovingTests
     }
 
     private static string[] Names(IEnumerable<WorkspaceImage> images) =>
-        images.Select(i => Path.GetFileName(i.Path)).ToArray();
+        images.Select(i => Path.GetFileName(i.Path!)).ToArray();
 
     private static string? SelectedName(Workspace workspace) =>
         workspace.Selected is { } selected ? Path.GetFileName(selected.Path) : null;

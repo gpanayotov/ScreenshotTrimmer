@@ -13,7 +13,7 @@ public class ResultsTests
     }
 
     private static string[] Names(Workspace workspace) =>
-        workspace.Images.Select(i => Path.GetFileName(i.Path)).ToArray();
+        workspace.Images.Select(i => Path.GetFileName(i.Path!)).ToArray();
 
     private static WorkspaceImage Entry(Workspace workspace, string name) =>
         workspace.Images.Single(i => Path.GetFileName(i.Path) == name);

@@ -6,7 +6,7 @@ namespace ScreenshotTrimmer.Processing.Workspaces;
 // Each image's pending Steps and the Steps at its last successful save.
 public sealed partial class Workspace
 {
-    /// <summary>The images with Steps, by path; an image missing here has <c>Steps.None</c> and was never saved.</summary>
+    /// <summary>The images with Steps, by <see cref="KeyOf">key</see>; an image missing here has <c>Steps.None</c> and was never saved.</summary>
     private readonly Dictionary<string, ImageSteps> _steps = new(FileNames.Comparer);
 
     /// <summary><paramref name="image"/>'s current Steps; <c>Steps.None</c> for an image with none.</summary>
@@ -18,7 +18,7 @@ public sealed partial class Workspace
         {
             ObjectDisposedException.ThrowIf(_disposed, this);
             RequireListed(image);
-            return StepsOf(image.Path).Current;
+            return StepsOf(KeyOf(image)).Current;
         }
     }
 
@@ -34,17 +34,17 @@ public sealed partial class Workspace
         Update(() =>
         {
             RequireListed(image);
-            var state = StepsOf(image.Path);
+            var state = StepsOf(KeyOf(image));
             if (state.Current == steps)
                 return;
-            _steps[image.Path] = state with { Current = steps };
+            _steps[KeyOf(image)] = state with { Current = steps };
             RefreshUnsavedMarkers();
         });
     }
 
     private ImageSteps StepsOf(string path) => _steps.GetValueOrDefault(path) ?? ImageSteps.New;
 
-    private bool HasUnsavedSteps(string path) => StepsOf(path) is var state && state.Current != state.Saved;
+    private bool HasUnsavedSteps(string key) => StepsOf(key) is var state && state.Current != state.Saved;
 
     /// <summary>
     /// Brings every listed entry's <see cref="WorkspaceImage.HasUnsavedSteps"/> up to date and queues a change when one
@@ -52,11 +52,13 @@ public sealed partial class Workspace
     /// </summary>
     private void RefreshUnsavedMarkers()
     {
-        var images = Images.Select(image => image with { HasUnsavedSteps = HasUnsavedSteps(image.Path) }).ToList();
+        var images = Images
+            .Select(image => image with { HasUnsavedSteps = image.IsPasted || HasUnsavedSteps(KeyOf(image)) })
+            .ToList();
         if (images.SequenceEqual(Images))
             return;
         Images = images;
-        Selected = Selected is null ? null : Find(Selected.Path);
+        Selected = Selected is null ? null : Find(KeyOf(Selected));
         QueueChange();
     }
 

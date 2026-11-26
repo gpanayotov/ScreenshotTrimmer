@@ -65,7 +65,7 @@ public sealed partial class Workspace : IDisposable
     /// <summary>
     /// Replaces the list with the images for <paramref name="paths"/>: one file lists its whole folder with that file
     /// selected; a folder or several paths list their images with the first selected. Removed entries are listed
-    /// again, and every image starts with no Steps. Paths that exist neither as a file nor as a folder are skipped and returned, so the caller can tell the
+    /// again, Pasted images leave the list, and every image starts with no Steps. Paths that exist neither as a file nor as a folder are skipped and returned, so the caller can tell the
     /// user.
     /// </summary>
     public IReadOnlyList<string> Open(IReadOnlyList<string> paths)
@@ -90,6 +90,7 @@ public sealed partial class Workspace : IDisposable
             _removed = new HashSet<string>(FileNames.Comparer);
             _steps.Clear();
             _backupSaves.Clear();
+            ForgetPasted();
             _folderWatch.Reset();
             Relist(listing => listing.Selected is { } opened ? Find(opened.Path) : Images.FirstOrDefault());
         });
@@ -109,7 +110,7 @@ public sealed partial class Workspace : IDisposable
                 return;
             _showResults = value;
             var selected = Selected;
-            Relist(_ => (selected is null ? null : Find(selected.Path))
+            Relist(_ => (selected is null ? null : Find(KeyOf(selected)))
                 ?? (selected is { IsResult: true } ? OriginalOf(selected) : null)
                 ?? Images.FirstOrDefault());
         });
@@ -130,14 +131,14 @@ public sealed partial class Workspace : IDisposable
                 return;
             var selectedIndex = SelectedIndex;
             var selected = Selected;
-            Relist(_ => (selected is null ? null : Find(selected.Path))
+            Relist(_ => (selected is null ? null : Find(KeyOf(selected)))
                 ?? (Images.Count == 0 ? null : Images[Math.Clamp(selectedIndex, 0, Images.Count - 1)]));
         });
     }
 
     /// <summary>
     /// Hides <paramref name="image"/>, which must be one of <see cref="Images"/>, for as long as this list is open; its
-    /// file is not touched.
+    /// file is not touched. A Pasted image that has not been saved is dropped with its pixels.
     /// </summary>
     public void Remove(WorkspaceImage image)
     {
@@ -145,9 +146,12 @@ public sealed partial class Workspace : IDisposable
         Update(() =>
         {
             RequireListed(image);
-            var before = Images.Select(listed => listed.Path).ToList();
+            var before = Images.Select(KeyOf).ToList();
             var selectedIndex = SelectedIndex;
-            _removed.Add(image.Path);
+            if (image.Path is null)
+                DropPasted(image);
+            else
+                _removed.Add(image.Path);
             Relist(_ => SurvivorNear(before, selectedIndex));
         });
     }
@@ -204,20 +208,26 @@ public sealed partial class Workspace : IDisposable
 
     /// <summary>
     /// Replaces <see cref="Images"/> with the current listing of the opened paths under the current settings and
-    /// <see cref="ShowResults"/>, less the removed entries; the one re-list path, so removed entries stay hidden
-    /// through every update. A listing equal to the current one keeps the current list instance.
+    /// <see cref="ShowResults"/>, then the saved Pasted images not listed among them, less the removed entries, then
+    /// the Pasted images not saved yet; the one re-list path, so removed entries stay hidden and Pasted images stay
+    /// listed through every update. A listing equal to the current one keeps the current list instance.
     /// </summary>
     private Listing List()
     {
         var listing = ImageListing.List(_openedPaths, ListingOptionsFor(_settings, _showResults));
-        var images = listing.Images
-            .Where(image => !_removed.Contains(image.Path))
-            .Select(image => new WorkspaceImage
+        var files = listing.Images
+            .Select(image => (image.Path, image.IsResult, image.HasResult))
+            .Concat(SavedPastedPaths().Select(path => (Path: path, IsResult: false, HasResult: false)))
+            .Where(file => !_removed.Contains(file.Path))
+            .DistinctBy(file => file.Path, FileNames.Comparer);
+        var images = files
+            .Select(file => new WorkspaceImage
             {
-                Path = image.Path, IsResult = image.IsResult, HasResult = image.HasResult,
-                ContentVersion = ContentVersion.Of(image.Path),
-                HasUnsavedSteps = HasUnsavedSteps(image.Path),
+                Path = file.Path, IsResult = file.IsResult, HasResult = file.HasResult,
+                ContentVersion = ContentVersion.Of(file.Path),
+                HasUnsavedSteps = HasUnsavedSteps(file.Path),
             })
+            .Concat(PastedEntries())
             .ToList();
         if (!images.SequenceEqual(Images))
             Images = images;
@@ -227,7 +237,8 @@ public sealed partial class Workspace : IDisposable
 
     /// <summary>Watches the home folders and every folder holding a listed image.</summary>
     private void Watch() =>
-        _folderWatch.Watch(Images.Select(image => Path.GetDirectoryName(image.Path)!), _homeFolders);
+        _folderWatch.Watch(Images.Where(image => image.Path is not null)
+            .Select(image => Path.GetDirectoryName(image.Path)!), _homeFolders);
 
     private void OnDiskQuiet()
     {
@@ -279,7 +290,7 @@ public sealed partial class Workspace : IDisposable
         }
         Selected = selectedIndex < 0
             ? Images.FirstOrDefault()
-            : SurvivorNear(old.Select(image => renamed(image.Path)).ToList(), selectedIndex);
+            : SurvivorNear(old.Select(image => image.Path is null ? KeyOf(image) : renamed(image.Path)).ToList(), selectedIndex);
         var newlyUnavailable = _homeFolders
             .Where(folder => unavailable.Contains(folder) && !_unavailableFolders.Contains(folder))
             .ToList();
@@ -294,16 +305,16 @@ public sealed partial class Workspace : IDisposable
     /// <summary>The listed Original of the Result <paramref name="result"/>, if any.</summary>
     private WorkspaceImage? OriginalOf(WorkspaceImage result)
     {
-        var stem = StemOf(result.Path);
+        var stem = StemOf(result.Path!);
         var suffix = _settings.ResultSuffix;
         if (!stem.EndsWith(suffix, FileNames.Comparison))
             return null;
         var originalStem = stem[..^suffix.Length];
-        return Images.FirstOrDefault(image => FileNames.Same(StemOf(image.Path), originalStem));
+        return Images.FirstOrDefault(image => image.Path is not null && FileNames.Same(StemOf(image.Path), originalStem));
     }
 
     /// <summary>
-    /// The listed entry at the path <paramref name="before"/>[<paramref name="index"/>] if it is still listed; otherwise the
+    /// The listed entry with the key <paramref name="before"/>[<paramref name="index"/>] if it is still listed; otherwise the
     /// nearest still-listed entry after it, or before it when none follows. <c>null</c> when nothing is listed.
     /// </summary>
     private WorkspaceImage? SurvivorNear(IReadOnlyList<string> before, int index)
@@ -315,8 +326,8 @@ public sealed partial class Workspace : IDisposable
     private static string StemOf(string path) =>
         Path.Combine(Path.GetDirectoryName(path)!, Path.GetFileNameWithoutExtension(path));
 
-    /// <summary>The listed entry for <paramref name="path"/>, or <c>null</c>.</summary>
-    private WorkspaceImage? Find(string path) => Images.FirstOrDefault(image => FileNames.Same(image.Path, path));
+    /// <summary>The listed entry whose <see cref="KeyOf">key</see> is <paramref name="key"/> (a file's path), or <c>null</c>.</summary>
+    private WorkspaceImage? Find(string key) => Images.FirstOrDefault(image => FileNames.Same(KeyOf(image), key));
 
     private int SelectedIndex => Selected is null ? -1 : IndexOf(Selected);
 
@@ -324,7 +335,7 @@ public sealed partial class Workspace : IDisposable
     {
         for (var i = 0; i < Images.Count; i++)
         {
-            if (FileNames.Same(Images[i].Path, image.Path))
+            if (FileNames.Same(KeyOf(Images[i]), KeyOf(image)))
                 return i;
         }
         return -1;

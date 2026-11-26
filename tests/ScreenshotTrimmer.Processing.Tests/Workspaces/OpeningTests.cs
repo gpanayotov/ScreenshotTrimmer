@@ -12,7 +12,7 @@ public class OpeningTests
     }
 
     private static string[] Names(Workspace workspace) =>
-        workspace.Images.Select(i => Path.GetFileName(i.Path)).ToArray();
+        workspace.Images.Select(i => Path.GetFileName(i.Path!)).ToArray();
 
     [Fact]
     public void Opening_a_folder_lists_its_images_with_the_first_selected()
