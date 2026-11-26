@@ -56,6 +56,7 @@
   <data name="ShadowPaddingWarning" xml:space="preserve"><value>The Original already seems to have shadow padding, so Shadow is left off for it. You can still turn it on.</value></data>
   <data name="CropSize" xml:space="preserve"><value>Crop: {0:N0} × {1:N0} px at {2:N0}, {3:N0}</value></data>
   <data name="ClearCrop" xml:space="preserve"><value>_Clear crop</value></data>
+  <data name="AutoCropMenu" xml:space="preserve"><value>_Auto crop</value></data>
   <data name="ClassicCrop" xml:space="preserve"><value>Classic crop</value></data>
   <data name="NoCrop" xml:space="preserve"><value>No crop: the whole image</value></data>
   <data name="EditMenu" xml:space="preserve"><value>_Edit</value></data>
@@ -93,6 +94,8 @@
   <data name="ToolbarOpenFolderTip" xml:space="preserve"><value>Open the screenshots in a folder (Ctrl+Shift+O)</value></data>
   <data name="ToolbarFit" xml:space="preserve"><value>Fit</value></data>
   <data name="ToolbarFitTip" xml:space="preserve"><value>Fit the image to the window (Ctrl+0)</value></data>
+  <data name="ToolbarAutoCrop" xml:space="preserve"><value>Auto crop</value></data>
+  <data name="ToolbarAutoCropTip" xml:space="preserve"><value>Crop to the subject the app finds in the image (Ctrl+Shift+A)</value></data>
   <data name="ToolbarActualSize" xml:space="preserve"><value>100%</value></data>
   <data name="ToolbarActualSizeTip" xml:space="preserve"><value>Show the image at its actual size (Ctrl+1)</value></data>
   <data name="ToolbarShowResults" xml:space="preserve"><value>Show Results</value></data>
@@ -124,6 +127,15 @@
   <data name="PastedImageName" xml:space="preserve"><value>Pasted image {0}</value></data>
   <data name="ClipboardHasNoImage" xml:space="preserve"><value>The clipboard holds no image.</value></data>
   <data name="ResultCopied" xml:space="preserve"><value>Copied the Result of {0}.</value></data>
+  <data name="NoSubjectFound" xml:space="preserve"><value>No subject found.</value></data>
+  <data name="FindingSubject" xml:space="preserve"><value>Finding the subject…</value></data>
+  <data name="ClassicCropTool" xml:space="preserve"><value>_Classic crop</value></data>
+  <data name="AutoCropInRegionTool" xml:space="preserve"><value>Auto crop in _region</value></data>
+  <data name="ToolbarClassicCrop" xml:space="preserve"><value>Classic crop</value></data>
+  <data name="ToolbarClassicCropTip" xml:space="preserve"><value>A rectangle you draw becomes the crop</value></data>
+  <data name="ToolbarAutoCropInRegion" xml:space="preserve"><value>Auto crop in region</value></data>
+  <data name="ToolbarAutoCropInRegionTip" xml:space="preserve"><value>The crop snaps to the largest subject inside a rectangle you draw, such as a button, a menu or a card</value></data>
+  <data name="NoSubjectInRegion" xml:space="preserve"><value>No subject found in the region; the rectangle you drew is kept as a Classic crop.</value></data>
   <data name="SavePastedTitle" xml:space="preserve"><value>Save the Result of {0}</value></data>
   <data name="PngFilter" xml:space="preserve"><value>PNG images</value></data>
   <data name="OverwriteTitle" xml:space="preserve"><value>Replace file</value></data>

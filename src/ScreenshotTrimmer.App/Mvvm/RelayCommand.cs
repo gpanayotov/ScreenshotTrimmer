@@ -22,9 +22,11 @@ public sealed class RelayCommand(Action execute, Func<bool>? canExecute = null) 
     public void NotifyCanExecuteChanged() => CanExecuteChanged?.Invoke(this, EventArgs.Empty);
 }
 
-/// <summary>A command that always runs <paramref name="execute"/> with its parameter, or <c>null</c> when it is not a <typeparamref name="T"/>.</summary>
-public sealed class RelayCommand<T>(Action<T?> execute) : ICommand
-    where T : class
+/// <summary>
+/// A command that runs <paramref name="execute"/> with its parameter when that is a <typeparamref name="T"/>, such as a
+/// strip entry or an enum value given with <c>x:Static</c>, and does nothing otherwise.
+/// </summary>
+public sealed class RelayCommand<T>(Action<T> execute) : ICommand
 {
     public event EventHandler? CanExecuteChanged
     {
@@ -34,5 +36,9 @@ public sealed class RelayCommand<T>(Action<T?> execute) : ICommand
 
     public bool CanExecute(object? parameter) => true;
 
-    public void Execute(object? parameter) => execute(parameter as T);
+    public void Execute(object? parameter)
+    {
+        if (parameter is T value)
+            execute(value);
+    }
 }

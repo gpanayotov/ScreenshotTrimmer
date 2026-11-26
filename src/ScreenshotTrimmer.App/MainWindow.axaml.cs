@@ -39,6 +39,7 @@ public partial class MainWindow : Window, IPathPicker, IQuestions
         AddViewerShortcuts();
         Viewer.AddHandler(PointerPressedEvent, OnViewerPointerPressed, RoutingStrategies.Tunnel);
         Viewer.KeyDown += OnViewerKeyDown;
+        Viewer.RegionDrawn += (_, region) => _viewModel?.AutoCropInRegion(region);
         ManualRadiusBox.AddHandler(KeyDownEvent, OnManualRadiusKeyDown, RoutingStrategies.Tunnel);
         ManualRadiusBox.LostFocus += (_, _) => _viewModel?.ApplyManualRadiusCommand.Execute(null);
         WatchShadowDrags(ShadowSizeSlider);

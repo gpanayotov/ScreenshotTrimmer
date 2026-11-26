@@ -66,11 +66,7 @@ public sealed partial class MainWindowViewModel : Observable, IDisposable
         RedoCommand = new RelayCommand(() => ChangeHistory(_workspace.Redo), () => CanChangeHistory(_workspace.CanRedo));
         ResetCommand = new RelayCommand(() => ChangeHistory(_workspace.Reset),
             () => CanChangeHistory(image => _workspace.Steps(image) != Steps.None));
-        ChooseBackgroundCommand = new RelayCommand<object>(choice =>
-        {
-            if (choice is ViewerBackground background)
-                Background = background;
-        });
+        ChooseBackgroundCommand = new RelayCommand<ViewerBackground>(background => Background = background);
     }
 
     public ObservableCollection<StripEntry> Entries { get; } = [];
@@ -290,6 +286,7 @@ public sealed partial class MainWindowViewModel : Observable, IDisposable
     {
         Localizer.Instance.PropertyChanged -= OnLanguageChanged;
         _workspace.Changed -= OnWorkspaceChanged;
+        CancelDetection();
         // A load still running sees it is outdated and disposes its bitmap.
         _loadNumber++;
         Image = null;
@@ -326,11 +323,7 @@ public sealed partial class MainWindowViewModel : Observable, IDisposable
             Remove(selected);
     }
 
-    private void Remove(StripEntry? entry)
-    {
-        if (entry is not null)
-            Remove(entry.Image);
-    }
+    private void Remove(StripEntry entry) => Remove(entry.Image);
 
     /// <summary>Removes <paramref name="image"/> from the strip, asking first when that would discard its unsaved Steps.</summary>
     private async void Remove(WorkspaceImage image)
@@ -495,6 +488,7 @@ public sealed partial class MainWindowViewModel : Observable, IDisposable
     private async void LoadImage(WorkspaceImage? image)
     {
         var load = ++_loadNumber;
+        CancelDetection();
         _shown = image;
         Raise(nameof(StatusFileName));
         Image = null;
