@@ -23,16 +23,19 @@ public sealed record UserSettings
     public string BackupSuffix { get; init; } = SaveOptions.DefaultBackupSuffix;
 
     /// <summary>Scales the Shadow's blur and padding; 1.0 is the default look.</summary>
-    public double ShadowSize { get; init; } = Shadow.DefaultSize;
+    public double ShadowSize { get; init; } = Rendering.Shadow.DefaultSize;
 
     /// <summary>The Shadow's opacity, from 0 to 1.</summary>
-    public double ShadowOpacity { get; init; } = Shadow.DefaultOpacity;
+    public double ShadowOpacity { get; init; } = Rendering.Shadow.DefaultOpacity;
 
     /// <summary>Whether Clean edges removes frame lines.</summary>
     public bool FrameLines { get; init; } = true;
 
     /// <summary>Whether Clean edges makes the pixels outside rounded corners transparent.</summary>
     public bool RoundedCorners { get; init; } = true;
+
+    /// <summary>Whether a Shadow is added; <see cref="ShadowSize"/> and <see cref="ShadowOpacity"/> say what it looks like.</summary>
+    public bool Shadow { get; init; } = true;
 
     public Language Language { get; init; } = Language.System;
 }
