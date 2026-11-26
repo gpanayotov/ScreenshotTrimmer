@@ -26,13 +26,24 @@ public static class BatchSelection
     /// </summary>
     public static BatchSkip? SkipReason(WorkspaceImage image, bool hasSteps, Func<RgbaImage> loadOriginal)
     {
-        ArgumentNullException.ThrowIfNull(image);
         ArgumentNullException.ThrowIfNull(loadOriginal);
+        return SkipReason(image, hasSteps, () => AlreadyProcessed.HasShadowPadding(loadOriginal()));
+    }
+
+    /// <summary>
+    /// The same rules as <see cref="SkipReason(WorkspaceImage, bool, Func{RgbaImage})"/>, for a caller that already
+    /// knows, or remembers, whether the Original is processed: <paramref name="isAlreadyProcessed"/> is called only for
+    /// an image not already ruled out by the cheaper checks.
+    /// </summary>
+    public static BatchSkip? SkipReason(WorkspaceImage image, bool hasSteps, Func<bool> isAlreadyProcessed)
+    {
+        ArgumentNullException.ThrowIfNull(image);
+        ArgumentNullException.ThrowIfNull(isAlreadyProcessed);
 
         if (image.IsResult)
             return BatchSkip.Result;
         if (hasSteps)
             return BatchSkip.HasSteps;
-        return AlreadyProcessed.HasShadowPadding(loadOriginal()) ? BatchSkip.AlreadyProcessed : null;
+        return isAlreadyProcessed() ? BatchSkip.AlreadyProcessed : null;
     }
 }
