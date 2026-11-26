@@ -117,23 +117,17 @@ public sealed record CropRectangle
         var (left, top) = viewport.ToView(rectangle.X, rectangle.Y);
         var (right, bottom) = viewport.ToView(rectangle.Right, rectangle.Bottom);
 
-        var vertical = NearerEdge(x, left, right, tolerance);
-        var horizontal = NearerEdge(y, top, bottom, tolerance);
+        var edgeX = NearerEdge(x, left, right, tolerance);
+        var edgeY = NearerEdge(y, top, bottom, tolerance);
         var withinX = x >= left - tolerance && x <= right + tolerance;
         var withinY = y >= top - tolerance && y <= bottom + tolerance;
-        return (vertical, horizontal) switch
-        {
-            (Edge.Low, Edge.Low) => CropHandle.TopLeft,
-            (Edge.High, Edge.Low) => CropHandle.TopRight,
-            (Edge.High, Edge.High) => CropHandle.BottomRight,
-            (Edge.Low, Edge.High) => CropHandle.BottomLeft,
-            (Edge.Low, _) when withinY => CropHandle.Left,
-            (Edge.High, _) when withinY => CropHandle.Right,
-            (_, Edge.Low) when withinX => CropHandle.Top,
-            (_, Edge.High) when withinX => CropHandle.Bottom,
-            _ when x > left && x < right && y > top && y < bottom => CropHandle.Inside,
-            _ => CropHandle.None,
-        };
+        if (edgeX != Edge.None && edgeY != Edge.None)
+            return Handle(edgeX, edgeY);
+        if (edgeX != Edge.None && withinY)
+            return Handle(edgeX, Edge.None);
+        if (edgeY != Edge.None && withinX)
+            return Handle(Edge.None, edgeY);
+        return x > left && x < right && y > top && y < bottom ? CropHandle.Inside : CropHandle.None;
     }
 
     /// <summary>
@@ -169,9 +163,9 @@ public sealed record CropRectangle
         if (handle == CropHandle.Inside)
             return Moved(rectangle, handle, dx, dy).Crop;
 
-        var (horizontal, vertical) = Sides(handle);
-        var (left, right) = Nudged(rectangle.X, rectangle.Right, horizontal, dx, ImageWidth);
-        var (top, bottom) = Nudged(rectangle.Y, rectangle.Bottom, vertical, dy, ImageHeight);
+        var (edgeX, edgeY) = Sides(handle);
+        var (left, right) = Nudged(rectangle.X, rectangle.Right, edgeX, dx, ImageWidth);
+        var (top, bottom) = Nudged(rectangle.Y, rectangle.Bottom, edgeY, dy, ImageHeight);
         return WithRectangle(new PixelRect(left, top, right - left, bottom - top));
     }
 
@@ -196,19 +190,19 @@ public sealed record CropRectangle
             return (WithRectangle(rectangle with { X = x, Y = y }), handle);
         }
 
-        var (horizontal, vertical) = Sides(handle);
+        var (edgeX, edgeY) = Sides(handle);
         var (left, right, flippedX) = (rectangle.X, rectangle.Right, false);
-        if (horizontal == Edge.Low)
+        if (edgeX == Edge.Low)
             (left, right, flippedX) = MoveEdge(rectangle.X, rectangle.Right, dx, ImageWidth);
-        else if (horizontal == Edge.High)
+        else if (edgeX == Edge.High)
             (left, right, flippedX) = MoveEdge(rectangle.Right, rectangle.X, dx, ImageWidth);
         var (top, bottom, flippedY) = (rectangle.Y, rectangle.Bottom, false);
-        if (vertical == Edge.Low)
+        if (edgeY == Edge.Low)
             (top, bottom, flippedY) = MoveEdge(rectangle.Y, rectangle.Bottom, dy, ImageHeight);
-        else if (vertical == Edge.High)
+        else if (edgeY == Edge.High)
             (top, bottom, flippedY) = MoveEdge(rectangle.Bottom, rectangle.Y, dy, ImageHeight);
 
-        var after = Handle(Flip(horizontal, flippedX), Flip(vertical, flippedY));
+        var after = Handle(Flip(edgeX, flippedX), Flip(edgeY, flippedY));
         return (WithRectangle(new PixelRect(left, top, right - left, bottom - top)), after);
     }
 
@@ -230,39 +224,49 @@ public sealed record CropRectangle
     private CropRectangle WithRectangle(PixelRect rectangle) =>
         rectangle == Rectangle ? this : this with { Rectangle = rectangle };
 
-    /// <summary>Which vertical edge (left is low) and which horizontal edge (top is low) <paramref name="handle"/> moves.</summary>
-    private static (Edge Horizontal, Edge Vertical) Sides(CropHandle handle) => handle switch
+    /// <summary>
+    /// Each handle that resizes, with the vertical edge it moves along x (left is low) and the horizontal edge it moves
+    /// along y (top is low); the one mapping both <see cref="Sides"/> and <see cref="Handle"/> read.
+    /// </summary>
+    private static readonly (CropHandle Handle, Edge X, Edge Y)[] HandleEdges =
+    [
+        (CropHandle.Left, Edge.Low, Edge.None),
+        (CropHandle.Right, Edge.High, Edge.None),
+        (CropHandle.Top, Edge.None, Edge.Low),
+        (CropHandle.Bottom, Edge.None, Edge.High),
+        (CropHandle.TopLeft, Edge.Low, Edge.Low),
+        (CropHandle.TopRight, Edge.High, Edge.Low),
+        (CropHandle.BottomRight, Edge.High, Edge.High),
+        (CropHandle.BottomLeft, Edge.Low, Edge.High),
+    ];
+
+    /// <summary>Which vertical edge (x) and which horizontal edge (y) <paramref name="handle"/> moves.</summary>
+    private static (Edge X, Edge Y) Sides(CropHandle handle)
     {
-        CropHandle.Left => (Edge.Low, Edge.None),
-        CropHandle.Right => (Edge.High, Edge.None),
-        CropHandle.Top => (Edge.None, Edge.Low),
-        CropHandle.Bottom => (Edge.None, Edge.High),
-        CropHandle.TopLeft => (Edge.Low, Edge.Low),
-        CropHandle.TopRight => (Edge.High, Edge.Low),
-        CropHandle.BottomRight => (Edge.High, Edge.High),
-        CropHandle.BottomLeft => (Edge.Low, Edge.High),
-        _ => (Edge.None, Edge.None),
-    };
+        foreach (var entry in HandleEdges)
+        {
+            if (entry.Handle == handle)
+                return (entry.X, entry.Y);
+        }
+        return (Edge.None, Edge.None);
+    }
+
+    /// <summary>The handle that moves the vertical edge <paramref name="x"/> and the horizontal edge <paramref name="y"/>.</summary>
+    private static CropHandle Handle(Edge x, Edge y)
+    {
+        foreach (var entry in HandleEdges)
+        {
+            if (entry.X == x && entry.Y == y)
+                return entry.Handle;
+        }
+        return CropHandle.None;
+    }
 
     private static Edge Flip(Edge edge, bool flipped) => !flipped ? edge : edge switch
     {
         Edge.Low => Edge.High,
         Edge.High => Edge.Low,
         _ => edge,
-    };
-
-    /// <summary>The handle that moves the vertical edge <paramref name="x"/> and the horizontal edge <paramref name="y"/>.</summary>
-    private static CropHandle Handle(Edge x, Edge y) => (x, y) switch
-    {
-        (Edge.Low, Edge.None) => CropHandle.Left,
-        (Edge.High, Edge.None) => CropHandle.Right,
-        (Edge.None, Edge.Low) => CropHandle.Top,
-        (Edge.None, Edge.High) => CropHandle.Bottom,
-        (Edge.Low, Edge.Low) => CropHandle.TopLeft,
-        (Edge.High, Edge.Low) => CropHandle.TopRight,
-        (Edge.High, Edge.High) => CropHandle.BottomRight,
-        (Edge.Low, Edge.High) => CropHandle.BottomLeft,
-        _ => CropHandle.None,
     };
 
     /// <summary>Which of the edges <paramref name="low"/> and <paramref name="high"/> is within reach of <paramref name="at"/>.</summary>
