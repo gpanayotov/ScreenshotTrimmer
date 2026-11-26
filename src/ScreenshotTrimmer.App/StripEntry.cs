@@ -27,9 +27,9 @@ public sealed class StripEntry(WorkspaceImage image, ThumbnailCache thumbnails, 
 
     /// <summary>What the user calls <paramref name="image"/>: its file's name, or "Pasted image 1" until it is saved.</summary>
     public static string DisplayName(WorkspaceImage image) =>
-        image.PastedNumber is { } number
-            ? Localizer.Instance.Format("PastedImageName", number)
-            : Path.GetFileName(image.Path!);
+        image.Path is { } path
+            ? Path.GetFileName(path)
+            : Localizer.Instance.Format("PastedImageName", image.PastedNumber);
 
     /// <summary>Whether this image's Result exists beside it, shown as the "has result" badge.</summary>
     public bool HasResult => Image.HasResult;
@@ -45,7 +45,7 @@ public sealed class StripEntry(WorkspaceImage image, ThumbnailCache thumbnails, 
     /// <see cref="Update"/> and keep its thumbnail.
     /// </summary>
     public bool Shows(WorkspaceImage image) =>
-        FileNames.Same(image.Key, Image.Key) && image.ContentVersion == Image.ContentVersion;
+        image.Key == Image.Key && image.ContentVersion == Image.ContentVersion;
 
     /// <summary>Shows the markers and badges of <paramref name="image"/>, which this entry <see cref="Shows"/>.</summary>
     public void Update(WorkspaceImage image)

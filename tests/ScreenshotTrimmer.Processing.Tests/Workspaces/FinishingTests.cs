@@ -28,7 +28,7 @@ public class FinishingTests
     {
         using var folder = new TempFolder();
         Touch(folder, "a.png", "b.png", "c.png");
-        var remembered = new UserSettings { FrameLines = true, RoundedCorners = true, Shadow = false };
+        var remembered = new UserSettings { FrameLines = true, RoundedCorners = true, ShadowOn = false };
         using var workspace = new Workspace(remembered);
         workspace.Open([folder.Path]);
         var pending = new Steps { Crop = Crop.Classic(new PixelRect(0, 0, 1, 1)), FrameLines = true };
@@ -50,7 +50,7 @@ public class FinishingTests
     {
         using var folder = new TempFolder();
         Touch(folder, "a.png");
-        var remembered = new UserSettings { FrameLines = false, RoundedCorners = false, Shadow = true };
+        var remembered = new UserSettings { FrameLines = false, RoundedCorners = false, ShadowOn = true };
         using var workspace = new Workspace(remembered);
         workspace.Open([folder.Path]);
         var image = Entry(workspace, "a.png");

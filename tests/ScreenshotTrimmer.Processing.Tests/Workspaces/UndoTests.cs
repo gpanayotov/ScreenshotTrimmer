@@ -307,7 +307,7 @@ public class UndoTests
     {
         using var folder = new TempFolder();
         using var workspace = Opened(folder, "a.png");
-        var stranger = new WorkspaceImage { Path = folder.File("elsewhere.png") };
+        var stranger = new WorkspaceImage { Key = ImageKey.OfFile(folder.File("elsewhere.png")) };
 
         Assert.Throws<ArgumentException>(() => workspace.Undo(stranger));
         Assert.Throws<ArgumentException>(() => workspace.Redo(stranger));

@@ -1,5 +1,6 @@
 using System.Collections.ObjectModel;
 using System.ComponentModel;
+using System.Diagnostics.CodeAnalysis;
 using System.Windows.Input;
 using Avalonia.Media.Imaging;
 using Avalonia.Threading;
@@ -37,8 +38,6 @@ public sealed partial class MainWindowViewModel : Observable, IDisposable
     private Crop? _crop;
     private PixelRect? _shownCrop;
     private bool _shownHasShadowPadding;
-    private readonly HashSet<string> _saving = new(FileNames.Comparer);
-    private bool _savingAll;
 
     public MainWindowViewModel(Workspace workspace, IPathPicker picker, IQuestions questions, IImageClipboard clipboard,
                                SettingsSession settings)
@@ -82,7 +81,7 @@ public sealed partial class MainWindowViewModel : Observable, IDisposable
         get => _selectedEntry;
         set
         {
-            if (value is not null && !SamePath(value.Image.Key, _workspace.Selected?.Key))
+            if (value is not null && value.Image.Key != _workspace.Selected?.Key)
                 IfStillListed(value.Image, _workspace.Select);
             else
                 Set(ref _selectedEntry, value);
@@ -125,13 +124,7 @@ public sealed partial class MainWindowViewModel : Observable, IDisposable
     {
         if (crop == _crop)
             return;
-        if (_workspace.Selected is { } image && Image is not null && SamePath(image.Key, _shown?.Key))
-        {
-            var hasShadowPadding = _shownHasShadowPadding;
-            IfStillListed(image, listed => _workspace.SetSteps(listed, FirstStep.Apply(
-                _workspace.Steps(listed), Settings, hasShadowPadding,
-                steps => steps with { Crop = crop }), mergeKey));
-        }
+        ChangeShownSteps(steps => steps with { Crop = crop }, mergeKey);
         // The workspace's change has set the crop it recorded; when nothing was recorded, the viewer goes back to the
         // current one.
         Raise(nameof(Crop));
@@ -245,29 +238,8 @@ public sealed partial class MainWindowViewModel : Observable, IDisposable
     /// <summary>Sets <see cref="Background"/> to the <see cref="ViewerBackground"/> given as the parameter.</summary>
     public ICommand ChooseBackgroundCommand { get; }
 
-    /// <summary>
-    /// Saves the selected image's Result off the interface thread and reports the file written, or why it could not be,
-    /// as a notice. Enabled while the selected image has unsaved Steps and is not already being saved.
-    /// </summary>
-    public RelayCommand SaveCommand { get; }
-
     /// <summary>Returns the selected image to the whole image, as one Step; nothing happens when it has no crop.</summary>
     public ICommand ClearCropCommand { get; }
-
-    /// <summary>Undoes the selected image's last Step. Enabled while it has one to undo.</summary>
-    public RelayCommand UndoCommand { get; }
-
-    /// <summary>Redoes the selected image's last undone Step. Enabled while it has one to redo.</summary>
-    public RelayCommand RedoCommand { get; }
-
-    /// <summary>Removes all of the selected image's Steps as one undoable Step. Enabled while it has Steps.</summary>
-    public RelayCommand ResetCommand { get; }
-
-    /// <summary>
-    /// Saves the Result of every image with unsaved Steps off the interface thread, then reports how many were saved
-    /// and why each failure failed as notices. Enabled while some image has unsaved Steps and no save is running.
-    /// </summary>
-    public RelayCommand SaveAllCommand { get; }
 
     /// <summary>
     /// Opens <paramref name="paths"/> in the workspace, replacing the list, and reports any path that does not exist
@@ -304,17 +276,13 @@ public sealed partial class MainWindowViewModel : Observable, IDisposable
         _workspace.ApplySettings(settings);
         ShowFinishing(_workspace.Selected);
         if (failure is not null)
-        {
-            _notices.Add(new Message("SettingsNotSaved", _settings.FilePath, failure));
-            RaiseNotices();
-        }
+            AddNotice("SettingsNotSaved", _settings.FilePath, failure);
     }
 
     /// <summary>Reports something that went wrong unexpectedly as a notice, instead of letting it end the app.</summary>
     public void ReportFailure(Exception failure)
     {
-        _notices.Add(new Message("UnexpectedError", failure.Message));
-        RaiseNotices();
+        AddNotice("UnexpectedError", failure.Message);
     }
 
     /// <summary>Lets go of the language, the workspace and the shown image; the window is closing.</summary>
@@ -348,9 +316,6 @@ public sealed partial class MainWindowViewModel : Observable, IDisposable
             ? Path.TrimEndingDirectorySeparator(folder)
             : null;
 
-    private static bool SamePath(string? a, string? b) =>
-        a is null || b is null ? a == b : FileNames.Same(a, b);
-
     /// <summary>The folder's own name; a root folder such as <c>C:\</c> or <c>/</c>, which has none, shows in full.</summary>
     private static string FolderName(string folder) =>
         Path.GetFileName(folder) is { Length: > 0 } name ? name : folder;
@@ -380,6 +345,44 @@ public sealed partial class MainWindowViewModel : Observable, IDisposable
         {
             ReportFailure(e);
         }
+    }
+
+    /// <summary>
+    /// Whether the selected image is the one shown and its Original has loaded, giving both; while another image
+    /// loads, the selected one has nothing shown to change or copy yet.
+    /// </summary>
+    private bool ShowsSelected([NotNullWhen(true)] out WorkspaceImage? image, [NotNullWhen(true)] out RgbaImage? original)
+    {
+        if (_workspace.Selected is { } selected && _original is { } loaded && selected.Key == _shown?.Key)
+        {
+            (image, original) = (selected, loaded);
+            return true;
+        }
+        (image, original) = (null, null);
+        return false;
+    }
+
+    /// <summary>
+    /// Changes the shown selected image's Steps with <paramref name="change"/>, its first Step seeded from the
+    /// remembered settings, merged with the previous Step when it has the same <paramref name="mergeKey"/>. Nothing
+    /// happens while the selected image is not shown yet or has left the list.
+    /// </summary>
+    private void ChangeShownSteps(Func<Steps, Steps> change, object? mergeKey = null)
+    {
+        if (!ShowsSelected(out var image, out _))
+            return;
+        var hasShadowPadding = _shownHasShadowPadding;
+        IfStillListed(image, listed => _workspace.SetSteps(listed,
+            FirstStep.Apply(_workspace.Steps(listed), Settings, hasShadowPadding, change), mergeKey));
+    }
+
+    /// <summary><paramref name="image"/>'s current Steps; <c>Steps.None</c> for no image or one no longer listed.</summary>
+    private Steps ListedSteps(WorkspaceImage? image)
+    {
+        var steps = Steps.None;
+        if (image is not null)
+            IfStillListed(image, listed => steps = _workspace.Steps(listed));
+        return steps;
     }
 
     /// <summary>
@@ -430,8 +433,8 @@ public sealed partial class MainWindowViewModel : Observable, IDisposable
             Raise(nameof(ShowsHint));
         }
 
-        var selected = Entries.FirstOrDefault(entry => SamePath(entry.Image.Key, change.Selected?.Key));
-        if (!SamePath(change.Selected?.Key, _shown?.Key))
+        var selected = Entries.FirstOrDefault(entry => entry.Image.Key == change.Selected?.Key);
+        if (change.Selected?.Key != _shown?.Key)
             LoadImage(change.Selected);
         Set(ref _selectedEntry, selected, nameof(SelectedEntry));
         ShowCrop(change.Selected);
@@ -464,148 +467,7 @@ public sealed partial class MainWindowViewModel : Observable, IDisposable
     }
 
     /// <summary>Shows the crop in <paramref name="image"/>'s Steps.</summary>
-    private void ShowCrop(WorkspaceImage? image)
-    {
-        Crop? crop = null;
-        if (image is not null)
-            IfStillListed(image, listed => crop = _workspace.Steps(listed).Crop);
-        Set(ref _crop, crop, nameof(Crop));
-    }
-
-    private bool CanSave() =>
-        _workspace.Selected is { HasUnsavedSteps: true } selected && !_saving.Contains(selected.Key) && !_savingAll;
-
-    private bool CanSaveAll() => !_savingAll && _saving.Count == 0 && _workspace.Images.Any(image => image.HasUnsavedSteps);
-
-    /// <summary>Applies <paramref name="change"/> to the selected image's history, if it is still listed.</summary>
-    private void ChangeHistory(Action<WorkspaceImage> change)
-    {
-        if (_workspace.Selected is { } image)
-            IfStillListed(image, change);
-    }
-
-    private bool CanChangeHistory(Func<WorkspaceImage, bool> can)
-    {
-        var allowed = false;
-        if (_workspace.Selected is { } image)
-            IfStillListed(image, listed => allowed = can(listed));
-        return allowed;
-    }
-
-    private void NotifyHistoryCommands()
-    {
-        UndoCommand.NotifyCanExecuteChanged();
-        RedoCommand.NotifyCanExecuteChanged();
-        ResetCommand.NotifyCanExecuteChanged();
-    }
-
-    private void NotifySaveCommands()
-    {
-        SaveCommand.NotifyCanExecuteChanged();
-        SaveAllCommand.NotifyCanExecuteChanged();
-    }
-
-    /// <summary>
-    /// Saves the selected image's Result off the interface thread and reports how it went as a notice. A Pasted image
-    /// not saved yet asks where to save it first.
-    /// </summary>
-    private async void Save()
-    {
-        if (_workspace.Selected is not { } image || !_saving.Add(image.Key))
-            return;
-        NotifySaveCommands();
-        try
-        {
-            if (image.IsPasted)
-            {
-                if (await SavePastedAsync(image) is { } written)
-                    _notices.Add(new Message("Saved", written));
-            }
-            else
-            {
-                var report = await Task.Run(() => _workspace.Save(image));
-                _notices.Add(new Message("Saved", string.Join(", ", report.Written)));
-            }
-        }
-        catch (ArgumentException)
-        {
-            // The image left the list while the save was starting; the strip already shows why.
-        }
-        catch (Exception e)
-        {
-            // The Result could not be written, the Original could not be read, or anything unforeseen.
-            _notices.Add(SaveFailedNotice(image, e));
-        }
-        finally
-        {
-            _saving.Remove(image.Key);
-            NotifySaveCommands();
-        }
-        RaiseNotices();
-    }
-
-    /// <summary>Saves every image with unsaved Steps off the interface thread and reports how it went as notices.</summary>
-    private async void SaveAll() => await SaveAllAsync();
-
-    /// <summary>
-    /// Saves every image with unsaved Steps off the interface thread and reports how it went as notices. Each Pasted
-    /// image not saved yet asks where to save it in turn, and the user may skip one, which leaves it unsaved.
-    /// </summary>
-    /// <returns>
-    /// Whether every one saved; <c>false</c> too when a save is already running or a Pasted image was skipped.
-    /// </returns>
-    private async Task<bool> SaveAllAsync()
-    {
-        if (_savingAll)
-            return false;
-        _savingAll = true;
-        NotifySaveCommands();
-        var savedAll = false;
-        try
-        {
-            var outcomes = await Task.Run(_workspace.SaveAll);
-            var saved = outcomes.Count(outcome => outcome.Report is not null);
-            var failures = outcomes
-                .Where(outcome => outcome.Failure is not null)
-                .Select(outcome => SaveFailedNotice(outcome.Image, outcome.Failure!))
-                .ToList();
-            foreach (var pasted in outcomes.Where(outcome => outcome.NeedsLocation))
-            {
-                try
-                {
-                    if (await SavePastedAsync(pasted.Image) is not null)
-                        saved++;
-                }
-                catch (ArgumentException)
-                {
-                    // Removed from the list while the user was choosing where to save an earlier one.
-                }
-                catch (Exception e)
-                {
-                    failures.Add(SaveFailedNotice(pasted.Image, e));
-                }
-            }
-            _notices.Add(new Message("SavedAll", saved, outcomes.Count));
-            _notices.AddRange(failures);
-            savedAll = saved == outcomes.Count;
-        }
-        catch (Exception e)
-        {
-            ReportFailure(e);
-        }
-        finally
-        {
-            _savingAll = false;
-            NotifySaveCommands();
-        }
-        RaiseNotices();
-        return savedAll;
-    }
-
-    /// <summary>Why saving <paramref name="image"/>'s Result failed, as a notice.</summary>
-    private static Message SaveFailedNotice(WorkspaceImage image, Exception failure) =>
-        new("SaveFailed", StripEntry.DisplayName(image),
-            failure is SaveFailedException saveFailure ? new SaveFailure(saveFailure) : failure.Message);
+    private void ShowCrop(WorkspaceImage? image) => Set(ref _crop, ListedSteps(image).Crop, nameof(Crop));
 
     /// <summary>
     /// Tells the user which folders went away; the title stops naming the open folder once it is gone. The workspace
@@ -613,8 +475,7 @@ public sealed partial class MainWindowViewModel : Observable, IDisposable
     /// </summary>
     private void ReportUnavailable(IReadOnlyList<string> folders)
     {
-        _notices.Add(new Message("FolderUnavailable", string.Join(", ", folders)));
-        RaiseNotices();
+        AddNotice("FolderUnavailable", string.Join(", ", folders));
         if (_openFolder is not null && folders.Any(folder => FileNames.Same(folder, _openFolder)))
         {
             _openFolder = null;
@@ -683,6 +544,13 @@ public sealed partial class MainWindowViewModel : Observable, IDisposable
         RaiseNotices();
     }
 
+    /// <summary>Adds the notice the resource <paramref name="key"/> formats with <paramref name="args"/> and shows it.</summary>
+    private void AddNotice(string key, params object?[] args)
+    {
+        _notices.Add(new Message(key, args));
+        RaiseNotices();
+    }
+
     private void RaiseNotices()
     {
         Raise(nameof(NoticeText));
@@ -711,18 +579,5 @@ public sealed partial class MainWindowViewModel : Observable, IDisposable
     private sealed record Message(string Key, params object?[] Args)
     {
         public string Text => Localizer.Instance.Format(Key, Args);
-    }
-
-    /// <summary>Why a save failed, in the current language when shown.</summary>
-    private sealed record SaveFailure(SaveFailedException Failure)
-    {
-        public override string ToString() => Failure.Reason switch
-        {
-            SaveFailureReason.TargetIsFolder => Localizer.Instance.Format("SaveFailureTargetIsFolder", Failure.TargetPath),
-            SaveFailureReason.TargetExists => Localizer.Instance.Format("SaveFailureTargetExists", Failure.TargetPath),
-            SaveFailureReason.FolderNotFound => Localizer.Instance.Format("SaveFailureFolderNotFound", Failure.TargetPath),
-            SaveFailureReason.AccessDenied => Localizer.Instance.Format("SaveFailureAccessDenied", Failure.TargetPath),
-            _ => Failure.InnerException?.Message ?? Failure.Message,
-        };
     }
 }

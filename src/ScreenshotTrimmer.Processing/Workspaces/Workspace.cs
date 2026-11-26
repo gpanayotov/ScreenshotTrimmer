@@ -148,10 +148,10 @@ public sealed partial class Workspace : IDisposable
             RequireListed(image);
             var before = Images.Select(image => image.Key).ToList();
             var selectedIndex = SelectedIndex;
-            if (image.Path is null)
-                DropPasted(image);
+            if (image.Path is { } path)
+                _removed.Add(path);
             else
-                _removed.Add(image.Path);
+                DropPasted(image);
             Relist(_ => SurvivorNear(before, selectedIndex));
         });
     }
@@ -221,15 +221,20 @@ public sealed partial class Workspace : IDisposable
             .Where(file => !_removed.Contains(file.Path))
             .DistinctBy(file => file.Path, FileNames.Comparer);
         var images = files
-            .Select(file => new WorkspaceImage
+            .Select(file =>
             {
-                Path = file.Path, IsResult = file.IsResult, HasResult = file.HasResult,
-                ContentVersion = ContentVersion.Of(file.Path),
-                HasUnsavedSteps = HasUnsavedSteps(file.Path),
+                var key = ImageKey.OfFile(file.Path);
+                return new WorkspaceImage
+                {
+                    Key = key, IsResult = file.IsResult, HasResult = file.HasResult,
+                    ContentVersion = ContentVersion.Of(file.Path),
+                    HasUnsavedSteps = HasUnsavedSteps(key),
+                };
             })
             .Concat(PastedEntries())
             .ToList();
-        if (!images.SequenceEqual(Images))
+        // Keys compare paths as the file system does; a rename that only changes case is still a new listing.
+        if (!images.SequenceEqual(Images) || !images.Select(image => image.Path).SequenceEqual(Images.Select(image => image.Path)))
             Images = images;
         Watch();
         return listing;
@@ -237,8 +242,8 @@ public sealed partial class Workspace : IDisposable
 
     /// <summary>Watches the home folders and every folder holding a listed image.</summary>
     private void Watch() =>
-        _folderWatch.Watch(Images.Where(image => image.Path is not null)
-            .Select(image => Path.GetDirectoryName(image.Path)!), _homeFolders);
+        _folderWatch.Watch(Images.Select(image => image.Path).OfType<string>()
+            .Select(path => Path.GetDirectoryName(path)!), _homeFolders);
 
     private void OnDiskQuiet()
     {
@@ -292,7 +297,7 @@ public sealed partial class Workspace : IDisposable
         }
         Selected = selectedIndex < 0
             ? Images.FirstOrDefault()
-            : SurvivorNear(old.Select(image => image.Path is null ? image.Key : renamed(image.Path)).ToList(), selectedIndex);
+            : SurvivorNear(old.Select(image => image.Key.Renamed(renamed)).ToList(), selectedIndex);
         var newlyUnavailable = _homeFolders
             .Where(folder => unavailable.Contains(folder) && !_unavailableFolders.Contains(folder))
             .ToList();
@@ -309,19 +314,21 @@ public sealed partial class Workspace : IDisposable
     /// <summary>The listed Original of the Result <paramref name="result"/>, if any.</summary>
     private WorkspaceImage? OriginalOf(WorkspaceImage result)
     {
-        var stem = StemOf(result.Path!);
+        if (result.Path is not { } path)
+            return null;
+        var stem = StemOf(path);
         var suffix = _settings.ResultSuffix;
         if (!stem.EndsWith(suffix, FileNames.Comparison))
             return null;
         var originalStem = stem[..^suffix.Length];
-        return Images.FirstOrDefault(image => image.Path is not null && FileNames.Same(StemOf(image.Path), originalStem));
+        return Images.FirstOrDefault(image => image.Path is { } candidate && FileNames.Same(StemOf(candidate), originalStem));
     }
 
     /// <summary>
     /// The listed entry with the key <paramref name="before"/>[<paramref name="index"/>] if it is still listed; otherwise the
     /// nearest still-listed entry after it, or before it when none follows. <c>null</c> when nothing is listed.
     /// </summary>
-    private WorkspaceImage? SurvivorNear(IReadOnlyList<string> before, int index)
+    private WorkspaceImage? SurvivorNear(IReadOnlyList<ImageKey> before, int index)
     {
         var candidates = before.Skip(index).Concat(before.Take(index).Reverse());
         return candidates.Select(Find).FirstOrDefault(image => image is not null) ?? Images.FirstOrDefault();
@@ -330,8 +337,11 @@ public sealed partial class Workspace : IDisposable
     private static string StemOf(string path) =>
         Path.Combine(Path.GetDirectoryName(path)!, Path.GetFileNameWithoutExtension(path));
 
-    /// <summary>The listed entry whose <see cref="WorkspaceImage.Key">key</see> is <paramref name="key"/> (a file's path), or <c>null</c>.</summary>
-    private WorkspaceImage? Find(string key) => Images.FirstOrDefault(image => FileNames.Same(image.Key, key));
+    /// <summary>The listed entry whose <see cref="WorkspaceImage.Key">key</see> is <paramref name="key"/>, or <c>null</c>.</summary>
+    private WorkspaceImage? Find(ImageKey key) => Images.FirstOrDefault(image => image.Key == key);
+
+    /// <summary>The listed entry of the file at <paramref name="path"/>, or <c>null</c>.</summary>
+    private WorkspaceImage? Find(string path) => Find(ImageKey.OfFile(path));
 
     private int SelectedIndex => Selected is null ? -1 : IndexOf(Selected);
 
@@ -339,7 +349,7 @@ public sealed partial class Workspace : IDisposable
     {
         for (var i = 0; i < Images.Count; i++)
         {
-            if (FileNames.Same(Images[i].Key, image.Key))
+            if (Images[i].Key == image.Key)
                 return i;
         }
         return -1;

@@ -21,7 +21,7 @@ public sealed partial class MainWindowViewModel
     private (RenderReport Report, Steps Steps)? _report;
     private bool _showsResult;
     private CleanEdges _cleanEdges = CleanEdges.Shown(Steps.None, new UserSettings());
-    private string? _finishingKey;
+    private ImageKey? _finishingKey;
     private string _manualRadiusText = "";
     private ShadowControls _shadow = ShadowControls.Shown(Steps.None, new UserSettings(), false);
 
@@ -212,13 +212,10 @@ public sealed partial class MainWindowViewModel
     /// </summary>
     private void ShowFinishing(WorkspaceImage? image)
     {
-        var steps = Steps.None;
-        if (image is not null)
-            IfStillListed(image, listed => steps = _workspace.Steps(listed));
-
+        var steps = ListedSteps(image);
         var shown = CleanEdges.Shown(steps, Settings);
         var shadow = ShadowControls.Shown(steps, Settings, _shownHasShadowPadding);
-        var sameImage = SamePath(image?.Key, _finishingKey);
+        var sameImage = image?.Key == _finishingKey;
         _finishingKey = image?.Key;
         if (!sameImage)
             _draggedShadow = null;
@@ -230,7 +227,7 @@ public sealed partial class MainWindowViewModel
             RaiseFinishing();
         }
 
-        if (image is not null && _original is { } original && SamePath(image.Key, _shown?.Key))
+        if (image is not null && _original is { } original && image.Key == _shown?.Key)
             Render(new RenderRequest(original, steps));
     }
 
@@ -241,16 +238,8 @@ public sealed partial class MainWindowViewModel
     private void ChangeFinishing(Func<Steps, Steps> change, UserSettings remembered)
     {
         if (remembered != Settings && _settings.Change(remembered) is { } failure)
-        {
-            _notices.Add(new Message("SettingsNotSaved", _settings.FilePath, failure));
-            RaiseNotices();
-        }
-        if (_workspace.Selected is { } image && _original is not null && SamePath(image.Key, _shown?.Key))
-        {
-            var hasShadowPadding = _shownHasShadowPadding;
-            IfStillListed(image, listed => _workspace.SetSteps(listed,
-                FirstStep.Apply(_workspace.Steps(listed), Settings, hasShadowPadding, change)));
-        }
+            AddNotice("SettingsNotSaved", _settings.FilePath, failure);
+        ChangeShownSteps(change);
         ShowsResult = true;
         ShowFinishing(_workspace.Selected);
     }
@@ -287,21 +276,18 @@ public sealed partial class MainWindowViewModel
     /// <summary>Renders the Result with the Shadow the drag has reached, without recording a Step.</summary>
     private void PreviewShadow()
     {
-        if (_draggedShadow is not { } dragged || _workspace.Selected is not { } image
-            || _original is not { } original || !SamePath(image.Key, _shown?.Key))
+        if (_draggedShadow is not { } dragged || !ShowsSelected(out var image, out var original))
             return;
-        var steps = Steps.None;
-        IfStillListed(image, listed => steps = _workspace.Steps(listed));
         ShowsResult = true;
-        Render(new RenderRequest(original, FirstStep.Apply(steps, Settings, _shownHasShadowPadding, dragged.Change)));
+        Render(new RenderRequest(original,
+            FirstStep.Apply(ListedSteps(image), Settings, _shownHasShadowPadding, dragged.Change)));
     }
 
     private void ApplyManualRadius()
     {
         if (!CleanEdges.TryParseManualRadius(ManualRadiusText, Localizer.Instance.Culture, out var radius))
         {
-            _notices.Add(new Message("ManualRadiusInvalid", CleanEdges.MaxManualRadius));
-            RaiseNotices();
+            AddNotice("ManualRadiusInvalid", CleanEdges.MaxManualRadius);
             ManualRadiusText = FormatRadius(_cleanEdges.ManualRadius);
             return;
         }
