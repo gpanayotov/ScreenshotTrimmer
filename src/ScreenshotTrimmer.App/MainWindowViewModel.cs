@@ -16,7 +16,7 @@ using ScreenshotTrimmer.Processing.Workspaces;
 namespace ScreenshotTrimmer.App;
 
 /// <summary>The main window's state: the strip, the selected image, the viewer and the notices.</summary>
-public sealed class MainWindowViewModel : Observable, IDisposable
+public sealed partial class MainWindowViewModel : Observable, IDisposable
 {
     private readonly Workspace _workspace;
     private readonly SettingsSession _settings;
@@ -110,6 +110,7 @@ public sealed class MainWindowViewModel : Observable, IDisposable
             // The workspace's change has set the crop it recorded; when nothing was recorded, the viewer goes back to
             // the current one.
             Raise();
+            ShowsResult = false;
         }
     }
 
@@ -122,6 +123,9 @@ public sealed class MainWindowViewModel : Observable, IDisposable
             var old = _image;
             if (!Set(ref _image, value))
                 return;
+            // The viewer lets go of the old bitmap before it is disposed.
+            Raise(nameof(ViewerImage));
+            Raise(nameof(ShowsFinishing));
             old?.Dispose();
             RaiseStatus();
         }
@@ -152,13 +156,13 @@ public sealed class MainWindowViewModel : Observable, IDisposable
     /// <summary>The selected image's file name for the status bar.</summary>
     public string? StatusFileName => _shownPath is null ? null : Path.GetFileName(_shownPath);
 
-    /// <summary>The shown image's size in pixels for the status bar, formatted for the current language.</summary>
+    /// <summary>The shown image's size in pixels (the Original's or the Result's) for the status bar, formatted for the current language.</summary>
     public string? StatusImageSize =>
-        Image is { } image ? Localizer.Instance.Format("ImageSize", image.PixelSize.Width, image.PixelSize.Height) : null;
+        ViewerImage is { } image ? Localizer.Instance.Format("ImageSize", image.PixelSize.Width, image.PixelSize.Height) : null;
 
     /// <summary>The viewer's zoom for the status bar, formatted for the current language.</summary>
     public string? StatusZoom =>
-        Image is not null && Zoom > 0 ? Localizer.Instance.Format("ZoomPercent", Zoom * 100) : null;
+        ViewerImage is not null && Zoom > 0 ? Localizer.Instance.Format("ZoomPercent", Zoom * 100) : null;
 
     /// <summary>The message shown in the viewer instead of the image, if any.</summary>
     public string? ViewerMessage => _viewerMessage?.Text;
@@ -242,6 +246,7 @@ public sealed class MainWindowViewModel : Observable, IDisposable
     {
         var failure = _settings.Change(settings);
         _workspace.ApplySettings(settings);
+        ShowFinishing(_workspace.Selected);
         if (failure is not null)
         {
             _notices.Add(new Message("SettingsNotSaved", _settings.FilePath, failure));
@@ -264,6 +269,7 @@ public sealed class MainWindowViewModel : Observable, IDisposable
         // A load still running sees it is outdated and disposes its bitmap.
         _loadNumber++;
         Image = null;
+        ForgetResult();
     }
 
     /// <summary>
@@ -360,6 +366,7 @@ public sealed class MainWindowViewModel : Observable, IDisposable
             LoadImage(change.Selected);
         Set(ref _selectedEntry, selected, nameof(SelectedEntry));
         ShowCrop(change.Selected);
+        ShowFinishing(change.Selected);
         NotifySaveCommands();
 
         if (change.UnavailableFolders.Count > 0)
@@ -488,19 +495,21 @@ public sealed class MainWindowViewModel : Observable, IDisposable
         _shownPath = path;
         Raise(nameof(StatusFileName));
         Image = null;
+        ForgetResult();
         SetViewerMessage(null);
         if (image is null || path is null)
             return;
 
         Bitmap? bitmap = null;
+        RgbaImage? original = null;
         var hasShadowPadding = false;
         Message? failure = null;
         try
         {
-            (bitmap, hasShadowPadding) = await Task.Run(() =>
+            (bitmap, original, hasShadowPadding) = await Task.Run(() =>
             {
-                var original = _workspace.LoadOriginal(image);
-                return (BitmapLoading.ToBitmap(original), AlreadyProcessed.HasShadowPadding(original));
+                var pixels = _workspace.LoadOriginal(image);
+                return (BitmapLoading.ToBitmap(pixels), pixels, AlreadyProcessed.HasShadowPadding(pixels));
             });
         }
         catch (ArgumentException)
@@ -520,8 +529,10 @@ public sealed class MainWindowViewModel : Observable, IDisposable
             return;
         }
         _shownHasShadowPadding = hasShadowPadding;
+        _original = original;
         Image = bitmap;
         SetViewerMessage(failure);
+        ShowFinishing(_workspace.Selected);
     }
 
     private void SetViewerMessage(Message? message)
@@ -552,6 +563,8 @@ public sealed class MainWindowViewModel : Observable, IDisposable
     {
         RaiseNotices();
         RaiseStatus();
+        RaiseFinishing();
+        ManualRadiusText = FormatRadius(_cleanEdges.ManualRadius);
         Raise(nameof(ViewerMessage));
         Raise(nameof(Title));
     }

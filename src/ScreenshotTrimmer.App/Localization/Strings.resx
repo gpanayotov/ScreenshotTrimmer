@@ -35,6 +35,20 @@
   <data name="BackgroundDarkGrey" xml:space="preserve"><value>_Dark grey</value></data>
   <data name="ImageSize" xml:space="preserve"><value>{0:N0} × {1:N0} px</value></data>
   <data name="ZoomPercent" xml:space="preserve"><value>{0:0.#}%</value></data>
+  <data name="ResultView" xml:space="preserve"><value>_Result view</value></data>
+  <data name="ToolbarResultView" xml:space="preserve"><value>Result</value></data>
+  <data name="ToolbarResultViewTip" xml:space="preserve"><value>Switch between the Original with the crop and the Result (Tab while the image has focus)</value></data>
+  <data name="ResultSize" xml:space="preserve"><value>Result: {0:N0} × {1:N0} px</value></data>
+  <data name="CleanEdges" xml:space="preserve"><value>Clean edges</value></data>
+  <data name="FrameLines" xml:space="preserve"><value>Frame lines</value></data>
+  <data name="FrameLinesRemoved" xml:space="preserve"><value>Removed: left {0}, top {1}, right {2}, bottom {3}</value></data>
+  <data name="RoundedCorners" xml:space="preserve"><value>Rounded corners</value></data>
+  <data name="MeasuredRadii" xml:space="preserve"><value>Measured radius: top left {0:0.#}, top right {1:0.#}, bottom right {2:0.#}, bottom left {3:0.#}</value></data>
+  <data name="ManualRadius" xml:space="preserve"><value>Radius</value></data>
+  <data name="ManualRadiusAutomatic" xml:space="preserve"><value>automatic</value></data>
+  <data name="ManualRadiusTip" xml:space="preserve"><value>A corner radius in pixels for this image only; leave it empty to use the measured radius</value></data>
+  <data name="PixelsUnit" xml:space="preserve"><value>px</value></data>
+  <data name="ManualRadiusInvalid" xml:space="preserve"><value>The corner radius must be a number of pixels from 0 to {0}, or empty for the measured radius.</value></data>
   <data name="ThumbnailUnreadable" xml:space="preserve"><value>Cannot be read</value></data>
   <data name="ShowResults" xml:space="preserve"><value>Show _Results</value></data>
   <data name="HasResultBadge" xml:space="preserve"><value>Result</value></data>
