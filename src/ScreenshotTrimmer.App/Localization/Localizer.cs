@@ -1,6 +1,5 @@
 using System.ComponentModel;
 using System.Globalization;
-using System.Resources;
 
 namespace ScreenshotTrimmer.App.Localization;
 
@@ -10,8 +9,6 @@ namespace ScreenshotTrimmer.App.Localization;
 /// </summary>
 public sealed class Localizer : INotifyPropertyChanged
 {
-    private readonly ResourceManager _resources = Strings.ResourceManager;
-
     private Localizer()
     {
     }
@@ -23,7 +20,13 @@ public sealed class Localizer : INotifyPropertyChanged
     public CultureInfo Culture { get; private set; } = CultureInfo.GetCultureInfo("en");
 
     /// <summary>The string for <paramref name="key"/>, or <c>!key!</c> when there is none, so a typo shows on screen.</summary>
-    public string this[string key] => _resources.GetString(key, Culture) ?? $"!{key}!";
+    public string this[string key] => Text(key, Culture);
+
+    /// <summary>
+    /// The string for <paramref name="key"/> in the language of <paramref name="culture"/>, whatever the current
+    /// interface language, or <c>!key!</c> when there is none.
+    /// </summary>
+    public static string Text(string key, CultureInfo culture) => Strings.ResourceManager.GetString(key, culture) ?? $"!{key}!";
 
     /// <summary>The string for <paramref name="key"/> with <paramref name="args"/> formatted for the current language.</summary>
     public string Format(string key, params object?[] args) => string.Format(Culture, this[key], args);

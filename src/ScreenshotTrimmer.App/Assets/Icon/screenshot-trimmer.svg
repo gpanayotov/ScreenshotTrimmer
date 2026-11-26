@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- ScreenshotTrimmer's icon: crop marks around a window. Regenerate the PNGs and the .ico with regenerate.py. -->
+<svg xmlns="http://www.w3.org/2000/svg" width="256" height="256" viewBox="0 0 256 256">
+  <!-- The window: a frame with a title bar, over a light page. -->
+  <rect x="50" y="58" width="156" height="140" rx="14" fill="#1f5fa8"/>
+  <rect x="62" y="92" width="132" height="94" rx="4" fill="#f4f7fb"/>
+  <rect x="64" y="70" width="40" height="10" rx="5" fill="#cfe0f5"/>
+  <!-- The page's content: two lines and a block. -->
+  <rect x="76" y="106" width="76" height="10" rx="5" fill="#9db6d3"/>
+  <rect x="76" y="126" width="104" height="10" rx="5" fill="#9db6d3"/>
+  <rect x="76" y="146" width="60" height="26" rx="5" fill="#c4d5e9"/>
+  <!-- The crop marks: one L at each corner, just outside the window. -->
+  <g fill="none" stroke="#e8590c" stroke-width="18" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M 22 82 V 30 H 74"/>
+    <path d="M 182 30 H 234 V 82"/>
+    <path d="M 234 174 V 226 H 182"/>
+    <path d="M 74 226 H 22 V 174"/>
+  </g>
+</svg>

@@ -2,7 +2,14 @@ name: CI
 
 on:
   push:
+    branches: ['**'] # not tags: the release workflow runs these same jobs for a version tag
   pull_request:
+  workflow_call:
+    inputs:
+      version:
+        description: The version to package with; empty for the commit's development version.
+        type: string
+        default: ''
 
 jobs:
   test:
@@ -18,3 +25,8 @@ jobs:
           dotnet-version: 10.0.x
       - run: dotnet build ScreenshotTrimmer.slnx --configuration Release
       - run: dotnet test ScreenshotTrimmer.slnx --configuration Release --no-build
+
+  package:
+    uses: ./.github/workflows/package.yml
+    with:
+      version: ${{ inputs.version }}

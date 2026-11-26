@@ -25,6 +25,7 @@ public partial class MainWindow : Window, IPathPicker, IQuestions
         InitializeComponent();
         ExitItem.Click += (_, _) => Close();
         SettingsItem.Click += (_, _) => EditSettings();
+        AboutItem.Click += async (_, _) => await new AboutWindow().ShowDialog(this);
         KeyBindings.Add(new KeyBinding
         {
             Gesture = new KeyGesture(Key.OemComma, KeyModifiers.Control), Command = new RelayCommand(EditSettings),

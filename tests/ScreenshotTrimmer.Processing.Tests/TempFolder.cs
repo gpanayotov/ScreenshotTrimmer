@@ -1,16 +1,15 @@
+using ScreenshotTrimmer.Processing.Files;
+
 namespace ScreenshotTrimmer.Processing.Tests;
 
 /// <summary>A real, empty temporary directory, deleted with everything in it on dispose.</summary>
 internal sealed class TempFolder : IDisposable
 {
-    public TempFolder()
-    {
-        Path = Directory.CreateTempSubdirectory("ScreenshotTrimmer.Tests-").FullName;
-    }
+    private readonly TemporaryFolder folder = new("ScreenshotTrimmer.Tests-");
 
-    public string Path { get; }
+    public string Path => folder.Path;
 
-    public string File(string name) => System.IO.Path.Combine(Path, name);
+    public string File(string name) => folder.File(name);
 
     /// <summary>The names of every entry in the folder, sorted ordinally.</summary>
     public string[] Entries() =>
@@ -19,10 +18,5 @@ internal sealed class TempFolder : IDisposable
             .Order(StringComparer.Ordinal)
             .ToArray()!;
 
-    public void Dispose()
-    {
-        try { Directory.Delete(Path, recursive: true); }
-        catch (IOException) { }
-        catch (UnauthorizedAccessException) { }
-    }
+    public void Dispose() => folder.Dispose();
 }

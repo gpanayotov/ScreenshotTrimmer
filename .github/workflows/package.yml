@@ -1,0 +1,134 @@
+name: Package
+
+# Builds the downloads and proves each one works on its own system. CI calls it on every push and pull request;
+# the release workflow calls it with the tag's version.
+on:
+  workflow_call:
+    inputs:
+      version:
+        description: The version to embed and name the files with, such as 1.2.3; empty for the commit's development version.
+        type: string
+        default: ''
+
+jobs:
+  package:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - rid: win-x64
+            os: windows-latest
+            executable: ScreenshotTrimmer.exe
+          - rid: linux-x64
+            os: ubuntu-latest
+            executable: ScreenshotTrimmer
+    runs-on: ${{ matrix.os }}
+    env:
+      LAUNCH_SECONDS: 8 # how long each launch check keeps the app running
+    defaults:
+      run:
+        shell: bash # with pipefail, unlike the default shell
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 10.0.x
+
+      - name: Test the build scripts
+        if: runner.os == 'Linux'
+        run: |
+          build/version.test.sh
+          build/appdir.test.sh
+          build/smoke-test.test.sh
+          build/launch-check.test.sh
+
+      # The release workflow passes the tag's version, already checked; anything else gets the development version.
+      # On a pull request github.sha is a temporary merge commit, so the version names the pull request's head commit.
+      - name: Choose the version
+        env:
+          GIVEN: ${{ inputs.version }}
+          COMMIT: ${{ github.event.pull_request.head.sha || github.sha }}
+        run: |
+          version="${GIVEN:-$(build/version.sh "$COMMIT")}"
+          echo "Version: $version"
+          echo "VERSION=$version" >> "$GITHUB_ENV"
+          echo "ZIP=ScreenshotTrimmer-$version-${{ matrix.rid }}.zip" >> "$GITHUB_ENV"
+
+      # Self-contained single file with the native libraries (SkiaSharp, HarfBuzz) inside, extracted on first run.
+      # No trimming and no native AOT: Avalonia's use of reflection makes them risky.
+      - name: Publish
+        run: >
+          dotnet publish src/ScreenshotTrimmer.App/ScreenshotTrimmer.App.csproj
+          --configuration Release --runtime ${{ matrix.rid }} --self-contained
+          -p:PublishSingleFile=true -p:IncludeNativeLibrariesForSelfExtract=true
+          -p:EnableCompressionInSingleFile=true -p:DebugType=none
+          -p:InformationalVersion="$VERSION" --output publish
+
+      - name: Zip (Windows)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: Compress-Archive -Path publish/${{ matrix.executable }}, LICENSE -DestinationPath $env:ZIP
+
+      - name: Zip (Linux)
+        if: runner.os == 'Linux'
+        # Written in the workspace root, where the later steps and the upload look for it: no cd, no relative path.
+        # -j stores the files without their folders.
+        run: |
+          zip -j "$ZIP" publish/${{ matrix.executable }} LICENSE
+          test -f "$ZIP"
+
+      # The checks below run the executable taken from the zip, as a user would.
+      - name: Smoke test
+        run: |
+          unzip "$ZIP" -d unzipped
+          build/smoke-test.sh "$VERSION" unzipped/${{ matrix.executable }}
+
+      - name: Install Xvfb
+        if: runner.os == 'Linux'
+        run: command -v xvfb-run || { sudo apt-get update && sudo apt-get install -y xvfb; }
+
+      - name: Launch check (Linux)
+        if: runner.os == 'Linux'
+        run: build/launch-check.sh "$LAUNCH_SECONDS" unzipped/${{ matrix.executable }}
+
+      # Windows needs no virtual display, and PowerShell can stop the app where bash's timeout cannot.
+      - name: Launch check (Windows)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          $p = Start-Process -FilePath unzipped/${{ matrix.executable }} -PassThru
+          Start-Sleep -Seconds $env:LAUNCH_SECONDS
+          if ($p.HasExited) { throw "The app exited with $($p.ExitCode) within $env:LAUNCH_SECONDS seconds." }
+          Stop-Process -Id $p.Id -Force
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ${{ env.ZIP }}
+          path: ${{ env.ZIP }}
+          if-no-files-found: error
+          retention-days: 7
+
+      # The AppImage wraps the same executable. build/appimage.sh fetches the pinned appimagetool and runtime and
+      # checks their SHA-256. It writes into the workspace root, beside the zip.
+      - name: AppImage
+        if: runner.os == 'Linux'
+        run: |
+          build/appimage.sh publish/${{ matrix.executable }} "$VERSION" .
+          echo "APPIMAGE=ScreenshotTrimmer-$VERSION-x86_64.AppImage" >> "$GITHUB_ENV"
+
+      # The runner has no FUSE, so the AppImage unpacks itself and runs from there, as it would on a desktop without it.
+      - name: Smoke test (AppImage)
+        if: runner.os == 'Linux'
+        run: build/smoke-test.sh "$VERSION" ./"$APPIMAGE" --appimage-extract-and-run
+
+      - name: Launch check (AppImage)
+        if: runner.os == 'Linux'
+        run: build/launch-check.sh "$LAUNCH_SECONDS" ./"$APPIMAGE" --appimage-extract-and-run
+
+      - if: runner.os == 'Linux'
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ env.APPIMAGE }}
+          path: ${{ env.APPIMAGE }}
+          if-no-files-found: error
+          retention-days: 7
