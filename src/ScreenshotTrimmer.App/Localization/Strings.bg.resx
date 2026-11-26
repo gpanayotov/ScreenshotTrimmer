@@ -141,4 +141,11 @@
   <data name="OverwriteTitle" xml:space="preserve"><value>Замяна на файл</value></data>
   <data name="OverwriteQuestion" xml:space="preserve"><value>{0} вече съществува. Да бъде ли заменен?</value></data>
   <data name="ReplaceAnswer" xml:space="preserve"><value>Замяна</value></data>
+  <data name="BatchMenu" xml:space="preserve"><value>_Пакетна обработка</value></data>
+  <data name="ToolbarBatch" xml:space="preserve"><value>Пакетна обработка</value></data>
+  <data name="ToolbarBatchTip" xml:space="preserve"><value>Автоматично изрязване на всяко изображение от списъка, което има нужда, с текущите настройки за изчистване на ръбовете и сянка, за преглед преди записване (Ctrl+B)</value></data>
+  <data name="BatchProgress" xml:space="preserve"><value>Пакетна обработка: {0} от {1}</value></data>
+  <data name="BatchDone" xml:space="preserve"><value>Пакетната обработка приключи: обработени {0}, без намерен обект {1}. Пропуснати: {2} вече редактирани, {3} вече обработени, {4} Резултати. Нищо не е записано, докато не запишете.</value></data>
+  <data name="BatchNoSubjectFoundIn" xml:space="preserve"><value>Не е намерен обект в: {0}</value></data>
+  <data name="NoSubjectFoundTip" xml:space="preserve"><value>Пакетната обработка не намери обект в това изображение</value></data>
 </root>

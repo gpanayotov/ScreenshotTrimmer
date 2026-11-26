@@ -424,6 +424,7 @@ public sealed partial class MainWindowViewModel : Observable, IDisposable
             _listedImages = change.Images;
             ShowInStrip(change.Images);
             Raise(nameof(ShowsHint));
+            BatchCommand.NotifyCanExecuteChanged();
         }
 
         var selected = Entries.FirstOrDefault(entry => entry.Image.Key == change.Selected?.Key);
@@ -573,6 +574,7 @@ public sealed partial class MainWindowViewModel : Observable, IDisposable
         Raise(nameof(ViewerMessage));
         Raise(nameof(StatusFileName));
         Raise(nameof(Title));
+        Raise(nameof(BatchProgressText));
     }
 
     /// <summary>A string from the resources with its arguments, formatted in the current language when shown.</summary>
