@@ -42,6 +42,25 @@ public class ImageFileTests
     }
 
     [Fact]
+    public void Encoded_bytes_decode_exactly_with_transparency()
+    {
+        using var folder = new TempFolder();
+        var path = folder.File("pasted.png");
+        EncodedImages.Write(path, EncodedImages.HalfAndHalf(8, 4, SKColors.Transparent, new SKColor(10, 20, 30, 128)));
+
+        var image = ImageFile.Decode(File.ReadAllBytes(path));
+
+        Assert.True(image.PixelsEqual(ImageFile.Load(path)));
+        Assert.Equal(new Rgba(10, 20, 30, 128), image[6, 2]);
+    }
+
+    [Fact]
+    public void Bytes_that_are_not_an_image_do_not_decode()
+    {
+        Assert.Throws<InvalidDataException>(() => ImageFile.Decode([1, 2, 3]));
+    }
+
+    [Fact]
     public void Jpeg_orientation_metadata_is_applied_on_load()
     {
         using var folder = new TempFolder();

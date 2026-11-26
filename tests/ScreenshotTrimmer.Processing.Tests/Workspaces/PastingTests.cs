@@ -187,6 +187,24 @@ public class PastingTests
         Assert.Equal(elsewhere.File("shot.png"), workspace.Selected?.Path);
     }
 
+    [Fact]
+    public async Task A_saved_pasted_image_renamed_on_disk_still_renders_from_its_pixels()
+    {
+        using var folder = new TempFolder();
+        using var workspace = new Workspace(new UserSettings(), WatchDelay);
+        workspace.Open([folder.Path]);
+        var pasted = workspace.Paste(Synthetic.Gradient(40, 30));
+        workspace.SetSteps(pasted, Cropped);
+        workspace.SavePasted(pasted, folder.File("shot.png"), overwrite: false);
+        var renamed = ChangeWhere(workspace, c => c.Images is [{ Path: var path }] && path == folder.File("moved.png"));
+
+        File.Move(folder.File("shot.png"), folder.File("moved.png"));
+
+        var moved = Assert.Single((await renamed).Images);
+        Assert.True(workspace.LoadOriginal(moved).PixelsEqual(Synthetic.Gradient(40, 30)));
+        Assert.Equal(Cropped, workspace.Steps(moved));
+    }
+
     [Theory]
     [InlineData(SaveMode.Suffix)]
     [InlineData(SaveMode.Backup)]

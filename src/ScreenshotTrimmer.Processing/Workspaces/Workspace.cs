@@ -259,6 +259,7 @@ public sealed partial class Workspace : IDisposable
         var renamed = _folderWatch.TakeRenames();
         _openedPaths = _openedPaths.Select(renamed).ToList();
         _removed = _removed.Select(renamed).ToHashSet(FileNames.Comparer);
+        FollowRenamesOfSavedPasted(renamed);
         FollowRenamesWithSteps(renamed);
         if (_openedOneFile && _openedPaths is [var file] && !File.Exists(file))
         {
@@ -296,7 +297,8 @@ public sealed partial class Workspace : IDisposable
             .Where(folder => unavailable.Contains(folder) && !_unavailableFolders.Contains(folder))
             .ToList();
         _unavailableFolders = unavailable;
-        var dropped = DiscardStepsOfDropped(old.Select(image => image with { Path = renamed(image.Path) }).ToList());
+        var dropped = DiscardStepsOfDropped(old.Select(image => image.Path).OfType<string>().Select(renamed));
+        ForgetSavedPastedNotListed();
 
         // Events for files that are not listed, or writes that left a file as it was, change nothing to show.
         if (ReferenceEquals(Images, old) && Selected == oldSelected && newlyUnavailable.Count == 0)

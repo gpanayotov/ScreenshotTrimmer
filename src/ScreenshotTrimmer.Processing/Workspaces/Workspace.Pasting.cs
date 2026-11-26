@@ -107,6 +107,19 @@ public sealed partial class Workspace
     /// <summary>The entries of the Pasted images not saved yet; call under the lock.</summary>
     private IEnumerable<WorkspaceImage> PastedEntries() => _pasted.Select(pasted => pasted.Entry);
 
+    /// <summary>Moves the saved Pasted images whose files were renamed on disk to their new paths; call under the lock.</summary>
+    private void FollowRenamesOfSavedPasted(Func<string, string> renamed)
+    {
+        for (var i = 0; i < _savedPasted.Count; i++)
+            _savedPasted[i] = _savedPasted[i] with { Path = renamed(_savedPasted[i].Path) };
+    }
+
+    /// <summary>
+    /// Forgets the saved Pasted images that left the list on disk, so a file that comes back under the same name is
+    /// read from disk like any other; call under the lock after re-listing.
+    /// </summary>
+    private void ForgetSavedPastedNotListed() => _savedPasted.RemoveAll(saved => Find(saved.Path) is null);
+
     /// <summary>Drops the unsaved Pasted image <paramref name="image"/> with its pixels and Steps; call under the lock.</summary>
     private void DropPasted(WorkspaceImage image)
     {
