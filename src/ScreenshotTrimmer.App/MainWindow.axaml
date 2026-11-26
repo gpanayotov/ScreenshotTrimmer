@@ -16,6 +16,10 @@
     <KeyBinding Gesture="Ctrl+Shift+O" Command="{Binding OpenFolderCommand}" />
     <KeyBinding Gesture="Ctrl+S" Command="{Binding SaveCommand}" />
     <KeyBinding Gesture="Ctrl+Shift+S" Command="{Binding SaveAllCommand}" />
+    <!-- Like Delete, undo and redo reach these bindings only when the focused text box left them unhandled. -->
+    <KeyBinding Gesture="Ctrl+Z" Command="{Binding UndoCommand}" />
+    <KeyBinding Gesture="Ctrl+Y" Command="{Binding RedoCommand}" />
+    <KeyBinding Gesture="Ctrl+Shift+Z" Command="{Binding RedoCommand}" />
     <!-- A key binding only sees a Delete that the focused control left unhandled, so text boxes keep theirs. -->
     <KeyBinding Gesture="Delete" Command="{Binding RemoveSelectedCommand}" />
   </Window.KeyBindings>
@@ -32,6 +36,12 @@
         <MenuItem x:Name="SettingsItem" Header="{loc:Tr SettingsMenu}" InputGesture="Ctrl+OemComma" />
         <Separator />
         <MenuItem x:Name="ExitItem" Header="{loc:Tr Exit}" />
+      </MenuItem>
+      <MenuItem Header="{loc:Tr EditMenu}">
+        <MenuItem Header="{loc:Tr Undo}" InputGesture="Ctrl+Z" Command="{Binding UndoCommand}" />
+        <MenuItem Header="{loc:Tr Redo}" InputGesture="Ctrl+Y" Command="{Binding RedoCommand}" />
+        <Separator />
+        <MenuItem Header="{loc:Tr ResetSteps}" Command="{Binding ResetCommand}" />
       </MenuItem>
       <MenuItem Header="{loc:Tr ViewMenu}">
         <!-- A menu item does not check itself when clicked: its command changes the setting, and the binding shows it. -->

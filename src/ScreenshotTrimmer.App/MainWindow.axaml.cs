@@ -208,6 +208,8 @@ public partial class MainWindow : Window, IPathPicker
             _viewModel.Zoom = Viewer.Zoom;
         else if (e.Property == ImageViewer.ShownCropProperty)
             _viewModel.ShownCrop = Viewer.ShownCrop;
+        else if (e.Property == ImageViewer.NudgedHandleProperty)
+            _viewModel.NudgedHandle = Viewer.NudgedHandle;
     }
 
     // The strip recycles its containers as it scrolls; remembering which entry each one shows tells an entry when it

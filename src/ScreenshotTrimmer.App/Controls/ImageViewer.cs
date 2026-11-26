@@ -42,6 +42,9 @@ public sealed class ImageViewer : Control
     public static readonly DirectProperty<ImageViewer, ImageRect?> ShownCropProperty =
         AvaloniaProperty.RegisterDirect<ImageViewer, ImageRect?>(nameof(ShownCrop), viewer => viewer.ShownCrop);
 
+    public static readonly DirectProperty<ImageViewer, CropHandle?> NudgedHandleProperty =
+        AvaloniaProperty.RegisterDirect<ImageViewer, CropHandle?>(nameof(NudgedHandle), viewer => viewer.NudgedHandle);
+
     /// <summary>The side of a crop handle's square, in device-independent units, at any zoom.</summary>
     private const double HandleSize = 8;
 
@@ -99,6 +102,7 @@ public sealed class ImageViewer : Control
     private CropHandle _editedHandle;
     private CropHandle _selected;
     private ImageRect? _shownCrop;
+    private CropHandle? _nudgedHandle;
     private bool _isSpaceHeld;
     private double _zoom;
     private double _horizontalScroll;
@@ -160,6 +164,16 @@ public sealed class ImageViewer : Control
     {
         get => _shownCrop;
         private set => SetAndRaise(ShownCropProperty, ref _shownCrop, value);
+    }
+
+    /// <summary>
+    /// The handle the arrow keys nudged to make the last <see cref="Crop"/> the viewer set, or <c>null</c> when a drag
+    /// made it. It is set just before <see cref="Crop"/>, so a run of nudges on the same handle can be one Step.
+    /// </summary>
+    public CropHandle? NudgedHandle
+    {
+        get => _nudgedHandle;
+        private set => SetAndRaise(NudgedHandleProperty, ref _nudgedHandle, value);
     }
 
     /// <summary>Physical screen pixels per image pixel; 0 when there is no image.</summary>
@@ -416,7 +430,7 @@ public sealed class ImageViewer : Control
         };
         if ((dx, dy) == (0, 0) || EditableCrop() is not { } crop)
             return;
-        SetCrop(crop.Nudge(_selected, dx, dy).Crop);
+        SetCrop(crop.Nudge(_selected, dx, dy).Crop, nudged: _selected);
         e.Handled = true;
     }
 
@@ -521,11 +535,17 @@ public sealed class ImageViewer : Control
             : start.Drag(_editHandle, from, to, viewport, Scaling);
     }
 
-    /// <summary>Sets <see cref="Crop"/> to <paramref name="crop"/> when it differs, as one change.</summary>
-    private void SetCrop(CropStep? crop)
+    /// <summary>
+    /// Sets <see cref="Crop"/> to <paramref name="crop"/> when it differs, as one change, made by nudging
+    /// <paramref name="nudged"/> when it is given.
+    /// </summary>
+    private void SetCrop(CropStep? crop, CropHandle? nudged = null)
     {
         if (crop != Crop)
+        {
+            NudgedHandle = nudged;
             SetCurrentValue(CropProperty, crop);
+        }
         ShowCurrentCrop();
     }
 

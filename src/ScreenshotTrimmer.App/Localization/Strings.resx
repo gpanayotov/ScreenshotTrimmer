@@ -51,6 +51,10 @@
   <data name="ManualRadiusInvalid" xml:space="preserve"><value>The corner radius must be a number of pixels from 0 to {0}, or empty for the measured radius.</value></data>
   <data name="CropSize" xml:space="preserve"><value>Crop: {0:N0} × {1:N0} px at {2:N0}, {3:N0}</value></data>
   <data name="ClearCrop" xml:space="preserve"><value>_Clear crop</value></data>
+  <data name="EditMenu" xml:space="preserve"><value>_Edit</value></data>
+  <data name="Undo" xml:space="preserve"><value>_Undo</value></data>
+  <data name="Redo" xml:space="preserve"><value>_Redo</value></data>
+  <data name="ResetSteps" xml:space="preserve"><value>Re_set</value></data>
   <data name="ThumbnailUnreadable" xml:space="preserve"><value>Cannot be read</value></data>
   <data name="ShowResults" xml:space="preserve"><value>Show _Results</value></data>
   <data name="HasResultBadge" xml:space="preserve"><value>Result</value></data>
