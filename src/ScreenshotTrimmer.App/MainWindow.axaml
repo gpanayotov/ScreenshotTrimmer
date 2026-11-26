@@ -14,6 +14,7 @@
   <Window.KeyBindings>
     <KeyBinding Gesture="Ctrl+O" Command="{Binding OpenFilesCommand}" />
     <KeyBinding Gesture="Ctrl+Shift+O" Command="{Binding OpenFolderCommand}" />
+    <KeyBinding Gesture="Ctrl+S" Command="{Binding SaveCommand}" />
     <!-- A key binding only sees a Delete that the focused control left unhandled, so text boxes keep theirs. -->
     <KeyBinding Gesture="Delete" Command="{Binding RemoveSelectedCommand}" />
   </Window.KeyBindings>
@@ -23,6 +24,8 @@
       <MenuItem Header="{loc:Tr FileMenu}">
         <MenuItem Header="{loc:Tr OpenFiles}" InputGesture="Ctrl+O" Command="{Binding OpenFilesCommand}" />
         <MenuItem Header="{loc:Tr OpenFolder}" InputGesture="Ctrl+Shift+O" Command="{Binding OpenFolderCommand}" />
+        <Separator />
+        <MenuItem Header="{loc:Tr SaveMenu}" InputGesture="Ctrl+S" Command="{Binding SaveCommand}" />
         <Separator />
         <MenuItem x:Name="SettingsItem" Header="{loc:Tr SettingsMenu}" InputGesture="Ctrl+OemComma" />
         <Separator />
@@ -150,6 +153,11 @@
                         ToolTip.Tip="{loc:Tr HasResultTip}">
                   <TextBlock Text="{loc:Tr HasResultBadge}" FontSize="11" Foreground="White" />
                 </Border>
+                <!-- The unsaved marker: this image has Steps its Result on disk does not show. -->
+                <Ellipse DockPanel.Dock="Left" IsVisible="{Binding HasUnsavedSteps}" Width="8" Height="8"
+                         Margin="0,0,6,0" VerticalAlignment="Center"
+                         Fill="{DynamicResource SystemControlForegroundAccentBrush}"
+                         ToolTip.Tip="{loc:Tr UnsavedTip}" />
                 <TextBlock Text="{Binding Name}" TextTrimming="CharacterEllipsis" TextAlignment="Center"
                            VerticalAlignment="Center" ToolTip.Tip="{Binding Name}" />
               </DockPanel>
@@ -162,7 +170,8 @@
 
       <Panel Grid.Column="2">
         <Grid ColumnDefinitions="*,Auto" RowDefinitions="*,Auto">
-          <controls:ImageViewer x:Name="Viewer" Source="{Binding Image}" BackgroundKind="{Binding Background}" />
+          <controls:ImageViewer x:Name="Viewer" Source="{Binding Image}" BackgroundKind="{Binding Background}"
+                                Crop="{Binding Crop, Mode=TwoWay}" />
           <ScrollBar Grid.Column="1" Orientation="Vertical" Visibility="Auto" AllowAutoHide="False"
                      Maximum="{Binding #Viewer.VerticalScrollMax}" ViewportSize="{Binding #Viewer.ViewHeight}"
                      LargeChange="{Binding #Viewer.ViewHeight}" SmallChange="48"
