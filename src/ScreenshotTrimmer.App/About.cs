@@ -29,7 +29,7 @@ public sealed record About(string Title, string Name, string Version, string Lic
     /// <summary>The About texts for <paramref name="version"/> in the language of <paramref name="culture"/>.</summary>
     public static About Describe(CultureInfo culture, string version)
     {
-        string Text(string key) => Strings.ResourceManager.GetString(key, culture) ?? $"!{key}!";
+        string Text(string key) => Localizer.Text(key, culture);
 
         return new About(
             string.Format(culture, Text("AboutTitle"), AppName),
