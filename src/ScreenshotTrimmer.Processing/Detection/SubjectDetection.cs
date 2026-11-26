@@ -22,21 +22,26 @@ public static class SubjectDetection
     public static Subject? Find(RgbaImage image, CancellationToken cancellation = default)
     {
         ArgumentNullException.ThrowIfNull(image);
-        var window = ChooseWindow(image, cancellation);
+        var edges = new EdgeMap(image, RectangleMethod.MinimumRun, cancellation);
+        var rectangles = RectangleMethod.FindRectangles(edges, cancellation);
+        var window = ChooseWindow(image, edges, rectangles, cancellation);
         if (window is not { } found || IsWholeImage(found, image))
             return null;
-        return new Subject(found);
+        return new Subject(found) { Popups = RectangleMethod.Popups(image, edges, rectangles, found) };
     }
 
     /// <summary>The pixels at each end of a side that may be lost to a rounded corner.</summary>
     private const int CornerMargin = RectangleMethod.CornerMargin;
 
-    private static PixelRect? ChooseWindow(RgbaImage image, CancellationToken cancellation)
+    private static PixelRect? ChooseWindow(
+        RgbaImage image, EdgeMap edges, IReadOnlyList<PixelRect> rectangles, CancellationToken cancellation)
     {
-        var edges = new EdgeMap(image, RectangleMethod.MinimumRun, cancellation);
-        var rectangles = RectangleMethod.FindRectangles(edges, cancellation);
         var windows = RectangleMethod.Windows(image, rectangles);
-        if (BrightnessMethod.FindWindow(image, cancellation) is not { } dialog
+        // The bright area can hold a popup attached to the dialog: of its rectangles, the dialog is the largest the
+        // rectangle method also found, as it does not find the popup's columns stretched over the dialog.
+        var bright = BrightnessMethod.FindWindows(image, cancellation);
+        var assembled = bright.Where(candidate => rectangles.Any(rectangle => RectangleMethod.Competes(rectangle, candidate)));
+        if (assembled.Concat(bright).FirstOrDefault() is not { IsEmpty: false } dialog
             || !IsDimmedDialog(dialog, image, edges, rectangles, windows))
             return windows.Count > 0 ? windows[0] : null;
         // A light window body under a dark title bar is bright too, with a wallpaper around it that is not: the window
