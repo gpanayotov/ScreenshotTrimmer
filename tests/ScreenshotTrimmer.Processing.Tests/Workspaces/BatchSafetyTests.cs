@@ -1,7 +1,8 @@
 using ScreenshotTrimmer.Processing.Imaging;
 using ScreenshotTrimmer.Processing.Rendering;
-using ScreenshotTrimmer.Processing.Settings;
 using ScreenshotTrimmer.Processing.Workspaces;
+
+using static ScreenshotTrimmer.Processing.Tests.Workspaces.BatchTesting;
 
 namespace ScreenshotTrimmer.Processing.Tests.Workspaces;
 
@@ -14,33 +15,14 @@ public class BatchSafetyTests
 {
     private static readonly TimeSpan Timeout = TimeSpan.FromSeconds(30);
 
-    private static readonly UserSettings Remembered = new()
-    {
-        FrameLines = true, RoundedCorners = false, ShadowOn = true, ShadowSize = 1.5, ShadowOpacity = 0.5,
-    };
-
     private static readonly Steps HandMade = new() { Crop = Crop.Classic(new PixelRect(10, 10, 50, 50)) };
-
-    /// <summary>A light dialog over a dimmed application page, as a modal dialog screenshot looks.</summary>
-    private static RgbaImage DimmedDialog(PixelRect dialog)
-    {
-        var image = Synthetic.DimmedApplication(800, 500);
-        Synthetic.DrawDialog(image, dialog, 8);
-        return image;
-    }
 
     /// <summary>Writes a dimmed dialog screenshot, each name with its dialog in a different place, for each of <paramref name="names"/>.</summary>
     private static void WriteDialogs(TempFolder folder, params string[] names)
     {
         for (var i = 0; i < names.Length; i++)
-            EncodedImages.WritePng(folder.File(names[i]), DimmedDialog(new PixelRect(60 + 30 * i, 40 + 15 * i, 300 + 10 * i, 220)));
+            EncodedImages.WritePng(folder.File(names[i]), Synthetic.DialogOverDimmedApplication(new PixelRect(60 + 30 * i, 40 + 15 * i, 300 + 10 * i, 220)));
     }
-
-    private static WorkspaceImage Entry(Workspace workspace, string name) =>
-        workspace.Images.Single(i => Path.GetFileName(i.Path) == name);
-
-    private static IEnumerable<string> Names(IEnumerable<WorkspaceImage> images) =>
-        images.Select(image => Path.GetFileName(image.Path)!);
 
     /// <summary>Each listed image's name with its Steps and whether no Subject was found in it.</summary>
     private static string[] Outcome(Workspace workspace) =>
@@ -80,7 +62,7 @@ public class BatchSafetyTests
         Assert.Equal(HandMade, workspace.Steps(Entry(workspace, "b.png")));
         Assert.NotEqual(Steps.None, workspace.Steps(Entry(workspace, "a.png")));
         Assert.Equal(1, summary.Processed);
-        Assert.Equal(1, summary.SkippedFor(BatchSkip.HasSteps));
+        Assert.Equal(1, summary.Skipped.HasSteps);
     }
 
     [Fact]
@@ -97,7 +79,7 @@ public class BatchSafetyTests
 
         Assert.Equal(["a.png"], Names(workspace.Images));
         Assert.Equal(1, summary.Processed);
-        Assert.Equal(1, summary.SkippedFor(BatchSkip.Gone));
+        Assert.Equal(1, summary.Skipped.Gone);
         Assert.Empty(summary.Failed);
     }
 
@@ -114,7 +96,7 @@ public class BatchSafetyTests
             new SynchronousProgress(p => { if (p.Done == 1) File.Delete(folder.File("b.png")); }), CancellationToken.None, 1);
 
         Assert.Equal(1, summary.Processed);
-        Assert.Equal(1, summary.SkippedFor(BatchSkip.Gone));
+        Assert.Equal(1, summary.Skipped.Gone);
         Assert.Empty(summary.Failed);
     }
 
@@ -186,7 +168,7 @@ public class BatchSafetyTests
 
         Assert.IsType<InvalidOperationException>(refusal);
         Assert.Equal(2, summary.Processed);
-        Assert.Equal(2, workspace.RunBatch(null, CancellationToken.None).SkippedFor(BatchSkip.HasSteps));
+        Assert.Equal(2, workspace.RunBatch(null, CancellationToken.None).Skipped.HasSteps);
     }
 
     [Fact]
@@ -226,6 +208,55 @@ public class BatchSafetyTests
         Assert.True(release.IsSet);
     }
 
+    [Fact]
+    public async Task Stopping_cancels_the_Batch_without_waiting_and_completes_once_it_has_stopped()
+    {
+        using var folder = new TempFolder();
+        WriteDialogs(folder, "a.png", "b.png", "c.png");
+        using var workspace = new Workspace(Remembered);
+        workspace.Open([folder.Path]);
+        using var release = new ManualResetEventSlim();
+        var batch = StartHeldAfterFirstImage(workspace, release);
+
+        var stopped = workspace.StopBatchAsync();
+
+        Assert.False(stopped.IsCompleted);
+        release.Set();
+        await stopped.WaitAsync(Timeout);
+        Assert.True(batch.IsCompleted);
+        var summary = await batch;
+        Assert.True(summary.Cancelled);
+        Assert.Equal(1, summary.Processed);
+        Assert.NotEqual(Steps.None, workspace.Steps(Entry(workspace, "a.png")));
+        Assert.Equal(Steps.None, workspace.Steps(Entry(workspace, "b.png")));
+    }
+
+    [Fact]
+    public void Stopping_with_no_Batch_running_is_already_done()
+    {
+        using var workspace = new Workspace(Remembered);
+
+        Assert.True(workspace.StopBatchAsync().IsCompletedSuccessfully);
+    }
+
+    /// <summary>
+    /// Starts a Batch, one image at a time, on another thread and returns once its first image is done. The Batch is
+    /// held in that image's progress report until <paramref name="release"/> is set.
+    /// </summary>
+    private static Task<BatchSummary> StartHeldAfterFirstImage(Workspace workspace, ManualResetEventSlim release)
+    {
+        var reached = new ManualResetEventSlim();
+        var batch = Task.Run(() => workspace.RunBatch(new SynchronousProgress(p =>
+        {
+            if (p.Done != 1)
+                return;
+            reached.Set();
+            Assert.True(release.Wait(Timeout));
+        }), CancellationToken.None, 1));
+        Assert.True(reached.Wait(Timeout));
+        return batch;
+    }
+
     /// <summary>
     /// Starts a Batch, one image at a time, on another thread and returns once its first image is done. The Batch is
     /// held in that image's progress report until the workspace is asked to stop it, so the stop arrives while it runs.
@@ -246,9 +277,4 @@ public class BatchSafetyTests
         return (batch, release);
     }
 
-    /// <summary>An <see cref="IProgress{T}"/> that reports on the Batch's own thread, before it goes on.</summary>
-    private sealed class SynchronousProgress(Action<BatchProgress> report) : IProgress<BatchProgress>
-    {
-        public void Report(BatchProgress value) => report(value);
-    }
 }

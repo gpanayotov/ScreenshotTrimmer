@@ -53,8 +53,8 @@ public sealed partial class MainWindowViewModel : Observable, IDisposable
         OpenFolderCommand = new RelayCommand(() => OpenPicked(() => picker.PickFolderAsync(_lastFolder)));
         _workspace.Changed += OnWorkspaceChanged;
         Localizer.Instance.PropertyChanged += OnLanguageChanged;
-        NextCommand = new RelayCommand(Next);
-        PreviousCommand = new RelayCommand(Previous);
+        NextCommand = new RelayCommand(NextInStrip);
+        PreviousCommand = new RelayCommand(PreviousInStrip);
         RemoveSelectedCommand = new RelayCommand(RemoveSelected);
         RemoveEntryCommand = new RelayCommand<StripEntry>(Remove);
         DismissNoticesCommand = new RelayCommand(DismissNotices);
@@ -271,9 +271,18 @@ public sealed partial class MainWindowViewModel : Observable, IDisposable
     /// </summary>
     public void ApplySettings(UserSettings settings)
     {
+        Remember(settings);
+        ShowFinishing(_workspace.Selected);
+    }
+
+    /// <summary>
+    /// Makes <paramref name="settings"/> current in the app and the workspace, so the next Batch uses them, and saves
+    /// them, reporting a settings file that cannot be written as a notice.
+    /// </summary>
+    private void Remember(UserSettings settings)
+    {
         var failure = _settings.Change(settings);
         _workspace.ApplySettings(settings);
-        ShowFinishing(_workspace.Selected);
         if (failure is not null)
             AddNotice("SettingsNotSaved", _settings.FilePath, failure);
     }

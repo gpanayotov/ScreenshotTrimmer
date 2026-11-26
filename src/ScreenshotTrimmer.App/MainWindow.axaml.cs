@@ -93,12 +93,12 @@ public partial class MainWindow : Window, IPathPicker, IQuestions
     }
 
     /// <summary>
-    /// Keeps the window open while it asks about unsaved work, then closes it once the user has discarded the work or
-    /// saved all of it.
+    /// Keeps the window open while a running Batch stops and while it asks about unsaved work, then closes it once the
+    /// user has discarded the work or saved all of it.
     /// </summary>
     private async void OnClosing(object? sender, WindowClosingEventArgs e)
     {
-        if (_mayClose || _viewModel is null || !_viewModel.HasUnsavedWork)
+        if (_mayClose || _viewModel is null || !_viewModel.MustConfirmLeaving)
             return;
         e.Cancel = true;
         try
@@ -145,8 +145,8 @@ public partial class MainWindow : Window, IPathPicker, IQuestions
     public Task<bool> AskToStartBatchAsync(BatchPlan plan) =>
         new QuestionWindow<bool>(
             Localizer.Instance["BatchStartTitle"],
-            Localizer.Instance.Format("BatchStartQuestion", plan.Images.Count, plan.SkippedFor(BatchSkip.HasSteps),
-                plan.SkippedFor(BatchSkip.AlreadyProcessed), plan.SkippedFor(BatchSkip.Result)),
+            Localizer.Instance.Format("BatchStartQuestion", plan.Images.Count, plan.Skipped.HasSteps,
+                plan.Skipped.AlreadyProcessed, plan.Skipped.Result),
             [
                 (Localizer.Instance["BatchStartAnswer"], true),
                 (Localizer.Instance["Cancel"], false),

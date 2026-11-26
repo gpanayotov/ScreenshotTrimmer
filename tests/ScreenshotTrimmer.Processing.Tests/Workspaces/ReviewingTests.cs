@@ -1,29 +1,17 @@
 using ScreenshotTrimmer.Processing.Detection;
 using ScreenshotTrimmer.Processing.Imaging;
 using ScreenshotTrimmer.Processing.Rendering;
-using ScreenshotTrimmer.Processing.Settings;
 using ScreenshotTrimmer.Processing.Workspaces;
+
+using static ScreenshotTrimmer.Processing.Tests.Workspaces.BatchTesting;
 
 namespace ScreenshotTrimmer.Processing.Tests.Workspaces;
 
 /// <summary>Reviewing a Batch's Results: the No Subject found markers and moving between the images still to review.</summary>
 public class ReviewingTests
 {
-    private static readonly UserSettings Remembered = new() { ShadowOn = true };
-
-    /// <summary>A light dialog over a dimmed application page, in which a Batch finds a Subject.</summary>
-    private static RgbaImage DimmedDialog()
-    {
-        var image = Synthetic.DimmedApplication(800, 500);
-        Synthetic.DrawDialog(image, new PixelRect(100, 80, 400, 250), 8);
-        return image;
-    }
-
     /// <summary>A dimmed page with nothing on it, in which a Batch finds no Subject.</summary>
     private static RgbaImage Featureless() => Synthetic.DimmedApplication(800, 500);
-
-    private static WorkspaceImage Entry(Workspace workspace, string name) =>
-        workspace.Images.Single(i => Path.GetFileName(i.Path) == name);
 
     [Fact]
     public void Giving_a_marked_image_Steps_clears_its_No_Subject_found_marker()
@@ -43,7 +31,7 @@ public class ReviewingTests
     public void A_second_Batch_processes_only_the_images_that_still_need_it_and_clears_the_markers_of_those_it_now_processes()
     {
         using var folder = new TempFolder();
-        EncodedImages.WritePng(folder.File("a-dialog.png"), DimmedDialog());
+        EncodedImages.WritePng(folder.File("a-dialog.png"), Synthetic.DialogOverDimmedApplication());
         EncodedImages.WritePng(folder.File("b-retaken.png"), Featureless());
         EncodedImages.WritePng(folder.File("c-blank.png"), Featureless());
         using var workspace = new Workspace(Remembered);
@@ -52,7 +40,7 @@ public class ReviewingTests
         var reviewed = new Steps { Crop = Crop.Classic(new PixelRect(20, 20, 300, 200)) };
         workspace.SetSteps(Entry(workspace, "a-dialog.png"), reviewed);
         // The miss is retaken with a dialog on it.
-        var retaken = DimmedDialog();
+        var retaken = Synthetic.DialogOverDimmedApplication();
         EncodedImages.WritePng(folder.File("b-retaken.png"), retaken);
 
         var summary = workspace.RunBatch(null, CancellationToken.None);
@@ -63,7 +51,7 @@ public class ReviewingTests
         Assert.True(Entry(workspace, "c-blank.png").NoSubjectFound);
         Assert.Equal(1, summary.Processed);
         Assert.Equal(["c-blank.png"], summary.NoSubjectFound.Select(i => Path.GetFileName(i.Path)));
-        Assert.Equal(1, summary.SkippedFor(BatchSkip.HasSteps));
+        Assert.Equal(1, summary.Skipped.HasSteps);
     }
 
     private static string? SelectedName(Workspace workspace) =>
@@ -75,7 +63,7 @@ public class ReviewingTests
         foreach (var name in new[] { "a.png", "c.png", "e.png" })
             EncodedImages.WritePng(folder.File(name), Featureless());
         foreach (var name in new[] { "b.png", "d.png" })
-            EncodedImages.WritePng(folder.File(name), DimmedDialog());
+            EncodedImages.WritePng(folder.File(name), Synthetic.DialogOverDimmedApplication());
         var workspace = new Workspace(Remembered);
         workspace.Open([folder.Path]);
         workspace.RunBatch(null, CancellationToken.None);
@@ -147,5 +135,26 @@ public class ReviewingTests
         Assert.False(workspace.HasBatchSteps(processed));
         workspace.Undo(processed);
         Assert.False(workspace.HasBatchSteps(processed));
+    }
+
+    [Fact]
+    public void Selecting_the_nearest_match_keeps_a_matching_selection_and_otherwise_prefers_the_next_one()
+    {
+        using var folder = new TempFolder();
+        using var workspace = AfterBatch(folder);
+
+        workspace.Select(Entry(workspace, "c.png"));
+        workspace.SelectNearest(image => image.NoSubjectFound);
+        Assert.Equal("c.png", SelectedName(workspace));
+
+        workspace.Select(Entry(workspace, "d.png"));
+        workspace.SelectNearest(image => image.NoSubjectFound);
+        Assert.Equal("e.png", SelectedName(workspace));
+
+        workspace.SelectNearest(image => image.HasUnsavedSteps);
+        Assert.Equal("d.png", SelectedName(workspace));
+
+        workspace.SelectNearest(_ => false);
+        Assert.Equal("d.png", SelectedName(workspace));
     }
 }

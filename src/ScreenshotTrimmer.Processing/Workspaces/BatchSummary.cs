@@ -15,12 +15,12 @@ public sealed record BatchSummary
     /// <summary>Whether the Batch was cancelled before it went through every image; the counts say what it did.</summary>
     public bool Cancelled { get; init; }
 
-    /// <summary>How many images were skipped for each reason; a reason no image was skipped for is missing.</summary>
-    public IReadOnlyDictionary<BatchSkip, int> Skipped { get; init; } = new Dictionary<BatchSkip, int>();
-
-    /// <summary>How many images were skipped for <paramref name="reason"/>.</summary>
-    public int SkippedFor(BatchSkip reason) => Skipped.GetValueOrDefault(reason);
+    /// <summary>How many images were skipped for each reason, at the start or while the Batch ran.</summary>
+    public BatchSkipCounts Skipped { get; init; }
 }
 
-/// <summary>How far a running <b>Batch</b> has got: <paramref name="Done"/> of the <paramref name="Total"/> listed images.</summary>
+/// <summary>
+/// How far a running <b>Batch</b> has got: <paramref name="Done"/> of the <paramref name="Total"/> images it processes,
+/// which leaves out the images its plan skips.
+/// </summary>
 public readonly record struct BatchProgress(int Done, int Total);

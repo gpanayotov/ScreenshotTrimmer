@@ -131,6 +131,23 @@ public class ApplySettingsTests
     }
 
     [Fact]
+    public void Applying_settings_that_change_only_the_finishing_lists_nothing_again_and_announces_nothing()
+    {
+        using var folder = new TempFolder();
+        Touch(folder, "shot.png", "shot-trimmed.png");
+        using var workspace = new Workspace(new UserSettings());
+        workspace.Open([folder.Path]);
+        var images = workspace.Images;
+        var changes = 0;
+        workspace.Changed += (_, _) => changes++;
+
+        workspace.ApplySettings(new UserSettings { FrameLines = false, ShadowOn = true, ShadowSize = 2 });
+
+        Assert.Equal(0, changes);
+        Assert.Same(images, workspace.Images);
+    }
+
+    [Fact]
     public void Settings_applied_before_opening_are_used_by_the_next_open()
     {
         using var folder = new TempFolder();

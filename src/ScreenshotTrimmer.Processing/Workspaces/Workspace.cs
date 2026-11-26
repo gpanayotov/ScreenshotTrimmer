@@ -120,17 +120,19 @@ public sealed partial class Workspace : IDisposable
     }
 
     /// <summary>
-    /// Lists the opened paths again with <paramref name="settings"/>' save mode and Result suffix, which decide which
-    /// files are Results. The selection stays where the selected file is still listed; otherwise it passes to the
-    /// entry now in its place.
+    /// Makes <paramref name="settings"/> the settings in use: saves and the next Batch use them. When their save mode or
+    /// suffixes changed, which decide which files are Results, the opened paths are listed again: the selection stays
+    /// where the selected file is still listed; otherwise it passes to the entry now in its place. A change of the
+    /// finishing alone lists nothing again and announces nothing.
     /// </summary>
     public void ApplySettings(UserSettings settings)
     {
         ArgumentNullException.ThrowIfNull(settings);
         Update(() =>
         {
+            var listingChanged = SaveOptionsFor(settings) != SaveOptionsFor(_settings);
             _settings = settings;
-            if (_openedPaths.Count == 0)
+            if (_openedPaths.Count == 0 || !listingChanged)
                 return;
             var selectedIndex = SelectedIndex;
             var selected = Selected;
@@ -180,17 +182,7 @@ public sealed partial class Workspace : IDisposable
     public void Next(Func<WorkspaceImage, bool> matching)
     {
         ArgumentNullException.ThrowIfNull(matching);
-        Update(() =>
-        {
-            for (var i = SelectedIndex + 1; i < Images.Count; i++)
-            {
-                if (matching(Images[i]))
-                {
-                    SelectAt(i);
-                    return;
-                }
-            }
-        });
+        Update(() => SelectFirst(After(SelectedIndex), matching));
     }
 
     /// <summary>
@@ -200,16 +192,21 @@ public sealed partial class Workspace : IDisposable
     public void Previous(Func<WorkspaceImage, bool> matching)
     {
         ArgumentNullException.ThrowIfNull(matching);
+        Update(() => SelectFirst(Before(SelectedIndex), matching));
+    }
+
+    /// <summary>
+    /// Keeps the selection when it is <paramref name="matching"/>; otherwise selects the next image that is, or the
+    /// previous one when none follows, as a filter showing only those images does. Does nothing when none is.
+    /// </summary>
+    public void SelectNearest(Func<WorkspaceImage, bool> matching)
+    {
+        ArgumentNullException.ThrowIfNull(matching);
         Update(() =>
         {
-            for (var i = SelectedIndex - 1; i >= 0; i--)
-            {
-                if (matching(Images[i]))
-                {
-                    SelectAt(i);
-                    return;
-                }
-            }
+            var selected = SelectedIndex;
+            // From the selection itself onwards, or from the start when nothing is selected.
+            SelectFirst(After(Math.Max(selected, 0) - 1).Concat(Before(selected)), matching);
         });
     }
 
@@ -422,6 +419,25 @@ public sealed partial class Workspace : IDisposable
         if (index < 0)
             throw new ArgumentException("The image is not listed in this workspace.", nameof(image));
         return index;
+    }
+
+    /// <summary>The indexes after <paramref name="index"/>, nearest first.</summary>
+    private IEnumerable<int> After(int index) => Enumerable.Range(index + 1, Math.Max(0, Images.Count - index - 1));
+
+    /// <summary>The indexes before <paramref name="index"/>, nearest first.</summary>
+    private IEnumerable<int> Before(int index) => Enumerable.Range(0, Math.Max(0, index)).Reverse();
+
+    /// <summary>Selects the image at the first of <paramref name="indexes"/> that is <paramref name="matching"/>, if any.</summary>
+    private void SelectFirst(IEnumerable<int> indexes, Func<WorkspaceImage, bool> matching)
+    {
+        foreach (var i in indexes)
+        {
+            if (matching(Images[i]))
+            {
+                SelectAt(i);
+                return;
+            }
+        }
     }
 
     /// <summary>Selects the image at <paramref name="index"/>; an index outside the list, or the selection itself, changes nothing.</summary>

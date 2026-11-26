@@ -10,6 +10,9 @@ public sealed partial class MainWindowViewModel
 {
     private bool _showOnlyNoSubjectFound;
     private bool _offersShowNoSubjectFound;
+
+    /// <summary>Whether the Result view shows only because a Batch image was selected, not by the user's choice.</summary>
+    private bool _showsResultForBatch;
     private ICommand? _nextNoSubjectFoundCommand;
     private ICommand? _previousNoSubjectFoundCommand;
     private ICommand? _nextUnsavedCommand;
@@ -53,13 +56,9 @@ public sealed partial class MainWindowViewModel
         {
             if (!Set(ref _showOnlyNoSubjectFound, value))
                 return;
-            // A selected image the filter hides gives way to the first one it shows.
-            if (value && _workspace.Selected is { NoSubjectFound: false } && _listedImages?.Any(image => image.NoSubjectFound) == true)
-            {
-                _workspace.Next(image => image.NoSubjectFound);
-                if (_workspace.Selected is { NoSubjectFound: false })
-                    _workspace.Previous(image => image.NoSubjectFound);
-            }
+            // A selected image the filter hides gives way to the nearest one it shows.
+            if (value)
+                _workspace.SelectNearest(image => image.NoSubjectFound);
             ShowInStrip(_listedImages ?? [], _workspace.Selected);
             Set(ref _selectedEntry, Entries.FirstOrDefault(entry => entry.Image.Key == _workspace.Selected?.Key),
                 nameof(SelectedEntry));
@@ -81,18 +80,27 @@ public sealed partial class MainWindowViewModel
         !ShowOnlyNoSubjectFound || image.NoSubjectFound || image.Key == selected?.Key;
 
     /// <summary>Selects the next image the strip shows.</summary>
-    private void Next() => _workspace.Next(image => InStrip(image, null));
+    private void NextInStrip() => _workspace.Next(image => InStrip(image, null));
 
     /// <summary>Selects the previous image the strip shows.</summary>
-    private void Previous() => _workspace.Previous(image => InStrip(image, null));
+    private void PreviousInStrip() => _workspace.Previous(image => InStrip(image, null));
 
     /// <summary>
     /// Shows <paramref name="image"/>, just selected, in the Result view when its Steps came from a Batch, so it can be
-    /// judged straight away.
+    /// judged straight away. The view is only borrowed: selecting an image without Batch Steps next goes back to the
+    /// Original, unless the user chose the view meanwhile (toggling it, or editing, which sets it as usual).
     /// </summary>
     private void ShowBatchResultOf(WorkspaceImage? image)
     {
+        var fromBatch = false;
         if (image is not null)
-            IfStillListed(image, listed => ShowsResult |= _workspace.HasBatchSteps(listed));
+            IfStillListed(image, listed => fromBatch = _workspace.HasBatchSteps(listed));
+        if (fromBatch && !ShowsResult)
+        {
+            ShowsResult = true;
+            _showsResultForBatch = true;
+        }
+        else if (!fromBatch && _showsResultForBatch)
+            ShowsResult = false;
     }
 }

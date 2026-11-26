@@ -125,6 +125,17 @@ internal static class Synthetic
         });
     }
 
+    /// <summary>
+    /// A light dialog filling <paramref name="dialog"/> (by default 400 by 250 at 100, 80) over an 800 by 500
+    /// <see cref="DimmedApplication"/>, as a modal dialog screenshot looks; Auto crop finds the dialog as its Subject.
+    /// </summary>
+    public static RgbaImage DialogOverDimmedApplication(PixelRect? dialog = null)
+    {
+        var image = DimmedApplication(800, 500);
+        DrawDialog(image, dialog ?? new PixelRect(100, 80, 400, 250), 8);
+        return image;
+    }
+
     /// <summary>The background of an undimmed light page.</summary>
     public static readonly Rgba LightPage = new(241, 242, 244, 255);
 

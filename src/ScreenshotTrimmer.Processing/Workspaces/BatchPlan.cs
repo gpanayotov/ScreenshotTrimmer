@@ -6,9 +6,6 @@ public sealed record BatchPlan
     /// <summary>The images the Batch would process, in strip order.</summary>
     public IReadOnlyList<WorkspaceImage> Images { get; init; } = [];
 
-    /// <summary>How many images would be skipped for each reason; a reason no image would be skipped for is missing.</summary>
-    public IReadOnlyDictionary<BatchSkip, int> Skipped { get; init; } = new Dictionary<BatchSkip, int>();
-
-    /// <summary>How many images would be skipped for <paramref name="reason"/>.</summary>
-    public int SkippedFor(BatchSkip reason) => Skipped.GetValueOrDefault(reason);
+    /// <summary>How many images would be skipped for each reason; none are <see cref="BatchSkip.Gone"/> yet.</summary>
+    public BatchSkipCounts Skipped { get; init; }
 }

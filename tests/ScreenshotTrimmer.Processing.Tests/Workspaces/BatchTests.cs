@@ -1,35 +1,20 @@
 using ScreenshotTrimmer.Processing.Detection;
 using ScreenshotTrimmer.Processing.Imaging;
 using ScreenshotTrimmer.Processing.Rendering;
-using ScreenshotTrimmer.Processing.Settings;
 using ScreenshotTrimmer.Processing.Workspaces;
+
+using static ScreenshotTrimmer.Processing.Tests.Workspaces.BatchTesting;
 
 namespace ScreenshotTrimmer.Processing.Tests.Workspaces;
 
 public class BatchTests
 {
-    private static readonly UserSettings Remembered = new()
-    {
-        FrameLines = true, RoundedCorners = false, ShadowOn = true, ShadowSize = 1.5, ShadowOpacity = 0.5,
-    };
-
-    /// <summary>A light dialog over a dimmed application page, as a modal dialog screenshot looks.</summary>
-    private static RgbaImage DimmedDialog(PixelRect dialog)
-    {
-        var image = Synthetic.DimmedApplication(800, 500);
-        Synthetic.DrawDialog(image, dialog, 8);
-        return image;
-    }
-
-    private static WorkspaceImage Entry(Workspace workspace, string name) =>
-        workspace.Images.Single(i => Path.GetFileName(i.Path) == name);
-
     [Fact]
     public void Each_dimmed_dialog_gets_one_unsaved_undoable_Step_with_the_found_crop_and_the_remembered_finishing()
     {
         using var folder = new TempFolder();
-        var first = DimmedDialog(new PixelRect(100, 80, 400, 250));
-        var second = DimmedDialog(new PixelRect(220, 60, 300, 320));
+        var first = Synthetic.DialogOverDimmedApplication();
+        var second = Synthetic.DialogOverDimmedApplication(new PixelRect(220, 60, 300, 320));
         EncodedImages.WritePng(folder.File("a.png"), first);
         EncodedImages.WritePng(folder.File("b.png"), second);
         using var workspace = new Workspace(Remembered);
@@ -54,6 +39,22 @@ public class BatchTests
     }
 
     [Fact]
+    public void A_Batch_uses_the_finishing_settings_applied_last()
+    {
+        using var folder = new TempFolder();
+        EncodedImages.WritePng(folder.File("a.png"), Synthetic.DialogOverDimmedApplication());
+        using var workspace = new Workspace(Remembered);
+        workspace.Open([folder.Path]);
+
+        workspace.ApplySettings(Remembered with { FrameLines = false, ShadowOn = false });
+        workspace.RunBatch(null, CancellationToken.None);
+
+        var steps = workspace.Steps(Entry(workspace, "a.png"));
+        Assert.False(steps.FrameLines);
+        Assert.Null(steps.Shadow);
+    }
+
+    [Fact]
     public void A_featureless_image_is_marked_No_Subject_found_and_gets_no_Steps()
     {
         using var folder = new TempFolder();
@@ -75,7 +76,7 @@ public class BatchTests
     public void Images_with_Steps_already_processed_images_and_Results_are_skipped_and_counted()
     {
         using var folder = new TempFolder();
-        var dialog = DimmedDialog(new PixelRect(100, 80, 400, 250));
+        var dialog = Synthetic.DialogOverDimmedApplication();
         EncodedImages.WritePng(folder.File("edited.png"), dialog);
         EncodedImages.WritePng(folder.File("fresh.png"), dialog);
         EncodedImages.WritePng(folder.File("fresh-trimmed.png"), dialog);
@@ -97,16 +98,16 @@ public class BatchTests
         Assert.DoesNotContain(workspace.Images, i => i.NoSubjectFound && Path.GetFileName(i.Path) != "blank.png");
         Assert.Equal(1, summary.Processed);
         Assert.Single(summary.NoSubjectFound);
-        Assert.Equal(1, summary.SkippedFor(BatchSkip.HasSteps));
-        Assert.Equal(1, summary.SkippedFor(BatchSkip.AlreadyProcessed));
-        Assert.Equal(1, summary.SkippedFor(BatchSkip.Result));
+        Assert.Equal(1, summary.Skipped.HasSteps);
+        Assert.Equal(1, summary.Skipped.AlreadyProcessed);
+        Assert.Equal(1, summary.Skipped.Result);
     }
 
     [Fact]
     public void A_Pasted_image_with_no_Steps_is_processed()
     {
         using var workspace = new Workspace(Remembered);
-        var original = DimmedDialog(new PixelRect(150, 100, 350, 200));
+        var original = Synthetic.DialogOverDimmedApplication(new PixelRect(150, 100, 350, 200));
         var pasted = workspace.Paste(original);
 
         var summary = workspace.RunBatch(null, CancellationToken.None);
@@ -116,10 +117,10 @@ public class BatchTests
     }
 
     [Fact]
-    public void Progress_is_reported_after_each_listed_image()
+    public void Progress_is_reported_after_each_image_the_Batch_processes()
     {
         using var folder = new TempFolder();
-        EncodedImages.WritePng(folder.File("a.png"), DimmedDialog(new PixelRect(100, 80, 400, 250)));
+        EncodedImages.WritePng(folder.File("a.png"), Synthetic.DialogOverDimmedApplication());
         EncodedImages.WritePng(folder.File("b.png"), Synthetic.DimmedApplication(800, 500));
         using var workspace = new Workspace(Remembered);
         workspace.Open([folder.Path]);
@@ -131,10 +132,32 @@ public class BatchTests
     }
 
     [Fact]
+    public void Progress_counts_only_the_images_the_Batch_processes_as_its_plan_does()
+    {
+        using var folder = new TempFolder();
+        var dialog = Synthetic.DialogOverDimmedApplication();
+        EncodedImages.WritePng(folder.File("a.png"), dialog);
+        EncodedImages.WritePng(folder.File("b-edited.png"), dialog);
+        EncodedImages.WritePng(folder.File("c.png"), Synthetic.DimmedApplication(800, 500));
+        EncodedImages.WritePng(folder.File("d-processed.png"),
+            Renderer.Render(dialog, new Steps { Crop = Crop.Classic(new PixelRect(100, 80, 400, 250)), Shadow = new Shadow() }).Result);
+        using var workspace = new Workspace(Remembered);
+        workspace.Open([folder.Path]);
+        workspace.SetSteps(Entry(workspace, "b-edited.png"), new Steps { Crop = Crop.Classic(new PixelRect(10, 10, 50, 50)) });
+        var planned = workspace.PlanBatch().Images.Count;
+        var reports = new List<BatchProgress>();
+
+        workspace.RunBatch(new SynchronousProgress(reports.Add), CancellationToken.None);
+
+        Assert.Equal(2, planned);
+        Assert.Equal([new BatchProgress(1, 2), new BatchProgress(2, 2)], reports);
+    }
+
+    [Fact]
     public void A_Batch_writes_nothing_to_disk()
     {
         using var folder = new TempFolder();
-        EncodedImages.WritePng(folder.File("a.png"), DimmedDialog(new PixelRect(100, 80, 400, 250)));
+        EncodedImages.WritePng(folder.File("a.png"), Synthetic.DialogOverDimmedApplication());
         EncodedImages.WritePng(folder.File("b.png"), Synthetic.DimmedApplication(800, 500));
         var before = Snapshot(folder);
         using var workspace = new Workspace(Remembered);
@@ -151,9 +174,4 @@ public class BatchTests
             .Select(name => $"{name} {Convert.ToHexString(System.Security.Cryptography.SHA256.HashData(File.ReadAllBytes(folder.File(name))))} {File.GetLastWriteTimeUtc(folder.File(name)):O}")
             .ToArray();
 
-    /// <summary>An <see cref="IProgress{T}"/> that reports on the calling thread, so the reports are in order when the run returns.</summary>
-    private sealed class SynchronousProgress(Action<BatchProgress> report) : IProgress<BatchProgress>
-    {
-        public void Report(BatchProgress value) => report(value);
-    }
 }
